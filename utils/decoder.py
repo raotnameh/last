@@ -1,10 +1,10 @@
 import torch.nn as nn
-from torch.nn.utils import weight_norm
 
 class Conv1d(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, dilation=1):
         super().__init__()
-        self.conv = weight_norm( 
+        self.conv = nn.Seqeuntial(
+                                nn.LayerNorm(in_channels), 
                                 nn.Conv1d( in_channels, out_channels, kernel_size, dilation=dilation, padding=((kernel_size - 1) * dilation) // 2 )
                             )  
 
@@ -16,12 +16,9 @@ class ConvBlock(nn.Module):
         super().__init__()
         self.net = nn.Sequential(
             Conv1d(channels, channels, kernel_size=kernel_size, dilation=1),
-            nn.ReLU(),
-            nn.Dropout(0.1),
-               
+            nn.GELU(),               
             Conv1d(channels, channels, kernel_size=kernel_size, dilation=4),
-            nn.ReLU(),
-            nn.Dropout(0.1),
+            nn.GELU(),
             
         )
 
@@ -54,10 +51,12 @@ class Decoder(nn.Module):
 class ConvTranspose1d(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, dilation=1):
         super().__init__()
-        self.conv = nn.ConvTranspose1d(
-            in_channels, out_channels, kernel_size, stride=stride, dilation=dilation, 
-            padding=((kernel_size - 1) * dilation) // 2, output_padding=stride - 1
-        )
+        self.conv = nn.Seqeuntial(
+                                nn.LayerNorm(in_channels), 
+                                nn.ConvTranspose1d(
+                                in_channels, out_channels, kernel_size, stride=stride, dilation=dilation, 
+                                padding=((kernel_size - 1) * dilation) // 2, output_padding=stride - 1),
+                            )
 
     def forward(self, x):
         return self.conv(x)
@@ -68,8 +67,7 @@ class Upsampling(nn.Module):
         super().__init__()
         self.upsampling = nn.Sequential(
             ConvTranspose1d(inp_dim, hidden_dim, kernel_size=3, stride=2),
-            nn.ReLU(),
-            nn.Dropout(0.1),
+            nn.GELU(),
         )
         
     def forward(self, x):

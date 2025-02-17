@@ -46,11 +46,6 @@ class Discriminator(nn.Module):
             kernel_size=kernel_size
         )
         
-        # mean pooling
-        
-        
-            
-        
         
     def forward(self, x):
         # Apply first conv layer and activation.

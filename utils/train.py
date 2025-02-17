@@ -23,7 +23,7 @@ writer = SummaryWriter(log_dir="logs")  # Specify the log directory
 # import models
 import dac
 from encoder import Encoder, Downsampling
-from vocab import FrozenVocabulary, get_closest_vocab, merge_similar_indices
+from utils.codebook import FrozenVocabulary, get_closest_vocab, merge_similar_indices
 from decoder import Upsampling, Decoder, calculate_params
 from codec import Codec
 
