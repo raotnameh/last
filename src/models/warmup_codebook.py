@@ -13,7 +13,7 @@ from dataset_txt import Dataset_txt
 data="/raid/home/rajivratn/hemant_rajivratn/last/data/transcription.txt"    
 dataset_txt = Dataset_txt(data=data)
 print(F"Vocab: {dataset_txt.vocab}")
-dataloader = DataLoader(dataset_txt, batch_size=256, shuffle=True, collate_fn=dataset_txt.collate_fn, pin_memory=True, num_workers=6, persistent_workers=True)
+dataloader = DataLoader(dataset_txt, batch_size=512, shuffle=False, collate_fn=dataset_txt.collate_fn, pin_memory=True, num_workers=6, persistent_workers=True)
 
 
 from codebook import Codebook
@@ -83,7 +83,7 @@ class CausalCNN(nn.Module):
 # Initialize the model
 hidden_dim = emb_dim
 
-num_layers = 10
+num_layers = 20
 kernel_size = 11
 vocab_size = len(dataset_txt.vocab)
 model = CausalCNN(hidden_dim, num_layers, kernel_size, vocab_size)
@@ -134,8 +134,8 @@ for epoch in range(num_epochs):
         
         # torch.cuda.empty_cache()
         running_loss += loss.item()
-        if iteration % 10 == 0:
-            print(f"Batch {iteration+1}/{len(dataloader)}, Loss: {loss.item():.4f}")
+        # if iteration % 10 == 0:
+        #     print(f"Batch {iteration+1}/{len(dataloader)}, Loss: {loss.item():.4f}")
 
 
     # print model predictions in char format and compare with ground truth
@@ -157,7 +157,6 @@ for epoch in range(num_epochs):
     print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {avg_loss:.4f}")
       
     torch.save(codebook, "codebook.pt")
-    torch.save(model, "model.pt")
     print("Models saved!")
 
 print("Training finished!")
