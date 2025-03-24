@@ -69,8 +69,28 @@ if __name__ == "__main__":
     data="/raid/home/rajivratn/hemant_rajivratn/last/data/transcription.txt"
     
     dataset = Dataset_txt(data=data)
+    print(F"Vocab: {dataset.vocab}")
     dataloader = DataLoader(dataset, batch_size=2, shuffle=True, collate_fn=dataset.collate_fn)
     
     for i, batch in enumerate(dataloader):
-        print(batch)
+        print(batch['inp'].shape, batch['out'].shape)
         break
+    
+    
+    # # Initialize embedding
+    # from models.codebook import Codebook
+    
+    # vocab_size = len(dataset.vocab)
+    # emb_dim = 128  # Change as needed
+    # codebook = Codebook(vocab_size, emb_dim)
+    # print(f"Size of codebook: {vocab_size} x {emb_dim}")
+    # print(codebook.get_embedding())
+    
+    # # Get a batch
+    # batch = next(iter(dataloader))
+    # inp = batch["inp"]  # (batch_size, seq_len)
+
+    # # Convert input indices to embeddings
+    # embeddings = codebook(inp)  # (batch_size, seq_len, emb_dim)
+
+    # print(embeddings.shape)  # Expected: (batch_size, seq_len, emb_dim)
