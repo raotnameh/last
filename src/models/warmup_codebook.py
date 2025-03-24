@@ -88,11 +88,11 @@ kernel_size = 11
 vocab_size = len(dataset_txt.vocab)
 model = CausalCNN(hidden_dim, num_layers, kernel_size, vocab_size)
 # print(model)
-print(f"Number of parameters: {sum(p.numel() for p in model.parameters()) / 1e6} M")
 
 
 criterion = nn.CrossEntropyLoss(ignore_index=dataset_txt.char_to_idx['p'])
-optimizer = optim.Adam(model.parameters(), lr=0.0005)
+optimizer = optim.Adam(list(model.parameters()) + list(codebook.parameters()), lr=0.0005)
+print(f"Number of parameters in millions for model and codebook: {sum(p.numel() for p in model.parameters()) / 1e6:.2f}, {sum(p.numel() for p in codebook.parameters()) / 1e6:.2f}")
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
