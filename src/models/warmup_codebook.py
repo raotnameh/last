@@ -160,6 +160,7 @@ for epoch in range(num_epochs):
     print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {avg_loss:.4f}, LR: {scheduler.get_last_lr()[0]:.6f}")
       
     torch.save(codebook, "codebook.pt")
+    torch.save(model, "model.pt")
     print("Model saved!")
 
 print("Training finished!")
