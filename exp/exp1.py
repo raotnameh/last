@@ -1,19 +1,32 @@
+
+# Dataloader: Done
 '''
-Finetuune the encoder, decoder, discriminator, and a interpretable vocab.
+Data used: train-clean 100 hour from LibriSpeech.
 
-The losses are:
-1. Reconstruction loss. This is the loss from the decoder.
-2. Discriminator loss. This is the loss from the discriminator.
-3. Commitment loss from VQ-VAE. It is the distance between the encoder output and the quantized output.
-4. Vocab diversity loss. This is the loss from the interpretable vocab.
-
-The training is done in the following way:
-1. The encoder is trained using the reconstruction loss and the commitment loss.
-2. The discriminator is trained using the discriminator loss.
-3. The interpretable vocab is trained using the vocab diversity loss and discriminator loss.
+1. The dataloader returns the unormalized waveform and the speaker id.
+2. The waveform is of shape (B, T) and the speaker id is of shape (B,1).
+'''
 
 
+# Model
+'''
+1. Encoder: Done
+(B, T) -> (B, D, T).
 
 
-Dataset-used is train-clean 100 hour from LibriSpeech.
+2. Downsampler: Done
+(B, D, T) -> (B, D, T/2).
+
+3. Codebook: 
+(B, D, T/2) -> (B, D, T/2).
+
+4. Discriminator: 
+(B, D, T/2) -> (B, 1).
+50% prob to repeat the real characters or not. This is done to match the distribution of the generated characters with the real characters.
+
+5. Upsampler: 
+(B, D, T/2) -> (B, D, T).
+
+6. Decoder: 
+(B, D, T) -> (B, D, T).
 '''

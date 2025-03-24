@@ -1,0 +1,32 @@
+# Ignore PyTorch model checkpoints
+*.pt
+
+# Ignore Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Ignore virtual environment
+venv/
+.env/
+
+# Ignore logs and temporary files
+*.log
+*.tmp
+.DS_Store
+
+# Ignore dataset and large files
+data/
+*.csv
+*.tsv
+*.json
+*.h5
+*.npz
+
+# Ignore VS Code settings
+.vscode/
+
