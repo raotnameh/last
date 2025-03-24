@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 import torch.optim as optim
 import Levenshtein as Lev
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
 
 import sys
@@ -85,6 +86,7 @@ hidden_dim = emb_dim
 
 num_layers = 20
 kernel_size = 11
+num_epochs = 100
 vocab_size = len(dataset_txt.vocab)
 model = CausalCNN(hidden_dim, num_layers, kernel_size, vocab_size)
 # print(model)
@@ -92,6 +94,8 @@ model = CausalCNN(hidden_dim, num_layers, kernel_size, vocab_size)
 
 criterion = nn.CrossEntropyLoss(ignore_index=dataset_txt.char_to_idx['p'])
 optimizer = optim.Adam(list(model.parameters()) + list(codebook.parameters()), lr=0.0005)
+scheduler = CosineAnnealingLR(optimizer, T_max=len(dataloader) * num_epochs, eta_min=1e-6)
+
 print(f"Number of parameters in millions for model and codebook: {sum(p.numel() for p in model.parameters()) / 1e6:.2f}, {sum(p.numel() for p in codebook.parameters()) / 1e6:.2f}")
 
 
@@ -103,7 +107,6 @@ criterion = criterion.to(device)
 
 
 # Training loop
-num_epochs = 100
 for epoch in range(num_epochs):
     model.train()  # Set the model to training mode
     codebook.train()
@@ -131,12 +134,12 @@ for epoch in range(num_epochs):
 
         # Update the parameters
         optimizer.step()
+        scheduler.step()
         
         # torch.cuda.empty_cache()
         running_loss += loss.item()
         # if iteration % 10 == 0:
         #     print(f"Batch {iteration+1}/{len(dataloader)}, Loss: {loss.item():.4f}")
-
 
     # print model predictions in char format and compare with ground truth
     with torch.no_grad():
@@ -154,9 +157,9 @@ for epoch in range(num_epochs):
         
         
     avg_loss = running_loss / len(dataloader)
-    print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {avg_loss:.4f}")
+    print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {avg_loss:.4f}, LR: {scheduler.get_last_lr()[0]:.6f}")
       
     torch.save(codebook, "codebook.pt")
-    print("Models saved!")
+    print("Model saved!")
 
 print("Training finished!")
