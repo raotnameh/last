@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import yaml
 
 import warnings
 warnings.simplefilter("ignore")
@@ -11,12 +12,22 @@ import torch.optim as optim
 import torchaudio
 from torch.utils.data import DataLoader
 
+# step 00 :- Prepare the Hyperparameters
+config = yaml.load( open("config/try1.yaml", "r"), Loader=yaml.FullLoader)
 
-from dataset import Dataset
+# step 01 :- Prepare the speech dataset.
+from dataset_speech import Dataset_speech
 # Get dataset
-dataset = Dataset(input_manifest="/raid/home/rajivratn/hemant_rajivratn/librispeech/data/manifest/train-clean-100.tsv", min_duration=32000, max_duration=250000)
+sdataset = Dataset_speech(input_manifest=config['dataset_speech']['path'], min_duration=32000, max_duration=250000)
+sdataloader = DataLoader(sdataset, batch_size=32, shuffle=False, num_workers=6, collate_fn=sdataset.collate_fn)
 
-dataloader = DataLoader(dataset, batch_size=32, shuffle=False, num_workers=6, collate_fn=dataset.collate_fn)
+
+
+
+
+
+exit()
+
 
 
 from models.encoder import Encoder, Downsample
