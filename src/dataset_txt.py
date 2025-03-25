@@ -2,16 +2,24 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 
+
 class Dataset_txt(Dataset):
     def __init__(self, data="/raid/home/rajivratn/hemant_rajivratn/last/data/transcription.txt"):
         super(Dataset_txt, self).__init__()
 
-        # reading dataset. 
-        with open(data, "r") as f:
-            out = f.readlines()
-        texts = [x.split("\t")[1].strip() for x in out]
-        texts = sorted(texts, key=len)
-        self.texts = [x for x in texts if len(x) > 10] # filtering out short texts that 2 second.
+        try: 
+            # reading dataset. 
+            with open(data, "r") as f:
+                out = f.readlines()
+            texts = [x.split("\t")[1].strip() for x in out]
+            texts = [x for x in texts if len(x) > 10 and len(x) < 500] # filtering out short texts that 2 second.
+        except:
+            with open(data, "r") as f:
+                out = f.readlines()
+            texts = [x.strip() for x in out if len(x) > 10 and len(x) < 500] # filtering out short texts that 2 second.
+            
+        self.texts = sorted(texts, key=len)
+         
         
         # creating the vocab.
         self.vocab = self.build_vocab(texts)
