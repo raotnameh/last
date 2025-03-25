@@ -1,0 +1,2 @@
+dataset_speech:
+  path: "/raid/home/rajivratn/hemant_rajivratn/librispeech/data/manifest/train-clean-100.tsv"
