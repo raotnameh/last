@@ -5,6 +5,7 @@ from torch.utils.data import Dataset, DataLoader
 import torch.optim as optim
 import Levenshtein as Lev
 from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.utils.data import DataLoader, SequentialSampler, BatchSampler
 
 
 import sys
@@ -12,9 +13,21 @@ sys.path.append("..")  # Add parent directory to path
 
 from dataset_txt import Dataset_txt
 data="/raid/home/rajivratn/hemant_rajivratn/last/data/transcription.txt"    
+data = "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech-lm-norm.txt"
 dataset_txt = Dataset_txt(data=data)
 print(F"Vocab: {dataset_txt.vocab}")
-dataloader = DataLoader(dataset_txt, batch_size=512, shuffle=False, collate_fn=dataset_txt.collate_fn, pin_memory=True, num_workers=6, persistent_workers=True)
+batch_size = 256
+sampler = SequentialSampler(dataset_txt)  # Keeps individual order
+batch_sampler = BatchSampler(sampler, batch_size=batch_size, drop_last=False)
+dataloader = DataLoader(
+    dataset_txt,
+    batch_sampler=batch_sampler,
+    collate_fn=dataset_txt.collate_fn,
+    pin_memory=True,
+    num_workers=6,
+    persistent_workers=True
+)
+# dataloader = DataLoader(dataset_txt, batch_size=128, shuffle=False, collate_fn=dataset_txt.collate_fn, pin_memory=True, num_workers=6, persistent_workers=True)
 
 
 from codebook import Codebook
@@ -63,10 +76,11 @@ class ResidualBlock(nn.Module):
 
 
 class CausalCNN(nn.Module):
-    def __init__(self, hidden_dim, num_layers, kernel_size, vocab_size):
+    def __init__(self, input_dim, hidden_dim, num_layers, kernel_size, vocab_size):
         super().__init__()
 
         layers = []
+        self.pre = nn.Conv1d(input_dim, hidden_dim, 1)  # Input layer
         
         # Hidden layers
         for _ in range(num_layers):
@@ -77,20 +91,24 @@ class CausalCNN(nn.Module):
 
     def forward(self, x):
         # x: (batch, time, channels)
+        x = self.pre(x.transpose(1, 2)).transpose(1, 2)  # Input layer
         x = self.model(x)
         x = self.proj(x.transpose(1, 2)).transpose(1, 2)  # Output layer
         return x
     
 # Initialize the model
-hidden_dim = emb_dim
+input_dim = emb_dim
+hidden_dim = 512
 
-num_layers = 20
+num_layers = 25
 kernel_size = 11
 num_epochs = 100
 vocab_size = len(dataset_txt.vocab)
-model = CausalCNN(hidden_dim, num_layers, kernel_size, vocab_size)
+model = CausalCNN(input_dim, hidden_dim, num_layers, kernel_size, vocab_size)
 # print(model)
 
+model = torch.compile(model)
+codebook = torch.compile(codebook)
 
 criterion = nn.CrossEntropyLoss(ignore_index=dataset_txt.char_to_idx['p'])
 optimizer = optim.Adam(list(model.parameters()) + list(codebook.parameters()), lr=0.0005)
@@ -138,29 +156,33 @@ for epoch in range(num_epochs):
         
         # torch.cuda.empty_cache()
         running_loss += loss.item()
-        # if iteration % 10 == 0:
-        #     print(f"Batch {iteration+1}/{len(dataloader)}, Loss: {loss.item():.4f}")
+        if iteration % 1000 == 0:
+            print(f"Batch {iteration+1}/{len(dataloader)}, Loss: {loss.item():.4f}")
 
-    # print model predictions in char format and compare with ground truth
-    with torch.no_grad():
-        pred = outputs.argmax(dim=-1).squeeze().cpu().numpy()[0,:]
-        gtruth = targets.squeeze().cpu().numpy()[0,:]
-        
-        def get_char(idx):
-            return dataset_txt.idx_to_char[int(idx)]
-        
-        gtruth = [get_char(idx) for idx in gtruth if get_char(idx) != "p"][:-1]
-        pred = [get_char(idx) for idx in pred][:len(gtruth)]
-        print(f"Ground truth: {''.join(gtruth)}")
-        print(f"Predictions: {''.join(pred)}")
-        print(f"Levenshtein distance (char) -- (lower is better): {Lev.distance(''.join(gtruth), ''.join(pred))}")
-        
+        if iteration % 10000 == 0:
+            # print model predictions in char format and compare with ground truth
+            with torch.no_grad():
+                pred = outputs.argmax(dim=-1).squeeze().cpu().numpy()[0,:]
+                gtruth = targets.squeeze().cpu().numpy()[0,:]
+                
+                def get_char(idx):
+                    return dataset_txt.idx_to_char[int(idx)]
+                
+                gtruth = [get_char(idx) for idx in gtruth if get_char(idx) != "p"][:-1]
+                pred = [get_char(idx) for idx in pred][:len(gtruth)]
+                print(f"Ground truth: {''.join(gtruth)}")
+                print(f"Predictions: {''.join(pred)}")
+                print(f"Levenshtein distance (char) -- (lower is better): {Lev.distance(''.join(gtruth), ''.join(pred))}")
+    
+                torch.save(codebook, "codebook.pt")
+                torch.save(model, "model.pt")
+                print("Model saved!")
+                
+                
         
     avg_loss = running_loss / len(dataloader)
     print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {avg_loss:.4f}, LR: {scheduler.get_last_lr()[0]:.6f}")
       
-    torch.save(codebook, "codebook.pt")
-    torch.save(model, "model.pt")
-    print("Model saved!")
+    
 
 print("Training finished!")
