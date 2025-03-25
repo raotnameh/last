@@ -1,7 +1,7 @@
+import random
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import Dataset, DataLoader
 import torch.optim as optim
 import Levenshtein as Lev
 from torch.optim.lr_scheduler import CosineAnnealingLR
@@ -17,22 +17,29 @@ data = "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech-lm-norm.txt"
 dataset_txt = Dataset_txt(data=data)
 print(F"Vocab: {dataset_txt.vocab}")
 batch_size = 256
-sampler = SequentialSampler(dataset_txt)  # Keeps individual order
-batch_sampler = BatchSampler(sampler, batch_size=batch_size, drop_last=False)
+class ShuffledBatchSampler(BatchSampler):
+    def __init__(self, sampler, batch_size, drop_last):
+        super().__init__(sampler, batch_size, drop_last)  
+
+    def __iter__(self):
+        batches = list(super().__iter__())  
+        random.shuffle(batches)  # Shuffle batch order
+        return iter(batches)
+sampler = SequentialSampler(dataset_txt)  # Keeps order within each batch
+batch_sampler = ShuffledBatchSampler(sampler, batch_size=batch_size, drop_last=False)
 dataloader = DataLoader(
     dataset_txt,
     batch_sampler=batch_sampler,
     collate_fn=dataset_txt.collate_fn,
     pin_memory=True,
     num_workers=6,
-    persistent_workers=True
 )
 # dataloader = DataLoader(dataset_txt, batch_size=128, shuffle=False, collate_fn=dataset_txt.collate_fn, pin_memory=True, num_workers=6, persistent_workers=True)
 
 
 from codebook import Codebook
 vocab_size = len(dataset_txt.vocab)
-emb_dim = 256  # Change as needed
+emb_dim = 768  # Change as needed
 codebook = Codebook(vocab_size, emb_dim)
 print(f"Size of codebook: {vocab_size} x {emb_dim}")
 
@@ -70,9 +77,18 @@ class ResidualBlock(nn.Module):
         self.conv = CausalConv1d(hidden_dim, hidden_dim, kernel_size)
         self.gelu = nn.GELU()
         self.dropout = nn.Dropout(0.1)
+        self.conv2 = CausalConv1d(hidden_dim, hidden_dim, kernel_size, dilation=2)
+        self.gelu2 = nn.GELU()
+        self.dropout2 = nn.Dropout(0.1)
+        self.conv3 = CausalConv1d(hidden_dim, hidden_dim, kernel_size, dilation=4)
+        self.gelu3 = nn.GELU()
+        self.dropout3 = nn.Dropout(0.1)
 
     def forward(self, x):
-        return x + self.dropout(self.gelu(self.conv(x)))  # Residual connection
+        d = self.dropout(self.gelu(self.conv(x)))
+        d = self.dropout2(self.gelu2(self.conv2(d)))
+        d = self.dropout3(self.gelu3(self.conv3(d)))
+        return x + d # Residual connection
 
 
 class CausalCNN(nn.Module):
@@ -80,35 +96,32 @@ class CausalCNN(nn.Module):
         super().__init__()
 
         layers = []
-        self.pre = nn.Conv1d(input_dim, hidden_dim, 1)  # Input layer
+        self.pre = CausalConv1d(input_dim, hidden_dim, 1)  # Input layer
         
         # Hidden layers
         for _ in range(num_layers):
             layers.append(ResidualBlock(hidden_dim, kernel_size))
     
         self.model = nn.Sequential(*layers)
-        self.proj = nn.Conv1d(hidden_dim, vocab_size, 1)  # Output layer
+        self.proj = CausalConv1d(hidden_dim, vocab_size, 1)  # Output layer
 
     def forward(self, x):
         # x: (batch, time, channels)
-        x = self.pre(x.transpose(1, 2)).transpose(1, 2)  # Input layer
+        x = self.pre(x)  # Input layer
         x = self.model(x)
-        x = self.proj(x.transpose(1, 2)).transpose(1, 2)  # Output layer
+        x = self.proj(x)  # Output layer
         return x
     
 # Initialize the model
 input_dim = emb_dim
-hidden_dim = 512
+hidden_dim = 768
 
-num_layers = 25
-kernel_size = 11
+num_layers = 5
+kernel_size = 7
 num_epochs = 100
 vocab_size = len(dataset_txt.vocab)
 model = CausalCNN(input_dim, hidden_dim, num_layers, kernel_size, vocab_size)
 # print(model)
-
-model = torch.compile(model)
-codebook = torch.compile(codebook)
 
 criterion = nn.CrossEntropyLoss(ignore_index=dataset_txt.char_to_idx['p'])
 optimizer = optim.Adam(list(model.parameters()) + list(codebook.parameters()), lr=0.0005)
@@ -117,10 +130,19 @@ scheduler = CosineAnnealingLR(optimizer, T_max=len(dataloader) * num_epochs, eta
 print(f"Number of parameters in millions for model and codebook: {sum(p.numel() for p in model.parameters()) / 1e6:.2f}, {sum(p.numel() for p in codebook.parameters()) / 1e6:.2f}")
 
 
+try: 
+    # Load the model
+    checkpoint = torch.load("checkpoint.pt")
+    model.load_state_dict(checkpoint["model"])
+    codebook.load_state_dict(checkpoint["codebook"])
+except:
+    print("No checkpoint found!")
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = model.to(device)
 codebook = codebook.to(device)
 criterion = criterion.to(device)
+
 
 
 
@@ -155,7 +177,7 @@ for epoch in range(num_epochs):
         scheduler.step()
         
         # torch.cuda.empty_cache()
-        running_loss += loss.item()
+        running_loss += loss.detach().item()
         if iteration % 1000 == 0:
             print(f"Batch {iteration+1}/{len(dataloader)}, Loss: {loss.item():.4f}")
 
@@ -174,9 +196,8 @@ for epoch in range(num_epochs):
                 print(f"Predictions: {''.join(pred)}")
                 print(f"Levenshtein distance (char) -- (lower is better): {Lev.distance(''.join(gtruth), ''.join(pred))}")
     
-                torch.save(codebook, "codebook.pt")
-                torch.save(model, "model.pt")
-                print("Model saved!")
+                torch.save({"model": model.state_dict(), "codebook": codebook.state_dict()}, "checkpoint.pt")
+                print("Models saved!")
                 
                 
         

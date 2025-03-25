@@ -49,6 +49,9 @@ class Discriminator(nn.Module):
             Conv1dBlock(hidden_dim, hidden_dim, kernel_size),
             nn.GELU(),
             nn.Dropout(0.1),
+            Conv1dBlock(hidden_dim, hidden_dim, kernel_size),
+            nn.GELU(),
+            nn.Dropout(0.1),
         ])
         
         self.proj = Conv1dBlock(hidden_dim, 1, kernel_size)
@@ -80,14 +83,15 @@ if __name__ == "__main__":
     # Test the Discriminator
     batch_size = 32
     seq_len = 1000
-    channels = 256
+    channels = 2048
     padding_mask = torch.zeros(batch_size, seq_len, dtype=torch.bool)
     padding_mask[:, -100:] = True
 
     x = torch.randn(batch_size, seq_len, channels)
     discriminator = Discriminator(in_channels=channels)
+    print(discriminator)
     # calculate the parameters
     num_params = sum(p.numel() for p in discriminator.parameters())
     print(f"Number of parameters: {num_params / 1e6}")
     out = discriminator(x, padding_mask)
-    print(out)  # (B,)
+    print(out.shape)  # (B,)

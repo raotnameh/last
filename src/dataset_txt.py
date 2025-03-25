@@ -19,7 +19,6 @@ class Dataset_txt(Dataset):
             texts = [x.strip() for x in out if len(x) > 10 and len(x) < 500] # filtering out short texts that 2 second.
             
         self.texts = sorted(texts, key=len)
-         
         
         # creating the vocab.
         self.vocab = self.build_vocab(texts)
@@ -30,18 +29,18 @@ class Dataset_txt(Dataset):
     def build_vocab(self, texts):
         """
         Creates a sorted list of unique characters with special tokens.
-        self.special_tokens = ["p", "b", "e", "?"]  # "p" = PAD, "b" = BOS, "e" = EOS, "?" = silence
+        special_tokens = ["p", "?"]  # "p" = PAD, "?" = silence
         """
         unique_chars = sorted(set("".join(texts)))
-        return ["p", "?"] + unique_chars + ["b", "e"]
+        return ["p"] + unique_chars + ["?"]
     
     def encode(self, text):
-        """Encodes text into a list of indices with BOS and EOS tokens."""
-        return [self.char_to_idx["b"]] + [self.char_to_idx[char] for char in text] + [self.char_to_idx["e"]]
+        """Encodes text into a list of indices."""
+        return [self.char_to_idx[char] for char in text]
 
     def decode(self, indices):
         """Decodes indices back into text, removing all special tokens."""
-        return "".join(self.idx_to_char[idx] for idx in indices if self.idx_to_char[idx] not in {"p", "b", "e", "?"})
+        return "".join(self.idx_to_char[idx] for idx in indices if self.idx_to_char[idx] not in {"p", "?"})
 
     def __len__(self):
         return len(self.texts)
@@ -85,20 +84,18 @@ if __name__ == "__main__":
         break
     
     
-    # # Initialize embedding
-    # from models.codebook import Codebook
+    # Initialize embedding
+    from models.codebook import Codebook
     
-    # vocab_size = len(dataset.vocab)
-    # emb_dim = 128  # Change as needed
-    # codebook = Codebook(vocab_size, emb_dim)
-    # print(f"Size of codebook: {vocab_size} x {emb_dim}")
-    # print(codebook.get_embedding())
+    vocab = dataset.vocab
+    codebook = Codebook(vocab)
+    print(f"Size of codebook: {codebook.embedding.weight.shape[0]} x {codebook.embedding.weight.shape[1]}")
     
-    # # Get a batch
-    # batch = next(iter(dataloader))
-    # inp = batch["inp"]  # (batch_size, seq_len)
+    # Get a batch
+    batch = next(iter(dataloader))
+    inp = batch["inp"]  # (batch_size, seq_len)
 
-    # # Convert input indices to embeddings
-    # embeddings = codebook(inp)  # (batch_size, seq_len, emb_dim)
+    # Convert input indices to embeddings
+    embeddings = codebook(inp)  # (batch_size, seq_len, emb_dim)
 
-    # print(embeddings.shape)  # Expected: (batch_size, seq_len, emb_dim)
+    print(embeddings.shape)  # Expected: (batch_size, seq_len, emb_dim)
