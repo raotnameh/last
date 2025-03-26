@@ -181,28 +181,35 @@ for epoch in range(num_steps):
         
         
         # ===== Discriminator Forward Pass =====
-        if iter % 2 == 0:
-            disc = True
-            pred_fake = discriminator(z_q, ~dpadding_masks) # discriminator fake output # step 6
-            output['pred_fake'] = pred_fake
+        # if iter % 2 == 0:
+        #     disc = True
+        #     pred_fake = discriminator(z_q, ~dpadding_masks) # discriminator fake output # step 6
+        #     print(pred_fake.shape)
+        #     output['pred_fake'] = pred_fake
             
-            try:
-                tbatch = next(titer_data)
-            except:
-                iter_data = iter(tdataloader)  # Reinitialize iterator
-                tbatch = next(titer_data)  # Fetch the first batch again
+        #     try:
+        #         tbatch = next(titer_data)
+        #     except:
+        #         iter_data = iter(tdataloader)  # Reinitialize iterator
+        #         tbatch = next(titer_data)  # Fetch the first batch again
             
-            text, mask = tbatch
-            text = text.to(device)
-            mask = mask.to(device)
-            text = codebook(text)
-            pred_real = discriminator(text, mask) # discriminator real output # step 6
-            output['pred_real'] = pred_real
+        #     text, mask = tbatch
+        #     text = text.to(device)
+        #     mask = mask.to(device)
+        #     text = codebook(text)
+        #     pred_real = discriminator(text, mask) # discriminator real output # step 6
+        #     output['pred_real'] = pred_real
 
         # ===== Loss Computation =====
-        total_loss = loss.step(output)
+        total_loss = loss.step(output, disc)
         
-        exit()
+        # ===== Backward Pass ===== 
+        optimizer_gen.zero_grad()
+        total_loss.backward()
+        optimizer_gen.step()
+        
+        print(total_loss.item())
+        
         
         
         # optimizer_gen.zero_grad()
