@@ -25,6 +25,11 @@ class Loss:
         smooth_loss = self.mse_loss(output["down_out"][:,:-1,:], output["down_out"][:,1:,:])
         smooth_loss *= self.config["smooth_loss_weight"]
         
+        # entropy loss
+        prob_dist = output['codebook_prob']
+        entropy_loss = -torch.sum(prob_dist * torch.log(prob_dist + 1e-8))  # Avoid log(0)
+        entropy_loss *= self.config["entropy_loss_weight"]
+        
         if disc: 
             real_loss = self.bce_loss(output['pred_real'], torch.ones_like(output['pred_real']))
             fake_loss = self.bce_loss(output['pred_fake'], torch.zeros_like(output['pred_fake']))
@@ -42,8 +47,8 @@ class Loss:
 
             loss_D = real_loss + fake_loss
 
-        print(f"rec_loss: {rec_loss}, commit_loss: {commit_loss}, smooth_loss: {smooth_loss}")
-        total_loss = rec_loss + commit_loss + smooth_loss
+        print(f"rec_loss: {rec_loss}, commit_loss: {commit_loss}, smooth_loss: {smooth_loss}, entropy_loss: {entropy_loss}")
+        total_loss = rec_loss + commit_loss + smooth_loss + entropy_loss
         
         return  total_loss
         

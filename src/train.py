@@ -4,6 +4,9 @@ import yaml
 
 import warnings
 warnings.simplefilter("ignore")
+import logging
+logging.getLogger('matplotlib').disabled = True
+
 
 import torch
 import torch.nn as nn
@@ -54,7 +57,7 @@ downsample = Downsample(input_dim=encoder.cfg['model']['encoder_embed_dim'], out
 
 # step 3 :- Prepare the quantizer
 from models.quantizer import Quantizer
-quantizer = Quantizer(codebook.embedding.weight.shape[1])
+quantizer = Quantizer(codebook.embedding.weight.shape[0])
 
 # step 4 :- Prepare the upsampler
 sys.path.append(f"{os.getcwd()}/models/decoder_utils")
@@ -178,7 +181,7 @@ for epoch in range(num_steps):
         output['down_out'] = down_out
         output['dpadding_masks'] = dpadding_masks
         
-        commitment_loss, z_q, encoding_indices = quantizer(down_out, codebook) # [B, T // 2, C], [B, T // 2, C], [B, T // 2] # step 3
+        commitment_loss, z_q, encoding_indices, codebook_prob = quantizer(down_out, codebook) # [B, T // 2, C], [B, T // 2, C], [B, T // 2] # step 3
         z_q = z_q[:,:dpadding_masks.shape[-1],:] # [B, T // 2, C]
         z_q = z_q * dpadding_masks.unsqueeze(-1).float() # [B, T // 2, C]
         encoding_indices = encoding_indices[:,:dpadding_masks.shape[-1]] # [B, T // 2]
@@ -186,6 +189,7 @@ for epoch in range(num_steps):
         output['commitment_loss'] = commitment_loss
         output['z_q'] = z_q
         output['encoding_indices'] = encoding_indices
+        output['codebook_prob'] = codebook_prob
         
         up_out = upsample(z_q)[:,:enc_out['padding_mask'].shape[1],:] # [B, T, C] # step 4
         up_out = up_out * enc_out['padding_mask'].float().unsqueeze(-1) # [B, T, C]       
