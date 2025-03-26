@@ -21,7 +21,7 @@ config = yaml.load( open("config/try1.yaml", "r"), Loader=yaml.FullLoader)
 # step 01 :- Prepare the speech dataset.
 from dataset_speech import Dataset_speech
 sdataset = Dataset_speech(input_manifest=config['dataset_speech']['path'], min_duration=32000, max_duration=320000)
-sdataloader = DataLoader(sdataset, batch_size=32, shuffle=False, num_workers=4, collate_fn=sdataset.collate_fn)
+sdataloader = DataLoader(sdataset, batch_size=32, shuffle=True, num_workers=4, collate_fn=sdataset.collate_fn)
 # Create an iterator from the dataloader
 siter_data = iter(sdataloader)
 
