@@ -1,5 +1,4 @@
 import torch
-import torch.nn as nn
 import fairseq
 from fairseq import checkpoint_utils
 
@@ -55,9 +54,10 @@ class Encoder(torch.nn.Module):
             "ret_conv": False,
         }
                       
-        x, padding_mask = self.model.extract_features(**w2v_args)
+        features, x, padding_mask = self.model.extract_features(**w2v_args)
 
         return {
+            "cnn_out": features,  # B x T x C
             "encoder_out": x,  # B x T x C 
             "padding_mask": padding_mask,  # B x T
         }

@@ -24,13 +24,6 @@ class Codebook(nn.Module):
 
     def forward(self, x): # x: (b,t) tensor
         return self.embedding(x) # (b,t,c)
-    
-    @torch.no_grad()
-    def get_embedding(self):
-        return self.embedding.weight.detach().clone()
-    
-    
-        
 
 
 if __name__ == "__main__":

@@ -22,9 +22,9 @@ class Quantizer(nn.Module):
             encoding_indices (torch.Tensor): Indices of the selected codebook vectors with shape (batch, seq_length).
         """
                 
-        e = codebook.weight.clone().detach() # (vocab_size, embed_dim)
+        e = codebook.embedding.weight.clone().detach() # (vocab_size, embed_dim)
         
-        z_flattened = z.view(-1, e.shape[1]) # (batch * time, channels)
+        z_flattened = z.contiguous().view(-1, e.shape[1]) # (batch * time, channels)
         
         
         # distances from z to codebooks e_j (z - e)^2 = z^2 + e^2 - 2 e * z
@@ -46,26 +46,6 @@ class Quantizer(nn.Module):
         return commitment_loss, z_q, min_encoding_indices.view(z.shape[0], z.shape[1]) # commitment_loss, z_q, encoding_indices
     
 
-    def merge_similar_indices(self, indices):
-        batch_size, seq = indices.shape
-        merged_indices = []
-
-        for b in range(batch_size):
-            unique_indices = []
-            prev_idx = None
-
-            for t in range(seq):
-                current_idx = indices[b, t].item()
-
-                if prev_idx is None or current_idx != prev_idx:
-                    unique_indices.append(current_idx)
-
-                prev_idx = current_idx
-
-            merged_indices.append(unique_indices)
-
-        return merged_indices
-    
 if __name__ == "__main__":
     codebook = nn.Embedding(5, 1)
     z = torch.randn(1, 2, 1)

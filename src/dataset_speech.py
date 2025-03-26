@@ -8,14 +8,8 @@ import torch.nn.functional as F
 
 class Dataset_speech(Dataset):
     def __init__(self, input_manifest, min_duration=0, max_duration=float("inf")):
-        super(Dataset, self).__init__()
-        # input_manifest = "h"
+        super().__init__()
 
-        # Define the duration range
-        # min_duration = 32000  # 2 seconds
-        # max_duration = 250000  # 15.625 seconds
-
-        # Dictionary to store filtered samples per speaker
         paths = []
         min_dur, max_dur, tot_dur = min_duration, max_duration, 0
         with open(input_manifest, "r") as infile:
@@ -33,7 +27,7 @@ class Dataset_speech(Dataset):
                     max_dur = max(max_dur, duration)
                     tot_dur += duration
                     
-        print(f"Duration range in seconds: {min_dur/16000:.2f} - {max_dur/16000:.2f} | Total duration in hours: {tot_dur/16000/3600:.2f}")
+        print(f"Speech dataset duration range in seconds: {min_dur/16000:.2f} - {max_dur/16000:.2f} | Total duration in hours: {tot_dur/16000/3600:.2f}")
         # Sort by duration
         paths.sort(key=lambda x: x[1])
         self.paths = paths
@@ -63,7 +57,7 @@ class Dataset_speech(Dataset):
                             ])
             
             waveforms.append(padded_waveform)
-            padding_masks.append(padding_mask)
+            padding_masks.append(padding_mask) # 1 for masked position and 0 for non-masked position
         
         return torch.stack(waveforms), torch.stack(padding_masks) # (bsz, seq_len) for waveforms and padding_masks
 
