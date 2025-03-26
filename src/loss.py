@@ -9,10 +9,7 @@ class Loss:
         self.mae_loss = nn.L1Loss() # decoder loss
         
     
-    def step(self, output):
-        
-        print("Loss step")
-        print(output.keys())
+    def step(self, output, disc=False):
         
         # reconstrunction loss :- decoder 
         rec_loss = self.mae_loss(output["dec_out"], output["gt"])
@@ -24,7 +21,12 @@ class Loss:
         # smoothness loss :- down_out shifted by 1
         smooth_loss = self.mse_loss(output["down_out"][:,:-1,:], output["down_out"][:,1:,:])
         
-        # 
+        if disc: 
+            pass
+        
+        total_loss = rec_loss + commit_loss + smooth_loss
+        
+        return  total_loss
         
     
         

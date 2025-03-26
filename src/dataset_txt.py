@@ -55,9 +55,7 @@ class Dataset_txt(Dataset):
         
     def collate_fn(self, batch):
         inp = [item for item in batch]
-
         pad_token_id = self.char_to_idx['p']
-        # Find max length in the batch
         max_length = max(len(seq) for seq in inp)
 
         # Pad sequences
@@ -65,8 +63,9 @@ class Dataset_txt(Dataset):
             return seq + [pad_token_id] * (max_length - len(seq))
 
         inp = torch.tensor([pad_sequence(seq, max_length) for seq in inp], dtype=torch.long)
+        mask = torch.tensor([[False] * len(seq) + [True] * (max_length - len(seq)) for seq in batch], dtype=torch.bool)
     
-        return inp
+        return inp, mask
         
         
 if __name__ == "__main__":
