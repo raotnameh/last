@@ -9,10 +9,11 @@ encoder:
   ckpt_path: "hubert_base_ls960.pt"
 
 downsample:
-  kernel_size: 9
+  kernel_size: 1
   stride: &stride_value 2
 
 upsample:
+  kernel_size: 1
   stride: *stride_value
 
 decoder:
@@ -30,6 +31,12 @@ train:
   lr: 0.0005
   lr_disc: 0.0005
   num_steps: 100000
+
+loss:
+  recon_loss_weight: 1.0
+  smooth_loss_weight: 10
+  commit_loss_weight: 10
+  disc_loss_weight: 1.0
 
 
 

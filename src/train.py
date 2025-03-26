@@ -59,7 +59,7 @@ quantizer = Quantizer(codebook.embedding.weight.shape[1])
 # step 4 :- Prepare the upsampler
 sys.path.append(f"{os.getcwd()}/models/decoder_utils")
 from models.decoder_utils.decoder import Upsample
-upsample = Upsample(codebook.embedding.weight.shape[1], output_dim=config["decoder"]["transformer"]["decoder_hidden"], stride=config['upsample']['stride'])
+upsample = Upsample(codebook.embedding.weight.shape[1], output_dim=config["decoder"]["transformer"]["decoder_hidden"], kernel_size=config['upsample']['kernel_size'], stride=config['upsample']['stride'])
 
 # step 5 :- Prepare the decoder
 from models.decoder_utils.decoder import Decoder
@@ -96,6 +96,23 @@ codebook.embedding.weight.requires_grad = False
 
 
 # ========================
+# Parameters count in millions
+print(f"Parameters in encoder: {sum(p.numel() for p in encoder.parameters()) / 1e6}M")
+print(f"Parameters in downsample: {sum(p.numel() for p in downsample.parameters()) / 1e6}M")
+print(f"Parameters in quantizer: {sum(p.numel() for p in quantizer.parameters()) / 1e6}M")
+print(f"Parameters in upsample: {sum(p.numel() for p in upsample.parameters()) / 1e6}M")
+print(f"Parameters in decoder: {sum(p.numel() for p in decoder.parameters()) / 1e6}M")
+print(f"Parameters in discriminator: {sum(p.numel() for p in discriminator.parameters()) / 1e6}M")
+print(f"Parameters in codebook: {sum(p.numel() for p in codebook.parameters()) / 1e6}M")
+
+
+
+
+
+
+
+
+# ========================
 # Optimizers and Hyperparameters
 # ========================
 lr_gen = config['train']['lr']
@@ -104,10 +121,13 @@ num_steps = config['train']['num_steps']
 
 # Group the generator parameters: encoder, downsample, quantizer, upsample, decoder.
 gen_params = list(downsample.parameters()) + list(upsample.parameters()) + list(decoder.parameters())
+print(f"Parameters in generator: {sum(p.numel() for p in gen_params) / 1e6}M")
+
+disc_params = list(discriminator.parameters())
+print(f"Parameters in discriminator: {sum(p.numel() for p in disc_params) / 1e6}M")
 
 optimizer_gen = optim.Adam(gen_params, lr=lr_gen)
-optimizer_disc = optim.Adam(discriminator.parameters(), lr=lr_disc)
-
+optimizer_disc = optim.Adam(disc_params, lr=lr_disc)
 
 # ========================
 # Losses
@@ -208,7 +228,7 @@ for epoch in range(num_steps):
         total_loss.backward()
         optimizer_gen.step()
         
-        print(total_loss.item())
+        # print(total_loss.item())
         
         
         
