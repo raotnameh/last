@@ -63,6 +63,8 @@ class Quantizer(nn.Module):
 
         # Compute histogram
         histogram = torch.bincount(flattened_indices, minlength=self.num_codebooks).float().cpu()
+        # Normalize to probabilities
+        histogram /= histogram.sum() + 1e-8  # Avoid division by zero
         
         self.codebook_usage += histogram
         
@@ -71,7 +73,6 @@ class Quantizer(nn.Module):
         plt.ylabel("Count")
         plt.title("Codebook Usage Histogram")
         plt.savefig("codebook_usage_histogram.png")
-        plt.show()
 
     
 
