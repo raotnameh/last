@@ -10,7 +10,7 @@ class Loss:
         self.bce_loss = nn.BCEWithLogitsLoss(reduction='none')  # Discriminator loss with masking
         
     
-    def step(self, output, disc=False):
+    def step(self, output, disc=False, epoch=None, iter=None, total_iter=None):
         
         # reconstrunction loss :- decoder 
         rec_loss = self.mae_loss(output["dec_out"], output["gt"])
@@ -47,7 +47,7 @@ class Loss:
 
             loss_D = real_loss + fake_loss
 
-        print(f"rec_loss: {rec_loss}, commit_loss: {commit_loss}, smooth_loss: {smooth_loss}, entropy_loss: {entropy_loss}")
+        print(f"epoch/iter/total: {epoch}/{iter}/{total_iter} rec_loss: {rec_loss}, commit_loss: {commit_loss}, smooth_loss: {smooth_loss}, entropy_loss: {entropy_loss}")
         total_loss = rec_loss + commit_loss + smooth_loss + entropy_loss
         
         return  total_loss

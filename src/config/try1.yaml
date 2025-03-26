@@ -34,9 +34,9 @@ train:
 
 loss:
   recon_loss_weight: 1.0
-  smooth_loss_weight: 0.1
+  smooth_loss_weight: 0.0
   commit_loss_weight: 10
-  entropy_loss_weight: 0.1
+  entropy_loss_weight: 1000
   disc_loss_weight: 1.0
 
 
