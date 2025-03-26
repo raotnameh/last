@@ -39,7 +39,9 @@ class Dataset_speech(Dataset):
         path, duration = self.paths[idx]
         waveform, sample_rate = sf.read(path)
         assert sample_rate == 16000, "Sampling rate must be 16000"
-        return torch.from_numpy(waveform).float(), duration # (seq_len), (duration)
+        
+        waveform = torch.from_numpy(waveform).float()
+        return waveform, duration # (seq_len), (duration)
     
     # collate function to pad the waveforms to the same length wrt the maximum duration
     def collate_fn(self, batches):
