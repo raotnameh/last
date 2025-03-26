@@ -18,9 +18,6 @@ class Loss:
         rec_loss = self.mae_loss(output["dec_out"], output["gt"])
         rec_loss += self.mae_loss(output["dec_out2"], output["gt"])
         
-        # quantization entropy loss
-        ent_loss = 
-        
         # commitment loss
         commit_loss = output["commitment_loss"]
         
