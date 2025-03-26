@@ -46,9 +46,9 @@ class Quantizer(nn.Module):
         z_q = z + (z_q - z).detach()
         
         min_encoding_indices = min_encoding_indices.view(z.shape[0], z.shape[1])
-        self.Codebook_usage(min_encoding_indices)
+        codebook_prob = self.Codebook_usage(min_encoding_indices)
         
-        return commitment_loss, z_q, min_encoding_indices # commitment_loss, z_q, encoding_indices
+        return commitment_loss, z_q, min_encoding_indices, codebook_prob # commitment_loss, z_q, encoding_indices, codebook_prob
     
     def Codebook_usage(self, encoding_indices):
         """
@@ -68,11 +68,17 @@ class Quantizer(nn.Module):
         
         self.codebook_usage += histogram
         
+        
+        plt.clf() 
         plt.bar(range(self.num_codebooks), histogram)
         plt.xlabel("Codebook Index")
         plt.ylabel("Count")
         plt.title("Codebook Usage Histogram")
         plt.savefig("codebook_usage_histogram.png")
+        plt.close()
+        
+        
+        return histogram
 
     
 

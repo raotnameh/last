@@ -36,7 +36,9 @@ loss:
   recon_loss_weight: 1.0
   smooth_loss_weight: 10
   commit_loss_weight: 10
+  entropy_loss_weight: 0.1
   disc_loss_weight: 1.0
+
 
 
 
