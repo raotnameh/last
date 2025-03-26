@@ -179,7 +179,6 @@ for epoch in range(num_steps):
         output['dec_out'] = dec_out
         output['dec_out2'] = dec_out2
         
-        exit()
         # ===== Loss Computation =====
         total_loss = loss.step(output)
         

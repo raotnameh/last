@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+import matplotlib.pyplot as plt
 
 class Quantizer(nn.Module):
     def __init__(self, num_codebooks):
@@ -61,7 +62,7 @@ class Quantizer(nn.Module):
         flattened_indices = encoding_indices.view(-1)  # Shape: (B*T,)
 
         # Compute histogram
-        histogram = torch.bincount(flattened_indices, minlength=self.num_codebooks).float()
+        histogram = torch.bincount(flattened_indices, minlength=self.num_codebooks).float().cpu()
         
         self.codebook_usage += histogram
         
