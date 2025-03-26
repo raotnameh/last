@@ -68,13 +68,9 @@ class Quantizer(nn.Module):
         histogram = torch.bincount(flattened_indices, minlength=self.num_codebooks).float()
         # Accumulate usage
         self.codebook_usage += histogram.cpu()
-
-        # Re-normalize after accumulation
-        self.codebook_usage /= self.codebook_usage.sum() + 1e-8  # Keep it as a probability distribution
-        
         
         plt.clf() 
-        plt.bar(range(self.num_codebooks), self.codebook_usage.cpu().numpy())
+        plt.bar(range(self.num_codebooks), histogram.cpu().numpy())
         plt.xlabel("Codebook Index")
         plt.ylabel("Count")
         plt.title("Codebook Usage Histogram")
@@ -86,7 +82,6 @@ class Quantizer(nn.Module):
 
         self.frame_count += 1  # Increment frame count
         
-        histogram /= histogram.sum() + 1e-8  # Normalize to a probability distribution
         return histogram
 
     
