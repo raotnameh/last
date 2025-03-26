@@ -7,6 +7,7 @@ class Loss:
         
         self.mse_loss = nn.MSELoss() # commitment loss, smoothness loss
         self.mae_loss = nn.L1Loss() # decoder loss
+        self.bce_loss = nn.BCEWithLogitsLoss(reduction='none')  # Discriminator loss with masking
         
     
     def step(self, output, disc=False):
@@ -22,7 +23,22 @@ class Loss:
         smooth_loss = self.mse_loss(output["down_out"][:,:-1,:], output["down_out"][:,1:,:])
         
         if disc: 
-            pass
+            real_loss = self.bce_loss(output['pred_real'], torch.ones_like(output['pred_real']))
+            fake_loss = self.bce_loss(output['pred_fake'], torch.zeros_like(output['pred_fake']))
+
+            # Apply masking if provided
+            if mask is not None:
+                real_loss = (real_loss * mask).sum() / mask.sum()
+            else:
+                real_loss = real_loss.mean()
+            
+            if dpadding_masks is not None:
+                fake_loss = (fake_loss * (~dpadding_masks)).sum() / (~dpadding_masks).sum()
+            else:
+                fake_loss = fake_loss.mean()
+
+            loss_D = real_loss + fake_loss
+
         
         total_loss = rec_loss + commit_loss + smooth_loss
         
