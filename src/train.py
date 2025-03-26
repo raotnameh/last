@@ -1,6 +1,6 @@
 import os, sys
 import numpy as np
-import yaml
+import yaml, random
 
 import warnings
 warnings.simplefilter("ignore")
@@ -13,8 +13,16 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim 
 import torchaudio
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, SequentialSampler, BatchSampler
 
+class ShuffledBatchSampler(BatchSampler):
+    def __init__(self, sampler, batch_size, drop_last):
+        super().__init__(sampler, batch_size, drop_last)  
+
+    def __iter__(self):
+        batches = list(super().__iter__())  
+        random.shuffle(batches)  # Shuffle batch order
+        return iter(batches)
 
 
 
@@ -24,15 +32,29 @@ config = yaml.load( open("config/try1.yaml", "r"), Loader=yaml.FullLoader)
 # step 01 :- Prepare the speech dataset.
 from dataset_speech import Dataset_speech
 sdataset = Dataset_speech(input_manifest=config['dataset_speech']['path'], min_duration=32000, max_duration=320000)
-sdataloader = DataLoader(sdataset, batch_size=32, shuffle=True, num_workers=4, collate_fn=sdataset.collate_fn)
-# Create an iterator from the dataloader
-siter_data = iter(sdataloader)
+ssampler = SequentialSampler(sdataset)
+sbatch_sampler = ShuffledBatchSampler(ssampler, batch_size=32, drop_last=False)
+sdataloader = DataLoader(
+    sdataset,
+    batch_sampler=sbatch_sampler,
+    collate_fn=sdataset.collate_fn,
+    pin_memory=True,
+    num_workers=6,
+)
 
 # step 02 :- Prepare the text dataset.
 from dataset_txt import Dataset_txt    
 tdataset = Dataset_txt(data=config['dataset_txt']['path'])
 vocab = tdataset.vocab
-tdataloader = DataLoader(tdataset, batch_size=32, shuffle=True, collate_fn=tdataset.collate_fn)
+tsampler = SequentialSampler(tdataset)
+tbatch_sampler = ShuffledBatchSampler(tsampler, batch_size=32, drop_last=False)
+tdataloader = DataLoader(
+    tdataset,
+    batch_sampler=tbatch_sampler,
+    collate_fn=tdataset.collate_fn,
+    pin_memory=True,
+    num_workers=6,
+)
 # Create an iterator from the dataloader
 titer_data = iter(tdataloader)
 
@@ -225,7 +247,7 @@ for epoch in range(num_steps):
         #     output['pred_real'] = pred_real
 
         # ===== Loss Computation =====
-        total_loss = loss.step(output, disc)
+        total_loss = loss.step(output, disc, epoch, iter, len(sdataloader))
         
         # ===== Backward Pass ===== 
         optimizer_gen.zero_grad()
