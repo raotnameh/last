@@ -4,9 +4,10 @@ import torch.nn.functional as F
 import numpy as np
 
 class Quantizer(nn.Module):
-    def __init__(self, beta=1.0):
+    def __init__(self, num_codebooks):
         super(Quantizer, self).__init__()
-        self.beta = beta
+        self.num_codebooks = num_codebooks
+        self.codebook_usage = torch.zeros(self.num_codebooks)
            
     def forward(self, z, codebook):
         """
@@ -40,10 +41,37 @@ class Quantizer(nn.Module):
         # get quantized latent vectors
         z_q = torch.matmul(min_encodings, e).view(z.shape)
         
-        commitment_loss = self.beta * F.mse_loss(z, z_q.detach())
+        commitment_loss = F.mse_loss(z, z_q.detach())
         z_q = z + (z_q - z).detach()
         
-        return commitment_loss, z_q, min_encoding_indices.view(z.shape[0], z.shape[1]) # commitment_loss, z_q, encoding_indices
+        min_encoding_indices = min_encoding_indices.view(z.shape[0], z.shape[1])
+        self.Codebook_usage(min_encoding_indices)
+        
+        return commitment_loss, z_q, min_encoding_indices # commitment_loss, z_q, encoding_indices
+    
+    def Codebook_usage(self, encoding_indices):
+        """
+        Computes the codebook usage as a histogram of codebook occurrences.
+        Args:
+            encoding_indices (Tensor): Tensor of shape (B, T) containing codebook indices.
+        Returns:
+            Tensor: Histogram of shape (num_codebooks,), representing the count of each codebook entry.
+        """
+        # Flatten indices across batch and time
+        flattened_indices = encoding_indices.view(-1)  # Shape: (B*T,)
+
+        # Compute histogram
+        histogram = torch.bincount(flattened_indices, minlength=self.num_codebooks).float()
+        
+        self.codebook_usage += histogram
+        
+        plt.bar(range(self.num_codebooks), histogram)
+        plt.xlabel("Codebook Index")
+        plt.ylabel("Count")
+        plt.title("Codebook Usage Histogram")
+        plt.savefig("codebook_usage_histogram.png")
+        plt.show()
+
     
 
 if __name__ == "__main__":
