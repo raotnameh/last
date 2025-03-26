@@ -3,10 +3,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 
 class Quantizer(nn.Module):
-    def __init__(self, num_codebooks):
+    def __init__(self, num_codebooks, save_dir="histogram_frames"):
         super(Quantizer, self).__init__()
+        self.frame_count = 0  
+        self.save_dir = save_dir
         self.num_codebooks = num_codebooks
         self.codebook_usage = torch.zeros(self.num_codebooks)
            
@@ -62,22 +65,28 @@ class Quantizer(nn.Module):
         flattened_indices = encoding_indices.view(-1)  # Shape: (B*T,)
 
         # Compute histogram
-        histogram = torch.bincount(flattened_indices, minlength=self.num_codebooks).float().cpu()
-        # Normalize to probabilities
-        histogram /= histogram.sum() + 1e-8  # Avoid division by zero
-        
-        self.codebook_usage += histogram
+        histogram = torch.bincount(flattened_indices, minlength=self.num_codebooks).float()
+        # Accumulate usage
+        self.codebook_usage += histogram.cpu()
+
+        # Re-normalize after accumulation
+        self.codebook_usage /= self.codebook_usage.sum() + 1e-8  # Keep it as a probability distribution
         
         
         plt.clf() 
-        plt.bar(range(self.num_codebooks), histogram)
+        plt.bar(range(self.num_codebooks), self.codebook_usage.cpu().numpy())
         plt.xlabel("Codebook Index")
         plt.ylabel("Count")
         plt.title("Codebook Usage Histogram")
-        plt.savefig("codebook_usage_histogram.png")
-        plt.close()
         
+        # filename = os.path.join(self.save_dir, f"frame_{self.frame_count:04d}.png")  # Saves as frame_0000.png, frame_0001.png, ...
+        filename = "codebook_usage_histogram.png"
+        plt.savefig(filename)
+        plt.close()  # Free memory
+
+        self.frame_count += 1  # Increment frame count
         
+        histogram /= histogram.sum() + 1e-8  # Normalize to a probability distribution
         return histogram
 
     
