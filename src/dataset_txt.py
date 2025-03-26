@@ -25,6 +25,9 @@ class Dataset_txt(Dataset):
         
         self.char_to_idx = {char: idx for idx, char in enumerate(self.vocab)} # char to index mapping
         self.idx_to_char = {idx: char for idx, char in enumerate(self.vocab)} # index to char mapping
+        print(F"Vocab: {self.vocab}")
+        print(F"-p- is for padding and -?- is for silence")
+        print(F"Vocab Size: {len(self.vocab)}")
         
     def build_vocab(self, texts):
         """
@@ -48,14 +51,10 @@ class Dataset_txt(Dataset):
     def __getitem__(self, idx):
         text = self.texts[idx]
         input_ids = self.encode(text)
-        return {
-            "inp": input_ids[:-1],  # Input sequence
-            "out": input_ids[1:]       # Target sequence (next char prediction)
-        }
+        return input_ids  # Input sequence
         
     def collate_fn(self, batch):
-        inp = [item["inp"] for item in batch]
-        out = [item["out"] for item in batch]
+        inp = [item for item in batch]
 
         pad_token_id = self.char_to_idx['p']
         # Find max length in the batch
@@ -66,9 +65,8 @@ class Dataset_txt(Dataset):
             return seq + [pad_token_id] * (max_length - len(seq))
 
         inp = torch.tensor([pad_sequence(seq, max_length) for seq in inp], dtype=torch.long)
-        out = torch.tensor([pad_sequence(seq, max_length) for seq in out], dtype=torch.long)
-
-        return {"inp": inp, "out": out}
+    
+        return inp
         
         
 if __name__ == "__main__":
@@ -80,7 +78,7 @@ if __name__ == "__main__":
     dataloader = DataLoader(dataset, batch_size=2, shuffle=True, collate_fn=dataset.collate_fn)
     
     for i, batch in enumerate(dataloader):
-        print(batch['inp'].shape, batch['out'].shape)
+        print(batch.shape)
         break
     
     
@@ -93,7 +91,7 @@ if __name__ == "__main__":
     
     # Get a batch
     batch = next(iter(dataloader))
-    inp = batch["inp"]  # (batch_size, seq_len)
+    inp = batch  # (batch_size, seq_len)
 
     # Convert input indices to embeddings
     embeddings = codebook(inp)  # (batch_size, seq_len, emb_dim)

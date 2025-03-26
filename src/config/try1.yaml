@@ -1,2 +1,48 @@
 dataset_speech:
   path: "/raid/home/rajivratn/hemant_rajivratn/librispeech/data/manifest/train-clean-100.tsv"
+
+dataset_txt:
+  path: "/raid/home/rajivratn/hemant_rajivratn/last/data/transcription.txt"
+  # path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech-lm-norm.txt"
+
+encoder:
+  ckpt_path: "hubert_base_ls960.pt"
+
+downsample:
+  kernel_size: 9
+  stride: &stride_value 2
+
+quantizer:
+  beta: 1.0
+
+upsample:
+  stride: *stride_value
+
+decoder:
+  transformer:
+    decoder_layer: 4
+    decoder_head: 2
+    decoder_hidden: 256
+    conv_filter_size: 2048
+    conv_kernel_size: [9, 1]
+    decoder_dropout: 0.2
+    dac_hidden: 1024
+  max_seq_len: 1000
+
+train: 
+  lr: 0.0005
+  lr_disc: 0.0005
+  num_steps: 100000
+
+
+
+# for i, (waveforms, padding_masks) in enumerate(sdataloader):
+#     enc_out = encoder(waveforms, padding_masks)
+#     down_out = downsample(enc_out['encoder_out'])
+#     commitment_loss, z_q, encoding_indices = quantizer(down_out, codebook)
+#     up_out = upsample(z_q)[:,:enc_out['encoder_out'].shape[1],:]
+#     dec_out, dec_out2, mask = decoder(up_out, padding_masks)
+    
+#     print(f"Waveform shape: {waveforms.shape} -> Encoder shape: {enc_out['encoder_out'].shape} -> Downsample shape: {down_out.shape} -> Commitment loss: {commitment_loss} -> Z_q shape: {z_q.shape} -> Encoding indices shape: {encoding_indices.shape} -> Upsample shape: {up_out.shape} decoder output shape: {dec_out.shape} -> decoder output2 shape: {dec_out2.shape} -> mask shape: {mask.shape}")
+   
+#     break
