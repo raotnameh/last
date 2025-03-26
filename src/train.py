@@ -43,8 +43,6 @@ print(f"Size of codebook: {codebook.embedding.weight.shape[0]} x {codebook.embed
 from models.gtruth import Gtruth
 gtruth = Gtruth()
 
-
-
 # step 1 :- Prepare the Encoder
 from models.encoder import Encoder
 encoder = Encoder(config['encoder']['ckpt_path'])
@@ -56,7 +54,7 @@ downsample = Downsample(input_dim=encoder.cfg['model']['encoder_embed_dim'], out
 
 # step 3 :- Prepare the quantizer
 from models.quantizer import Quantizer
-quantizer = Quantizer(config['quantizer']['beta'])
+quantizer = Quantizer(codebook.embedding.weight.shape[1])
 
 # step 4 :- Prepare the upsampler
 sys.path.append(f"{os.getcwd()}/models/decoder_utils")
@@ -162,9 +160,12 @@ for epoch in range(num_steps):
         commitment_loss, z_q, encoding_indices = quantizer(down_out, codebook) # [B, T // 2, C], [B, T // 2, C], [B, T // 2] # step 3
         z_q = z_q[:,:dpadding_masks.shape[-1],:] # [B, T // 2, C]
         z_q = z_q * dpadding_masks.unsqueeze(-1).float() # [B, T // 2, C]
+        encoding_indices = encoding_indices[:,:dpadding_masks.shape[-1]] # [B, T // 2]
+        encoding_indices = encoding_indices * dpadding_masks # [B, T // 2]
         output['commitment_loss'] = commitment_loss
         output['z_q'] = z_q
         output['encoding_indices'] = encoding_indices
+        print(output['encoding_indices'])
         
         up_out = upsample(z_q)[:,:enc_out['padding_mask'].shape[1],:] # [B, T, C] # step 4
         up_out = up_out * enc_out['padding_mask'].float().unsqueeze(-1) # [B, T, C]       
@@ -178,6 +179,7 @@ for epoch in range(num_steps):
         output['dec_out'] = dec_out
         output['dec_out2'] = dec_out2
         
+        exit()
         # ===== Loss Computation =====
         total_loss = loss.step(output)
         

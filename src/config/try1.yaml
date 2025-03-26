@@ -12,9 +12,6 @@ downsample:
   kernel_size: 9
   stride: &stride_value 2
 
-quantizer:
-  beta: 1.0
-
 upsample:
   stride: *stride_value
 
