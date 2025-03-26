@@ -68,8 +68,6 @@ class Discriminator(nn.Module):
                 x = layer(x)  # GELU & Dropout don't need padding_mask
         
         x = self.proj(x, padding_mask)
-
-        # Apply padding mask to final output
         x = x.masked_fill(padding_mask.unsqueeze(-1), 0)
         
         # Compute mean pooling over valid timesteps

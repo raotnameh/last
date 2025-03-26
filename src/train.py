@@ -127,7 +127,8 @@ for epoch in range(num_steps):
     decoder.train()
     discriminator.train()
     
-    for i, batch in enumerate(sdataloader):
+    for iter, batch in enumerate(sdataloader):
+        disc = False
         output = {}
         
         # ===== Data Preparation =====
@@ -165,7 +166,6 @@ for epoch in range(num_steps):
         output['commitment_loss'] = commitment_loss
         output['z_q'] = z_q
         output['encoding_indices'] = encoding_indices
-        print(output['encoding_indices'])
         
         up_out = upsample(z_q)[:,:enc_out['padding_mask'].shape[1],:] # [B, T, C] # step 4
         up_out = up_out * enc_out['padding_mask'].float().unsqueeze(-1) # [B, T, C]       
@@ -179,34 +179,38 @@ for epoch in range(num_steps):
         output['dec_out'] = dec_out
         output['dec_out2'] = dec_out2
         
+        
+        # ===== Discriminator Forward Pass =====
+        if iter % 2 == 0:
+            disc = True
+            pred_fake = discriminator(z_q, ~dpadding_masks) # discriminator fake output # step 6
+            output['pred_fake'] = pred_fake
+            
+            try:
+                tbatch = next(titer_data)
+            except:
+                iter_data = iter(tdataloader)  # Reinitialize iterator
+                tbatch = next(titer_data)  # Fetch the first batch again
+            
+            text, mask = tbatch
+            text = text.to(device)
+            mask = mask.to(device)
+            text = codebook(text)
+            pred_real = discriminator(text, mask) # discriminator real output # step 6
+            output['pred_real'] = pred_real
+
         # ===== Loss Computation =====
         total_loss = loss.step(output)
         
         exit()
         
-        # loss_gen = loss_Gen(dec_out, dec_out2, waveforms, mask, pred_fake, z_q, commitment_loss)
-        # ===== Loss Computation =====
-        # 1. Reconstruction loss (dec_out with dac latent and dac_out2 with dac latent)
-        # 2. Quantization loss (commitment loss)
-        # 3. Smoothness penalty (z_q)
-        # discriminator loss (pred_fake)
-        # Total generator loss: reconstruction + quantization + smoothness + discriminator.
         
         # optimizer_gen.zero_grad()
         # loss_gen.backward()
         # optimizer_gen.step()
         
         
-        # ===== Discriminator Forward Pass =====
-        try:
-            tbatch = next(titer_data)
-        except StopIteration:
-            iter_data = iter(tdataloader)  # Reinitialize iterator
-            tbatch = next(titer_data)  # Fetch the first batch again
         
-        pred_fake = discriminator(z_q) # discriminator fake output # step 6
-        
-
 
 
 
