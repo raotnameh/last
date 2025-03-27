@@ -121,8 +121,10 @@ class Loss:
         smooth_loss *= self.config["smooth_loss_weight"]
         
         # generator loss
-        gen_loss = F.binary_cross_entropy_with_logits(output["dis_fake"], torch.zeros_like(output["dis_fake"]))
-        gen_loss *= self.config["gen_loss_weight"]
+        gen_loss = 0.0
+        # gen_loss = F.binary_cross_entropy_with_logits(output["dis_fake"], torch.zeros_like(output["dis_fake"]))
+        # gen_loss *= self.config["gen_loss_weight"]
+        
         
         print(f"GEN-LOSS---step/total: {step}/{total_steps} rec_loss: {rec_loss}, commit_loss: {commit_loss}, smooth_loss: {smooth_loss}, gen_loss: {gen_loss}")
         total_loss = rec_loss + commit_loss + smooth_loss + gen_loss

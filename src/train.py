@@ -217,36 +217,36 @@ if __name__ == "__main__":
             
             
             # ===== Discriminator Forward Pass =====
-            pred_fake = discriminator(z_q, ~dmask.bool()) # discriminator fake output # step 6 # B 
-            output['dis_fake'] = pred_fake
+            # pred_fake = discriminator(z_q, ~dmask.bool()) # discriminator fake output # step 6 # B 
+            # output['dis_fake'] = pred_fake
 
-            if step % 2 == 0:
-                try:
-                    tbatch = next(titer_data)
-                except:
-                    iter_data = iter(tdataloader)  # Reinitialize iterator
-                    tbatch = next(titer_data)  # Fetch the first batch again
+            # if step % 2 == 0:
+            #     try:
+            #         tbatch = next(titer_data)
+            #     except:
+            #         iter_data = iter(tdataloader)  # Reinitialize iterator
+            #         tbatch = next(titer_data)  # Fetch the first batch again
                 
-                text, tmask = tbatch
-                text = text.to(device)
-                tmask = tmask.to(device)
-                text = codebook(text)
-                pred_real = discriminator(text, tmask.unsqueeze(-1)) # discriminator real output # step 6 # B
-                output['dis_real'] = pred_real
-                output['dis_real_x'] = text
-                output['tmask'] = tmask
+            #     text, tmask = tbatch
+            #     text = text.to(device)
+            #     tmask = tmask.to(device)
+            #     text = codebook(text)
+            #     pred_real = discriminator(text, tmask.unsqueeze(-1)) # discriminator real output # step 6 # B
+            #     output['dis_real'] = pred_real
+            #     output['dis_real_x'] = text
+            #     output['tmask'] = tmask
                 
-                # ===== Loss Computation =====
-                loss.gan_loss.discriminator = discriminator
-                total_loss = loss.step_disc(output, step, num_steps)
-                # ===== Backward Pass ===== 
-                optimizer_disc.zero_grad()
-                total_loss.backward()
-                torch.nn.utils.clip_grad_norm_(disc_params, max_norm=5.0)
-                optimizer_disc.step()
+            #     # ===== Loss Computation =====
+            #     loss.gan_loss.discriminator = discriminator
+            #     total_loss = loss.step_disc(output, step, num_steps)
+            #     # ===== Backward Pass ===== 
+            #     optimizer_disc.zero_grad()
+            #     total_loss.backward()
+            #     torch.nn.utils.clip_grad_norm_(disc_params, max_norm=5.0)
+            #     optimizer_disc.step()
                 
-                step += 1
-                continue
+            #     step += 1
+            #     continue
                  
             # ===== Generator Forward Pass Continued =====
             up_out = upsample(z_q) # [B, T, C] # step 4
