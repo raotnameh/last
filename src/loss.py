@@ -64,28 +64,14 @@ class GANLoss(nn.Module):
         b_size = min(real_data.size(0), fake_data.size(0))
         t_size = min(real_data.size(1), fake_data.size(1))
 
-        if self.cfg.probabilistic_grad_penalty_slicing:
-            def get_slice(data, dim, target_size):
-                size = data.size(dim)
-                diff = size - target_size
-                if diff <= 0:
-                    return data
-                start = np.random.randint(0, diff + 1)
-                return data.narrow(dim=dim, start=start, length=target_size)
-
-            real_data = get_slice(real_data, 0, b_size)
-            real_data = get_slice(real_data, 1, t_size)
-            fake_data = get_slice(fake_data, 0, b_size)
-            fake_data = get_slice(fake_data, 1, t_size)
-        else:
-            real_data = real_data[:b_size, :t_size]
-            fake_data = fake_data[:b_size, :t_size]
+        real_data = real_data[:b_size, :t_size]
+        fake_data = fake_data[:b_size, :t_size]
 
         alpha = torch.rand(real_data.size(0), 1, 1, device=real_data.device)
         alpha = alpha.expand(real_data.size())
         interpolates = alpha * real_data + (1 - alpha) * fake_data
-
-        disc_interpolates = self.discriminator(interpolates, None)
+  
+        disc_interpolates = self.discriminator(interpolates, torch.zeros_like(interpolates).bool()[:,:,:1])
 
         gradients = autograd.grad(
             outputs=disc_interpolates,
@@ -115,7 +101,7 @@ class Loss:
         
         loss = self.gan_loss(output["dis_fake"], output["dis_real"], output["z_q"], output["dis_real_x"])
         
-        print(f"step/total: {step}/{total_steps} real_loss: {loss['loss_real']}, fake_loss: {loss['loss_fake']}, gp_loss: {loss['grad_pen']}, total_loss: {loss['total_loss']}")
+        print(f"DISC-LOSS---step/total: {step}/{total_steps} real_loss: {loss['loss_real']}, fake_loss: {loss['loss_fake']}, gp_loss: {loss['grad_pen']}, total_loss: {loss['total_loss']}")
         
         return loss["total_loss"]
         
@@ -138,7 +124,7 @@ class Loss:
         gen_loss = F.binary_cross_entropy_with_logits(output["dis_fake"], torch.zeros_like(output["dis_fake"]))
         gen_loss *= self.config["gen_loss_weight"]
         
-        print(f"step/total: {step}/{total_steps} rec_loss: {rec_loss}, commit_loss: {commit_loss}, smooth_loss: {smooth_loss}, gen_loss: {gen_loss}")
+        print(f"GEN-LOSS---step/total: {step}/{total_steps} rec_loss: {rec_loss}, commit_loss: {commit_loss}, smooth_loss: {smooth_loss}, gen_loss: {gen_loss}")
         total_loss = rec_loss + commit_loss + smooth_loss + gen_loss
         
         return  total_loss
