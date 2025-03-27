@@ -112,3 +112,5 @@ if __name__ == "__main__":
     print(f"Encoding indices: {z_q}")
     print(f"Encoding indices: {encoding_indices}")
     
+    
+    

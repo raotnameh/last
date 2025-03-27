@@ -18,7 +18,7 @@ upsample:
 
 decoder:
   speaker:
-    use_s : False
+    use_s : True
     speaker_emb_dim: 512
   transformer:
     decoder_layer: 4
@@ -44,6 +44,10 @@ loss:
   recon_loss_weight: 1.0
   smooth_loss_weight: 0.01
   commit_loss_weight: 0.01
+  gen_loss_weight: 1.0
+  
   disc_loss_weight: 1.0
+  gp_weight: 1.0
+
 
 
