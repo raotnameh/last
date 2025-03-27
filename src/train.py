@@ -252,6 +252,7 @@ if __name__ == "__main__":
             up_out = upsample(z_q) # [B, T, C] # step 4
             up_out = up_out[:,:mask.shape[1],:] * mask # [B, T, C]       
             output['up_out'] = up_out 
+
             
             dec_out, dec_out2, dec_mask = decoder(up_out, padding_masks, output['cnn_out'], config['decoder']["speaker"]["use_s"]) # [B, T, C], [B, T, C], [B, T] # step 5
             dec_out = dec_out[:,:dec_mask.shape[1],:] * dec_mask
