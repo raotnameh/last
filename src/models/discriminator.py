@@ -21,7 +21,7 @@ class Conv1dBlock(nn.Module):
     def forward(self, x, padding_mask=None):
         # x is expected to be of shape (batch, time, channels)
         if padding_mask is not None:
-            x = x.masked_fill(padding_mask.unsqueeze(-1), 0)
+            x = x.masked_fill(padding_mask, 0)
         
         x = self.layernorm(x)
         
@@ -37,21 +37,21 @@ class Discriminator(nn.Module):
         super().__init__()
         
         self.disc_layers = nn.ModuleList([
-            Conv1dBlock(in_channels, hidden_dim, kernel_size),
+            Conv1dBlock(in_channels, hidden_dim, 1),
             nn.GELU(),
             nn.Dropout(0.1),
             Conv1dBlock(hidden_dim, hidden_dim, kernel_size),
             nn.GELU(),
             nn.Dropout(0.1),
-            Conv1dBlock(hidden_dim, hidden_dim, kernel_size),
-            nn.GELU(),
-            nn.Dropout(0.1),
-            Conv1dBlock(hidden_dim, hidden_dim, kernel_size),
-            nn.GELU(),
-            nn.Dropout(0.1),
-            Conv1dBlock(hidden_dim, hidden_dim, kernel_size),
-            nn.GELU(),
-            nn.Dropout(0.1),
+            # Conv1dBlock(hidden_dim, hidden_dim, kernel_size),
+            # nn.GELU(),
+            # nn.Dropout(0.1),
+            # Conv1dBlock(hidden_dim, hidden_dim, kernel_size),
+            # nn.GELU(),
+            # nn.Dropout(0.1),
+            # Conv1dBlock(hidden_dim, hidden_dim, kernel_size),
+            # nn.GELU(),
+            # nn.Dropout(0.1),
         ])
         
         self.proj = Conv1dBlock(hidden_dim, 1, kernel_size)
@@ -59,18 +59,17 @@ class Discriminator(nn.Module):
     def forward(self, x, padding_mask=None):
         """
         x: (batch, time, channels)
-        padding_mask: (batch, time) where True indicates a padded timestep.
+        padding_mask: (batch, time, 1) where True indicates a padded timestep.
         """
         for layer in self.disc_layers:
             if isinstance(layer, Conv1dBlock):
                 x = layer(x, padding_mask)  # Pass padding_mask only to Conv1dBlock
             else:
                 x = layer(x)  # GELU & Dropout don't need padding_mask
-        
-        x = x.masked_fill(padding_mask.unsqueeze(-1), 0)
+        x = x.masked_fill(padding_mask, 0)
         
         # Compute mean pooling over valid timesteps
-        valid_counts = (~padding_mask).sum(dim=1).unsqueeze(1).clamp(min=1).float()
+        valid_counts = (~padding_mask).sum(dim=1).clamp(min=1).float()
         x_mean = x.sum(dim=1) / valid_counts  # (batch, channels)
         x_mean = x_mean.unsqueeze(1) # (batch, 1, channels)
         
