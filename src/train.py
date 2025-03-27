@@ -68,6 +68,7 @@ print(f"Size of codebook: {codebook.embedding.weight.shape[0]} x {codebook.embed
 from models.gtruth import Gtruth
 gtruth = Gtruth()
 
+
 # step 1 :- Prepare the Encoder
 from models.encoder import Encoder
 encoder = Encoder(config['encoder']['ckpt_path'])
@@ -77,9 +78,9 @@ encoder = Encoder(config['encoder']['ckpt_path'])
 from models.encoder import Downsample
 downsample = Downsample(input_dim=encoder.cfg['model']['encoder_embed_dim'], output_dim=codebook.embedding.weight.shape[1], kernel_size=config['downsample']['kernel_size'], stride=config['downsample']['stride'])
 
-# step 3 :- Prepare the quantizer
-from models.quantizer import Quantizer
-quantizer = Quantizer(codebook.embedding.weight.shape[0])
+# step 3 :- Prepare the tokenizer
+from models.tokenizer import Tokenizer
+tokenizer = Tokenizer(codebook.embedding.weight.shape[0])
 
 # step 4 :- Prepare the upsampler
 sys.path.append(f"{os.getcwd()}/models/decoder_utils")
@@ -92,7 +93,7 @@ decoder = Decoder(config['decoder'])
 
 # step 6 :- Prepare the discriminator
 from models.discriminator import Discriminator
-discriminator = Discriminator(codebook.embedding.weight.shape[1])
+discriminator = Discriminator(codebook.embedding.weight.shape[1], config['discriminator']['hidden_dim'], config['discriminator']['kernel_size'])
 
 
 
@@ -104,32 +105,36 @@ discriminator = Discriminator(codebook.embedding.weight.shape[1])
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Move models to device
-gtruth = gtruth.to(device)
+codebook = codebook.to(device)
+gtruth = gtruth.to(device) # Always non trainable
 encoder = encoder.to(device)
 downsample = downsample.to(device)
-quantizer = quantizer.to(device)
+tokenizer = tokenizer.to(device)
 upsample = upsample.to(device)
 decoder = decoder.to(device)
 discriminator = discriminator.to(device)
 
-codebook = codebook.to(device)
-# Freeze codebook embeddings (assuming they should remain fixed)
+# Non trainable steps
 codebook.embedding.weight.requires_grad = False
+print(F"Parameters in codebook are trainable: {codebook.embedding.weight.requires_grad}")
 
+for param in encoder.parameters():
+    param.requires_grad = False
+print(F"Parameters in encoder are trainable: {param.requires_grad}")
 
 
 
 
 # ========================
 # Parameters count in millions
+# ========================
+print(f"Parameters in codebook: {sum(p.numel() for p in codebook.parameters()) / 1e6}M")
 print(f"Parameters in encoder: {sum(p.numel() for p in encoder.parameters()) / 1e6}M")
 print(f"Parameters in downsample: {sum(p.numel() for p in downsample.parameters()) / 1e6}M")
-print(f"Parameters in quantizer: {sum(p.numel() for p in quantizer.parameters()) / 1e6}M")
+print(f"Parameters in tokenizer: {sum(p.numel() for p in tokenizer.parameters()) / 1e6}M")
 print(f"Parameters in upsample: {sum(p.numel() for p in upsample.parameters()) / 1e6}M")
 print(f"Parameters in decoder: {sum(p.numel() for p in decoder.parameters()) / 1e6}M")
 print(f"Parameters in discriminator: {sum(p.numel() for p in discriminator.parameters()) / 1e6}M")
-print(f"Parameters in codebook: {sum(p.numel() for p in codebook.parameters()) / 1e6}M")
-
 
 
 
@@ -140,11 +145,11 @@ print(f"Parameters in codebook: {sum(p.numel() for p in codebook.parameters()) /
 # ========================
 # Optimizers and Hyperparameters
 # ========================
-lr_gen = config['train']['lr']
+lr_gen = config['train']['lr_gen']
 lr_disc = config['train']['lr_disc']
 num_steps = config['train']['num_steps']
 
-# Group the generator parameters: encoder, downsample, quantizer, upsample, decoder.
+# Group the generator parameters: encoder, downsample, upsample, decoder. keeping the encoder frozen
 gen_params = list(downsample.parameters()) + list(upsample.parameters()) + list(decoder.parameters())
 print(f"Parameters in generator: {sum(p.numel() for p in gen_params) / 1e6}M")
 
@@ -165,72 +170,60 @@ loss = Loss(config)
 # ========================
 # Training Loop
 # ========================
-for epoch in range(num_steps):
+step = 1
+while True:
     encoder.eval()
     downsample.train()
     upsample.train()
     decoder.train()
     discriminator.train()
     
-    for iter, batch in enumerate(sdataloader):
+    for _, batch in enumerate(sdataloader):
         disc = False
         output = {}
         
         # ===== Data Preparation =====
         waveforms, padding_masks = batch
         waveforms = waveforms.to(device) # [B, T]
-        padding_masks = padding_masks.to(device) # [B, T] 1 (true) for masked, 0(false) for not masked means [0,0,0,1,1]
+        padding_masks = padding_masks.to(device) # [B, T] true for masked, false for not masked means [False, False, ..., True, True]
         
         # ===== Generator Forward Pass =====
-        with torch.no_grad():
-            enc_out = encoder(waveforms, padding_masks)  # [B, T, C] # step 1
-        padding_masks = ~enc_out['padding_mask'] # [B, T // 320] # 0 for masked, 1 for not masked
-        output["cnn_out"] = enc_out['cnn_out']
-        output['encoder_out'] = enc_out['encoder_out']
-        output['padding_mask'] = padding_masks
+        enc_out = encoder(waveforms, padding_masks)  # [B, T, C] # step 1
+        padding_masks = enc_out['padding_mask'] # [B, T // 320] 
+        output["cnn_out"] = enc_out['cnn_out'] # [B, T // 320] 
+        output['encoder_out'] = enc_out['encoder_out'] # [B, T // 320] 
+        output['padding_mask'] = padding_masks # [B, T // 320] 
         
-        
-        with torch.no_grad():
-            gt = gtruth.encode(waveforms.unsqueeze(1)) # [B, T, 1024] # step 04
-            gt = gt[:,:padding_masks.shape[-1],:]
-            gt = gt * padding_masks.unsqueeze(-1).float() # [B, T, 1024]
+        mask = ~padding_masks # B,T//320,1 # 0 for masked positions.
+        mask = mask.unsqueeze(-1).float()
+        gt = gtruth.encode(waveforms.unsqueeze(1)) # [B, T//320, 1024] # step 04
+        gt = gt[:,:mask.shape[1],:] * mask # [B, T, 1024]
         output['gt'] = gt    
         
         down_out = downsample(enc_out['encoder_out'])  # [B, T // 2, C] # step 2
-        dpadding_masks = padding_masks[:, ::config["upsample"]['stride']] # [B, T // config["upsample"]['stride']] 
-        down_out = down_out[:,:dpadding_masks.shape[-1],:] # [B, T // 2, C]
-        down_out = down_out * dpadding_masks.unsqueeze(-1).float() # [B, T // 2, C]
+        dmask = mask[:, ::config["upsample"]['stride']] # [B, T // config["upsample"]['stride'], 1]
+        down_out = down_out[:,:dmask.shape[1],:] * dmask # [B, T // 2, C]
         output['down_out'] = down_out
-        output['dpadding_masks'] = dpadding_masks
+        output['dmask'] = dmask
         
-        commitment_loss, z_q, encoding_indices, codebook_prob = quantizer(down_out, codebook) # [B, T // 2, C], [B, T // 2, C], [B, T // 2] # step 3
-        z_q = z_q[:,:dpadding_masks.shape[-1],:] # [B, T // 2, C]
-        z_q = z_q * dpadding_masks.unsqueeze(-1).float() # [B, T // 2, C]
-        encoding_indices = encoding_indices[:,:dpadding_masks.shape[-1]] # [B, T // 2]
-        encoding_indices = encoding_indices * dpadding_masks # [B, T // 2]
+        commitment_loss, z_q, encoding_indices = tokenizer(down_out, codebook, dmask) # [B, T // 2, C], [B, T // 2, C], [B, T // 2] # step 3 -- all the necessary masks are already applied in the tokenizer
         output['commitment_loss'] = commitment_loss
         output['z_q'] = z_q
         output['encoding_indices'] = encoding_indices
-        output['codebook_prob'] = codebook_prob
         
-        up_out = upsample(z_q)[:,:enc_out['padding_mask'].shape[1],:] # [B, T, C] # step 4
-        up_out = up_out * enc_out['padding_mask'].float().unsqueeze(-1) # [B, T, C]       
+        up_out = upsample(z_q) # [B, T, C] # step 4
+        up_out = up_out[:,:mask.shape[1],:] * mask # [B, T, C]       
         output['up_out'] = up_out 
 
-        dec_out, dec_out2, mask = decoder(up_out, ~padding_masks) # [B, T, C], [B, T, C], [B, T] # step 5
-        dec_out = dec_out[:,:padding_masks.shape[-1],:] # [B, T, C]
-        dec_out = dec_out * padding_masks.unsqueeze(-1).float() # [B, T, C]
-        dec_out2 = dec_out2[:,:padding_masks.shape[-1],:] # [B, T, C]
-        dec_out2 = dec_out2 * padding_masks.unsqueeze(-1).float() # [B, T, C]
+        dec_out, dec_out2, mask = decoder(up_out, padding_masks, output['cnn_out'], config['decoder']["speaker"]["use_s"]) # [B, T, C], [B, T, C], [B, T] # step 5
         output['dec_out'] = dec_out
         output['dec_out2'] = dec_out2
         
-        
-        # ===== Discriminator Forward Pass =====
-        # if iter % 2 == 0:
+    
+        # # # ===== Discriminator Forward Pass =====
+        # if step % 2 == 0:
         #     disc = True
-        #     pred_fake = discriminator(z_q, ~dpadding_masks) # discriminator fake output # step 6
-        #     print(pred_fake.shape)
+        #     pred_fake = discriminator(z_q, ~dmask.bool()) # discriminator fake output # step 6
         #     output['pred_fake'] = pred_fake
             
         #     try:
@@ -241,13 +234,14 @@ for epoch in range(num_steps):
             
         #     text, mask = tbatch
         #     text = text.to(device)
-        #     mask = mask.to(device)
+        #     tmask = mask.to(device)
         #     text = codebook(text)
-        #     pred_real = discriminator(text, mask) # discriminator real output # step 6
+        #     pred_real = discriminator(text, tmask.unsqueeze(-1)) # discriminator real output # step 6
         #     output['pred_real'] = pred_real
+        #     output['tmask'] = tmask
 
         # ===== Loss Computation =====
-        total_loss = loss.step(output, disc, epoch, iter, len(sdataloader))
+        total_loss = loss.step(output, disc, step, num_steps)
         
         # ===== Backward Pass ===== 
         optimizer_gen.zero_grad()
@@ -262,6 +256,9 @@ for epoch in range(num_steps):
         # loss_gen.backward()
         # optimizer_gen.step()
         
+        step +=1
+        if step > num_steps:
+            break
         
         
 

@@ -53,18 +53,33 @@ class Decoder(nn.Module):
     def __init__(self, config):
         super().__init__()
         
+        self.speaker = Conv1dBlock( config["speaker"]["speaker_emb_dim"], config["transformer"]["decoder_hidden"])
+        
         self.decoder = models.Decoder(config)
         self.proj = Conv1dBlock( config["transformer"]["decoder_hidden"], config["transformer"]["dac_hidden"])
         
         self.PostNet = layers.PostNet(n_mel_channels=config["transformer"]["dac_hidden"])
 
     
-    def forward(self, x, mask): # b,t,c # mask should be b,t and 1 for masked position
-   
-        dec_output, mask = self.decoder(x, mask.bool())
-        dec_output = self.proj(dec_output)
+    def forward(self, x, mask, s, use_s=None): # b,t,c # mask should be b,t and 1 for masked position and 0 for non-masked position # s is speaker embedding b,t',c
         
+        # speaker embedding
+        if use_s:
+            s = self.speaker(s) # b,t,c
+            s = torch.mean(s, dim=1, keepdim=True) # b,1,c
+            # concatenate speaker embedding with input at t dim
+            x = torch.cat((s,x), dim=1) # b,t+1,c
+            mask = torch.cat((torch.zeros((mask.shape[0], 1), device=mask.device).bool(), mask), dim=1)  # (b, t+1)
+
+        dec_output, mask = self.decoder(x, mask.bool())
+        dec_output = self.proj(dec_output)[:,:mask.shape[1],:] * mask.unsqueeze(-1)
+        
+        if use_s:
+            dec_output = dec_output[:,1:,:] # remove the first token
+            mask = mask[:,1:] # remove the first token
+    
         dec_output2 = self.PostNet(dec_output) + dec_output
+        dec_output2 = dec_output2[:,:mask.shape[1],:] * mask.unsqueeze(-1)
         
         return dec_output, dec_output2, mask
     
