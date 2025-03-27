@@ -129,8 +129,9 @@ class Loss:
         # gen_loss = F.binary_cross_entropy_with_logits(output["dis_fake"], torch.zeros_like(output["dis_fake"]))
         # gen_loss *= self.config["gen_loss_weight"]
         
-        
-        print(f"GEN-LOSS---step/total: {step}/{total_steps} rec_loss: {rec_loss}, commit_loss: {commit_loss}, smooth_loss: {smooth_loss}, gen_loss: {gen_loss}")
+        if (step) % 100 == 0:
+            print(f"GEN-LOSS---step/total: {step}/{total_steps} rec_loss: {rec_loss}, commit_loss: {commit_loss}, smooth_loss: {smooth_loss}, gen_loss: {gen_loss}")
+            
         total_loss = rec_loss + commit_loss + smooth_loss + gen_loss
         
         return  total_loss
