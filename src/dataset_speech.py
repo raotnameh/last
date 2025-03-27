@@ -30,8 +30,9 @@ class Dataset_speech(Dataset):
         print(f"Speech dataset duration range in seconds: {min_dur/16000:.2f} - {max_dur/16000:.2f} | Total duration in hours: {tot_dur/16000/3600:.2f}")
         # Sort by duration
         paths.sort(key=lambda x: x[1])
-        # self.paths = paths
-        self.paths = paths[:100]  # For testing
+        self.paths = paths
+        # self.paths = paths[:32]  # For testing
+        # print(f"Testing Mode: Using only {len(self.paths)} samples")
         
     def __len__(self):
         return len(self.paths)
