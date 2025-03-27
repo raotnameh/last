@@ -35,9 +35,9 @@ config = yaml.load( open("config/try1.yaml", "r"), Loader=yaml.FullLoader)
 
 # step 01 :- Prepare the speech dataset.
 from dataset_speech import Dataset_speech
-sdataset = Dataset_speech(input_manifest=config['dataset_speech']['path'], min_duration=32000, max_duration=320000)
+sdataset = Dataset_speech(input_manifest=config['dataset_speech']['path'], min_duration=32000, max_duration=160000)
 ssampler = SequentialSampler(sdataset)
-sbatch_sampler = ShuffledBatchSampler(ssampler, batch_size=32, drop_last=False)
+sbatch_sampler = ShuffledBatchSampler(ssampler, batch_size=64, drop_last=False)
 sdataloader = DataLoader(
     sdataset,
     batch_sampler=sbatch_sampler,
@@ -181,7 +181,6 @@ if __name__ == "__main__":
         discriminator.train()
         
         for _, batch in enumerate(sdataloader):
-            disc = False
             output = {}
             
             # ===== Data Preparation =====
