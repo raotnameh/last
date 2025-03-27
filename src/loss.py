@@ -90,8 +90,8 @@ class Loss:
     def __init__(self, config):
         self.config = config["loss"]
         
-        self.mse_loss = nn.MSELoss() # commitment loss, smoothness loss
-        self.mae_loss = nn.L1Loss() # decoder loss
+        self.mse_loss = nn.MSELoss(reduction='mean') # smoothness loss
+        self.mae_loss = nn.L1Loss(reduction='none') # reconstruction loss
         
         
         self.gan_loss = GANLoss(gp_weight=self.config["gp_weight"])
@@ -105,12 +105,16 @@ class Loss:
         
         return loss["total_loss"]
         
-    
+
     def step_gen(self, output, step=0, total_steps=None):
         
         # reconstrunction loss :- decoder 
-        rec_loss = self.mae_loss(output["dec_out"], output["gt"])
-        rec_loss += self.mae_loss(output["dec_out2"], output["gt"])
+        valid_count = output["dec_mask"].sum() * output["dec_out"].shape[-1]        
+        rec_loss1 = self.mae_loss(output["dec_out"], output["gt"], ) * output["dec_mask"]
+        rec_loss1 = rec_loss1.sum() / valid_count
+        rec_loss2 = self.mae_loss(output["dec_out2"], output["gt"]) * output["dec_mask"]
+        rec_loss2 = rec_loss2.sum() / valid_count
+        rec_loss = rec_loss1 + rec_loss2
         rec_loss *= self.config["recon_loss_weight"]
         
         # commitment loss
