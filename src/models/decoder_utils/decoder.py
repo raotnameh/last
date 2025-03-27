@@ -71,17 +71,17 @@ class Decoder(nn.Module):
             x = torch.cat((s,x), dim=1) # b,t+1,c
             mask = torch.cat((torch.zeros((mask.shape[0], 1), device=mask.device).bool(), mask), dim=1)  # (b, t+1)
 
-        dec_output, mask = self.decoder(x, mask.bool())
-        dec_output = self.proj(dec_output)[:,:mask.shape[1],:] * mask.unsqueeze(-1)
+        dec_output, mask = self.decoder(x, mask)
+        dec_output = self.proj(dec_output)
         
         if use_s:
             dec_output = dec_output[:,1:,:] # remove the first token
             mask = mask[:,1:] # remove the first token
     
         dec_output2 = self.PostNet(dec_output) + dec_output
-        dec_output2 = dec_output2[:,:mask.shape[1],:] * mask.unsqueeze(-1)
+        dec_output2 = dec_output2
         
-        return dec_output, dec_output2, mask
+        return dec_output, dec_output2, ~mask.unsqueeze(-1) # b,t,c # b,t,c # b,t,1
     
 if __name__ == '__main__':
     config = {

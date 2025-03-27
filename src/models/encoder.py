@@ -72,7 +72,7 @@ class Downsample(torch.nn.Module):
         self.conv = torch.nn.Conv1d(input_dim, output_dim, kernel_size=kernel_size, stride=stride, padding=padding)
         
     def forward(self, x): # B x T x C 
-        x = self.norm(x)
+        x = self.norm(x).contiguous()
         
         x = x.transpose(1, 2)
         x = self.conv(x)

@@ -20,6 +20,7 @@ class Tokenizer(nn.Module):
         Args:
             z (torch.Tensor): Encoder output of shape (batch, time, channels).
             codebook (nn.Module): A module with a weight attribute of shape (vocab_size, embed_dim).
+            mask (torch.Tensor): Mask of shape (batch, time,1) with 1s for valid positions and 0s for padding.
             
         Returns:
             commitment_loss (torch.Tensor): Commitment loss, scaled by beta.
@@ -56,6 +57,8 @@ class Tokenizer(nn.Module):
         # MSE loss between z and z_q ignoring padding positions
         valid_count = mask.sum() * z.shape[-1] # Total number of valid (non-masked) elements
         commitment_loss = commitment_loss.sum() / valid_count 
+        
+        z_q = z + (z_q - z).detach()
         
         min_encoding_indices = min_encoding_indices.view(z.shape[0], z.shape[1])
         

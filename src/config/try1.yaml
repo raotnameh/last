@@ -18,7 +18,7 @@ upsample:
 
 decoder:
   speaker:
-    use_s : False
+    use_s : True
     speaker_emb_dim: 512
   transformer:
     decoder_layer: 4
@@ -36,17 +36,15 @@ discriminator:
 
 
 train: 
-  lr_gen: 0.001
-  lr_disc: 0.001
+  lr_gen: 0.0005
+  lr_disc: 0.0005
   num_steps: 100000
 
 loss:
   recon_loss_weight: 1.0
   smooth_loss_weight: 0.0
-  commit_loss_weight: 0.0
+  commit_loss_weight: 1.0
   disc_loss_weight: 1.0
-
-
 
 
 # for i, (waveforms, padding_masks) in enumerate(sdataloader):
