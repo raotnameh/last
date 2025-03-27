@@ -18,7 +18,7 @@ upsample:
 
 decoder:
   speaker:
-    use_s : True
+    use_s : False
     speaker_emb_dim: 512
   transformer:
     decoder_layer: 4
