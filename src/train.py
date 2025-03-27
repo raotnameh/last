@@ -215,6 +215,40 @@ if __name__ == "__main__":
             output['z_q'] = z_q
             output['encoding_indices'] = encoding_indices
             
+    
+            # ===== Discriminator Forward Pass =====
+            
+            pred_fake = discriminator(z_q, ~dmask.bool()) # discriminator fake output # step 6 # B 
+            output['dis_fake'] = pred_fake
+
+            if step % 2 == 0:
+                try:
+                    tbatch = next(titer_data)
+                except:
+                    iter_data = iter(tdataloader)  # Reinitialize iterator
+                    tbatch = next(titer_data)  # Fetch the first batch again
+                
+                text, tmask = tbatch
+                text = text.to(device)
+                tmask = tmask.to(device)
+                text = codebook(text)
+                pred_real = discriminator(text, tmask.unsqueeze(-1)) # discriminator real output # step 6 # B
+                output['dis_real'] = pred_real
+                output['dis_real_x'] = text
+                output['tmask'] = tmask
+                
+                # ===== Loss Computation =====
+                total_loss = loss.step_disc(output, step, num_steps)
+                # ===== Backward Pass ===== 
+                optimizer_disc.zero_grad()
+                total_loss.backward()
+                torch.nn.utils.clip_grad_norm_(disc_params, max_norm=5.0)
+                optimizer_disc.step()
+                
+                step += 1
+                continue
+                 
+            # ===== Generator Forward Pass Continued =====
             up_out = upsample(z_q) # [B, T, C] # step 4
             up_out = up_out[:,:mask.shape[1],:] * mask # [B, T, C]       
             output['up_out'] = up_out 
@@ -226,30 +260,8 @@ if __name__ == "__main__":
             output['dec_out2'] = dec_out2
             output['dec_mask'] = dec_mask
             
-        
-            # # # ===== Discriminator Forward Pass =====
-            # if step % 2 == 0:
-            #     disc = True
-            #     pred_fake = discriminator(z_q, ~dmask.bool()) # discriminator fake output # step 6
-            #     output['pred_fake'] = pred_fake
-                
-            #     try:
-            #         tbatch = next(titer_data)
-            #     except:
-            #         iter_data = iter(tdataloader)  # Reinitialize iterator
-            #         tbatch = next(titer_data)  # Fetch the first batch again
-                
-            #     text, mask = tbatch
-            #     text = text.to(device)
-            #     tmask = mask.to(device)
-            #     text = codebook(text)
-            #     pred_real = discriminator(text, tmask.unsqueeze(-1)) # discriminator real output # step 6
-            #     output['pred_real'] = pred_real
-            #     output['tmask'] = tmask
-
             # ===== Loss Computation =====
-            total_loss = loss.step(output, disc, step, num_steps)
-            
+            total_loss = loss.step_gen(output, step, num_steps)
             # ===== Backward Pass ===== 
             optimizer_gen.zero_grad()
             total_loss.backward()
@@ -257,6 +269,7 @@ if __name__ == "__main__":
             optimizer_gen.step()
             
             step +=1
+            
         if step > num_steps:
             break
 

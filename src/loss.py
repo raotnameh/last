@@ -1,16 +1,126 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+import torch.autograd as autograd
+import numpy as np
 
+
+
+
+
+class GANLoss(nn.Module):
+    """
+    Computes adversarial loss and optional gradient penalty for GAN training.
+
+    Args:
+        gp_weight (float): Weight for the gradient penalty term.
+
+    Inputs:
+        fake (Tensor): Discriminator output for fake samples. Shape: [B, 1]
+        real (Tensor): Discriminator output for real samples. Shape: [B, 1]
+        fake_x (Tensor): Fake samples from generator. Shape: [B, ...]
+        real_x (Tensor): Real samples from dataset. Shape: [B, ...]
+        fake_smooth (float, optional): Label smoothing for fake labels. Default: 0.0
+        real_smooth (float, optional): Label smoothing for real labels. Default: 0.0
+
+    Returns:
+        dict: Contains loss for fake (`loss_fake`), real (`loss_real`), and gradient penalty (`grad_pen`).
+    """
+    def __init__(self, gp_weight=1.0):
+        super().__init__()
+        self.gp_weight = gp_weight
+
+    def forward(self, fake, real, fake_x, real_x, fake_smooth=0.0, real_smooth=0.0):
+        # using zero class for real and one class for fake
+        """Computes adversarial loss and gradient penalty."""
+        loss_fake = F.binary_cross_entropy_with_logits(
+            fake, torch.ones_like(fake) - fake_smooth, reduction="sum"
+        )
+        loss_real = F.binary_cross_entropy_with_logits(
+            real, torch.zeros_like(real) + real_smooth, reduction="sum"
+        )
+        total_loss = loss_fake + loss_real # total loss is sum of fake and real losses
+        grad_pen = None
+        if self.training and self.gp_weight > 0:
+            grad_pen = self.calc_gradient_penalty(real_x, fake_x) * self.gp_weight
+            total_loss += grad_pen
+        
+        return {"total_loss": total_loss, "loss_fake": loss_fake, "loss_real": loss_real, "grad_pen": grad_pen}
+
+    def calc_gradient_penalty(self, real_data, fake_data):
+        """
+        Calculates the gradient penalty.
+        
+        Slices the real and fake data to have the same batch and temporal sizes,
+        interpolates between them, and computes the gradient penalty.
+        
+        Inputs:
+          - real_data: Real samples. Shape: [B, T, ...]
+          - fake_data: Fake samples. Shape: [B, T, ...]
+          
+        Output:
+          - Scalar gradient penalty (mean over batch).
+        """
+        b_size = min(real_data.size(0), fake_data.size(0))
+        t_size = min(real_data.size(1), fake_data.size(1))
+
+        if self.cfg.probabilistic_grad_penalty_slicing:
+            def get_slice(data, dim, target_size):
+                size = data.size(dim)
+                diff = size - target_size
+                if diff <= 0:
+                    return data
+                start = np.random.randint(0, diff + 1)
+                return data.narrow(dim=dim, start=start, length=target_size)
+
+            real_data = get_slice(real_data, 0, b_size)
+            real_data = get_slice(real_data, 1, t_size)
+            fake_data = get_slice(fake_data, 0, b_size)
+            fake_data = get_slice(fake_data, 1, t_size)
+        else:
+            real_data = real_data[:b_size, :t_size]
+            fake_data = fake_data[:b_size, :t_size]
+
+        alpha = torch.rand(real_data.size(0), 1, 1, device=real_data.device)
+        alpha = alpha.expand(real_data.size())
+        interpolates = alpha * real_data + (1 - alpha) * fake_data
+
+        disc_interpolates = self.discriminator(interpolates, None)
+
+        gradients = autograd.grad(
+            outputs=disc_interpolates,
+            inputs=interpolates,
+            grad_outputs=torch.ones_like(disc_interpolates),
+            create_graph=True,
+            retain_graph=True,
+            only_inputs=True,
+        )[0]
+
+        gradient_penalty = (gradients.norm(2, dim=1) - 1) ** 2
+        return gradient_penalty.mean()
+    
+    
 class Loss:
     def __init__(self, config):
         self.config = config["loss"]
         
         self.mse_loss = nn.MSELoss() # commitment loss, smoothness loss
         self.mae_loss = nn.L1Loss() # decoder loss
-        self.bce_loss = nn.BCEWithLogitsLoss(reduction='none')  # Discriminator loss with masking
+        
+        
+        self.gan_loss = GANLoss(gp_weight=self.config["gp_weight"])
+    
+    def step_disc(self, output, step=0, total_steps=None):
+        # fake, real, fake_x, real_x, fake_smooth=0.0, real_smooth=0.0):
+        
+        loss = self.gan_loss(output["dis_fake"], output["dis_real"], output["z_q"], output["dis_real_x"])
+        
+        print(f"step/total: {step}/{total_steps} real_loss: {loss['loss_real']}, fake_loss: {loss['loss_fake']}, gp_loss: {loss['grad_pen']}, total_loss: {loss['total_loss']}")
+        
+        return loss["total_loss"]
         
     
-    def step(self, output, disc=False, step=0, total_steps=None):
+    def step_gen(self, output, step=0, total_steps=None):
         
         # reconstrunction loss :- decoder 
         rec_loss = self.mae_loss(output["dec_out"], output["gt"])
@@ -24,29 +134,13 @@ class Loss:
         smooth_loss = self.mse_loss(output["down_out"][:,:-1,:], output["down_out"][:,1:,:])
         smooth_loss *= self.config["smooth_loss_weight"]
         
-        # if disc: 
-        #     real_loss = self.bce_loss(output['pred_real'], torch.ones_like(output['pred_real']))
-        #     fake_loss = self.bce_loss(output['pred_fake'], torch.zeros_like(output['pred_fake']))
-
-        #     # Apply masking if provided
-        #     if mask is not None:
-        #         real_loss = (real_loss * mask).sum() / mask.sum()
-        #     else:
-        #         real_loss = real_loss.mean()
-            
-        #     if dpadding_masks is not None:
-        #         fake_loss = (fake_loss * (~dpadding_masks)).sum() / (~dpadding_masks).sum()
-        #     else:
-        #         fake_loss = fake_loss.mean()
-
-        #     loss_D = real_loss + fake_loss
-
-        print(f"step/total: {step}/{total_steps} rec_loss: {rec_loss}, commit_loss: {commit_loss}, smooth_loss: {smooth_loss}")
-        total_loss = rec_loss + commit_loss + smooth_loss 
+        # generator loss
+        gen_loss = F.binary_cross_entropy_with_logits(output["dis_fake"], torch.zeros_like(output["dis_fake"]))
+        gen_loss *= self.config["gen_loss_weight"]
+        
+        print(f"step/total: {step}/{total_steps} rec_loss: {rec_loss}, commit_loss: {commit_loss}, smooth_loss: {smooth_loss}, gen_loss: {gen_loss}")
+        total_loss = rec_loss + commit_loss + smooth_loss + gen_loss
         
         return  total_loss
-        
-    
-        
     
     
