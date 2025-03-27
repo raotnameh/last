@@ -35,7 +35,7 @@ config = yaml.load( open("config/try1.yaml", "r"), Loader=yaml.FullLoader)
 
 # step 01 :- Prepare the speech dataset.
 from dataset_speech import Dataset_speech
-sdataset = Dataset_speech(input_manifest=config['dataset_speech']['path'], min_duration=32000, max_duration=160000)
+sdataset = Dataset_speech(input_manifest=config['dataset_speech']['path'], min_duration=32000, max_duration=320000)
 ssampler = SequentialSampler(sdataset)
 sbatch_sampler = ShuffledBatchSampler(ssampler, batch_size=64, drop_last=False)
 sdataloader = DataLoader(
@@ -261,13 +261,13 @@ if __name__ == "__main__":
             output['dec_mask'] = dec_mask
             
             # ===== Loss Computation =====
-            
             total_loss = loss.step_gen(output, step, num_steps)
             # ===== Backward Pass ===== 
-            optimizer_gen.zero_grad()
             total_loss.backward()
             torch.nn.utils.clip_grad_norm_(gen_params, max_norm=5.0)
-            optimizer_gen.step()
+            if (step) % 1 == 0:
+                optimizer_gen.step()
+                optimizer_gen.zero_grad()
             
             step +=1
             
