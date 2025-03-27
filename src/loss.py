@@ -42,7 +42,7 @@ class Loss:
         #     loss_D = real_loss + fake_loss
 
         print(f"step/total: {step}/{total_steps} rec_loss: {rec_loss}, commit_loss: {commit_loss}, smooth_loss: {smooth_loss}")
-        total_loss = rec_loss # + commit_loss + smooth_loss 
+        total_loss = rec_loss + commit_loss + smooth_loss 
         
         return  total_loss
         
