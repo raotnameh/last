@@ -61,6 +61,7 @@ class Discriminator(nn.Module):
         x: (batch, time, channels)
         padding_mask: (batch, time, 1) where True indicates a padded timestep.
         """
+
         for layer in self.disc_layers:
             if isinstance(layer, Conv1dBlock):
                 x = layer(x, padding_mask)  # Pass padding_mask only to Conv1dBlock

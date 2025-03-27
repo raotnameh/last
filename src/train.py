@@ -215,9 +215,8 @@ if __name__ == "__main__":
             output['z_q'] = z_q
             output['encoding_indices'] = encoding_indices
             
-    
-            # ===== Discriminator Forward Pass =====
             
+            # ===== Discriminator Forward Pass =====
             pred_fake = discriminator(z_q, ~dmask.bool()) # discriminator fake output # step 6 # B 
             output['dis_fake'] = pred_fake
 
@@ -238,6 +237,7 @@ if __name__ == "__main__":
                 output['tmask'] = tmask
                 
                 # ===== Loss Computation =====
+                loss.gan_loss.discriminator = discriminator
                 total_loss = loss.step_disc(output, step, num_steps)
                 # ===== Backward Pass ===== 
                 optimizer_disc.zero_grad()
@@ -261,6 +261,7 @@ if __name__ == "__main__":
             output['dec_mask'] = dec_mask
             
             # ===== Loss Computation =====
+            
             total_loss = loss.step_gen(output, step, num_steps)
             # ===== Backward Pass ===== 
             optimizer_gen.zero_grad()
