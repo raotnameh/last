@@ -53,6 +53,7 @@ class Decoder(nn.Module):
     def __init__(self, config):
         super().__init__()
         
+        # Global conditioning.
         self.speaker = Conv1dBlock( config["speaker"]["speaker_emb_dim"], config["transformer"]["decoder_hidden"])
         
         self.decoder = models.Decoder(config)
