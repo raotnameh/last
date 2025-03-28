@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+import random
 
 class Tokenizer(nn.Module):
     def __init__(self, num_codebooks, save_dir="histogram_frames"):
@@ -12,6 +13,48 @@ class Tokenizer(nn.Module):
         self.save_dir = save_dir
         self.num_codebooks = num_codebooks
         self.codebook_usage = torch.zeros(self.num_codebooks)
+    
+    def randomly_keep_one_with_indices(self, tensor):
+        dtype = tensor.dtype
+        device = tensor.device
+        result = []
+        chosen_indices = []
+
+        for row_idx, row in enumerate(tensor):
+            filtered_row = []
+            row_indices = []
+            i = 0
+
+            while i < len(row):
+                value = row[i].item()
+                
+                # Detect consecutive duplicates
+                j = i + 1
+                while j < len(row) and row[j].item() == value:
+                    j += 1
+                
+                # Randomly select one index from the range
+                random_index = random.randint(i, j - 1)
+                filtered_row.append(row[random_index].item())
+                row_indices.append(random_index)  # Track chosen index
+                
+                # Move to next unique value
+                i = j
+
+            # Convert back to tensor
+            result.append(torch.tensor(filtered_row, dtype=dtype, device=device))
+            chosen_indices.append(row_indices)
+
+        # Pad to max length if necessary
+        max_len = max(len(row) for row in result)
+        final_result = []
+
+        for row in result:
+            padded_row = torch.cat([row, torch.zeros(max_len - len(row), dtype=dtype, device=device)])
+            final_result.append(padded_row)
+
+        return torch.stack(final_result), chosen_indices
+
            
     def forward(self, z, codebook, mask):
         """
@@ -61,6 +104,9 @@ class Tokenizer(nn.Module):
         z_q = z + (z_q - z).detach()
         
         min_encoding_indices = min_encoding_indices.view(z.shape[0], z.shape[1])
+        # print(min_encoding_indices[0].shape)
+        # print(self.randomly_keep_one_with_indices(min_encoding_indices)[0][0].shape)
+        # exit()
         
         codebook_prob = self.Codebook_usage(min_encoding_indices)
         
