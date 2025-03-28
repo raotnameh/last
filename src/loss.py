@@ -119,10 +119,14 @@ class Loss:
         
         # commitment loss
         commit_loss = output["commitment_loss"] * self.config["commit_loss_weight"] 
+        # Diversity loss
+        diversity_loss = output["diversity_loss"] * self.config["diversity_loss_weight"]
         
         # smoothness loss :- down_out shifted by 1
         smooth_loss = self.mse_loss(output["down_out"][:,:-1,:], output["down_out"][:,1:,:])
         smooth_loss *= self.config["smooth_loss_weight"]
+        
+        
         
         # generator loss
         gen_loss = 0.0
@@ -130,9 +134,9 @@ class Loss:
         # gen_loss *= self.config["gen_loss_weight"]
         
         if (step) % 10 == 0:
-            print(f"GEN-LOSS---step/total: {step}/{total_steps} rec_loss: {rec_loss}, commit_loss: {commit_loss}, smooth_loss: {smooth_loss}, gen_loss: {gen_loss}")
+            print(f"GEN-LOSS---step/total: {step}/{total_steps} rec_loss: {rec_loss}, commit_loss: {commit_loss}, smooth_loss: {smooth_loss}, gen_loss: {gen_loss}, diversity_loss: {diversity_loss}")
             
-        total_loss = rec_loss + commit_loss + smooth_loss + gen_loss
+        total_loss = rec_loss + commit_loss + smooth_loss + gen_loss + diversity_loss
         
         return  total_loss
     

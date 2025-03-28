@@ -64,7 +64,31 @@ class Tokenizer(nn.Module):
         
         codebook_prob = self.Codebook_usage(min_encoding_indices)
         
-        return commitment_loss, z_q, min_encoding_indices # commitment_loss, z_q, encoding_indices
+        # ----- Soft Assignment for Diversity Loss with Masking -----
+        # Compute soft assignments from distances using softmax (differentiable)
+        soft_assignments = F.softmax(-d, dim=1)  # shape: (batch*time, num_codebooks)
+
+        # Reshape mask to match soft_assignments shape
+        mask_flattened = mask.contiguous().view(-1, 1)  # Shape: (batch*time, 1)
+
+        # Apply masking to ignore padded positions
+        masked_assignments = soft_assignments * mask_flattened  # Shape: (batch*time, num_codebooks)
+
+        # Compute soft histogram using masked assignments
+        soft_histogram = masked_assignments.sum(dim=0)  # Shape: (num_codebooks,)
+        usage_sum = soft_histogram.sum() + 1e-8  # Avoid division by zero
+        p = soft_histogram / usage_sum  # Normalize to get probability distribution
+
+        # KL divergence from uniform distribution
+        diversity_loss = torch.sum(p * torch.log(p * self.num_codebooks + 1e-8))
+        # print(self.num_codebooks)
+        # print(p.shape)
+        # print(diversity_loss)
+        # exit()
+        
+        
+        
+        return commitment_loss, diversity_loss, z_q, min_encoding_indices # commitment_loss, z_q, encoding_indices
     
     def Codebook_usage(self, encoding_indices):
         """

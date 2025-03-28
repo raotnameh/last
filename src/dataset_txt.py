@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
-
+import random
 
 class Dataset_txt(Dataset):
     def __init__(self, data="/raid/home/rajivratn/hemant_rajivratn/last/data/transcription.txt"):
@@ -19,6 +19,7 @@ class Dataset_txt(Dataset):
             texts = [x.strip() for x in out if len(x) > 10 and len(x) < 500] # filtering out short texts that 2 second.
             
         self.texts = sorted(texts, key=len)
+        self.add_question_marks()
         
         # creating the vocab.
         self.vocab = self.build_vocab(texts)
@@ -28,7 +29,26 @@ class Dataset_txt(Dataset):
         print(F"Vocab: {self.vocab}")
         print(F"-p- is for padding and -?- is for silence")
         print(F"Vocab Size: {len(self.vocab)}")
-        
+    
+    def add_question_marks(self):
+        print(self.texts[:6])
+        modified_texts = []
+        for sentence in self.texts:
+            sentence = f"?{sentence}?" # Add question marks at start and end
+            
+            # Randomly insert question marks with 0.25 probability
+            modified_sentence = []
+            for char in sentence:
+                modified_sentence.append(char)
+                if random.random() < 0.25:
+                    modified_sentence.append("?")
+
+            modified_texts.append("".join(modified_sentence))
+
+        self.texts = modified_texts
+        print(self.texts[:6])
+        exit()
+
     def build_vocab(self, texts):
         """
         Creates a sorted list of unique characters with special tokens.

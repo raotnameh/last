@@ -87,12 +87,12 @@ from models.tokenizer import Tokenizer
 tokenizer = Tokenizer(codebook.embedding.weight.shape[0])
 
 # step 4 :- Prepare the upsampler
-sys.path.append(f"{os.getcwd()}/models/decoder_utils")
-from models.decoder_utils.decoder import Upsample
+sys.path.append(f"{os.getcwd()}/models/decoder")
+from models.decoder.decoder import Upsample
 upsample = Upsample(codebook.embedding.weight.shape[1], output_dim=config["decoder"]["transformer"]["decoder_hidden"], kernel_size=config['upsample']['kernel_size'], stride=config['upsample']['stride'])
 
 # step 5 :- Prepare the decoder
-from models.decoder_utils.decoder import Decoder
+from models.decoder.decoder import Decoder
 decoder = Decoder(config['decoder'])
 
 # step 6 :- Prepare the discriminator
@@ -215,10 +215,11 @@ if __name__ == "__main__":
             output['down_out'] = down_out
             output['dmask'] = dmask
             
-            commitment_loss, z_q, encoding_indices = tokenizer(down_out, codebook, dmask) # [B, T // 2, C], [B, T // 2, C], [B, T // 2] # step 3 -- all the necessary masks are already applied in the tokenizer
+            commitment_loss, diversity_loss, z_q, encoding_indices = tokenizer(down_out, codebook, dmask) # [B, T // 2, C], [B, T // 2, C], [B, T // 2] # step 3 -- all the necessary masks are already applied in the tokenizer
             output['commitment_loss'] = commitment_loss
             output['z_q'] = z_q
             output['encoding_indices'] = encoding_indices
+            output['diversity_loss'] = diversity_loss
             
             
             # ===== Discriminator Forward Pass =====
