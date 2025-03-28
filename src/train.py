@@ -37,7 +37,7 @@ config = yaml.load( open("config/try1.yaml", "r"), Loader=yaml.FullLoader)
 from dataset_speech import Dataset_speech
 sdataset = Dataset_speech(input_manifest=config['dataset_speech']['path'], min_duration=32000, max_duration=320000)
 ssampler = SequentialSampler(sdataset)
-sbatch_sampler = ShuffledBatchSampler(ssampler, batch_size=64, drop_last=False)
+sbatch_sampler = ShuffledBatchSampler(ssampler, batch_size=32, drop_last=False)
 sdataloader = DataLoader(
     sdataset,
     batch_sampler=sbatch_sampler,
@@ -122,10 +122,12 @@ if __name__ == "__main__":
     codebook.embedding.weight.requires_grad = False
     print(F"Parameters in codebook are trainable: {codebook.embedding.weight.requires_grad}")
 
-    for param in encoder.parameters():
+    for name, param in encoder.named_parameters():
+        # if "10" in name or "11" in name:
+        #     param.requires_grad = True
+        # else:
         param.requires_grad = False
-    num_trainable = sum(1 for param in encoder.parameters() if param.requires_grad)
-    print(f"Trainable parameters in encoder: {num_trainable}")
+    print(f"Trainable parameters in encoder: {sum(p.numel() for p in encoder.parameters() if p.requires_grad) / 1e6}M")
 
     # ========================
     # Parameters count in millions
@@ -147,19 +149,22 @@ if __name__ == "__main__":
     # ========================
     # Optimizers and Hyperparameters
     # ========================
-    lr_gen = config['train']['lr_gen']
-    lr_disc = config['train']['lr_disc']
     num_steps = config['train']['num_steps']
 
     # Group the generator parameters: encoder, downsample, upsample, decoder. keeping the encoder frozen
-    gen_params = list(downsample.parameters()) + list(upsample.parameters()) + list(decoder.parameters())
-    print(f"Parameters in generator: {sum(p.numel() for p in gen_params) / 1e6}M")
+    encoder_params = list([p for p in encoder.parameters() if p.requires_grad])
+    downsample_params = list([p for p in downsample.parameters() if p.requires_grad])
+    decoder_params = list([p for p in upsample.parameters() if p.requires_grad]) 
+    decoder_params += list([p for p in decoder.parameters() if p.requires_grad])
 
     disc_params = list(discriminator.parameters())
     print(f"Parameters in discriminator: {sum(p.numel() for p in disc_params) / 1e6}M")
 
-    optimizer_gen = optim.Adam(gen_params, lr=lr_gen)
-    optimizer_disc = optim.Adam(disc_params, lr=lr_disc)
+    # optimizer_enc = optim.Adam(encoder_params, lr=config['train']['lr_enc'])
+    optimizer_down = optim.Adam(downsample_params, lr=config['train']['lr_down'])
+    optimizer_dec = optim.Adam(decoder_params, lr=config['train']['lr_dec'])
+
+    optimizer_disc = optim.Adam(disc_params, lr=config['train']['lr_disc'])
 
     # ========================
     # Losses
@@ -199,6 +204,7 @@ if __name__ == "__main__":
             mask = ~padding_masks # B,T//320,1 # 0 for masked positions.
             mask = mask.unsqueeze(-1).float()
             output['enc_mask'] = mask
+            
             gt = gtruth.encode(waveforms.unsqueeze(1)) # [B, T//320, 1024] # step 04
             gt = gt[:,:mask.shape[1],:] * mask # [B, T, 1024]
             output['gt'] = gt    
@@ -264,10 +270,14 @@ if __name__ == "__main__":
             total_loss = loss.step_gen(output, step, num_steps)
             # ===== Backward Pass ===== 
             total_loss.backward()
-            torch.nn.utils.clip_grad_norm_(gen_params, max_norm=5.0)
-            if (step) % 1 == 0:
-                optimizer_gen.step()
-                optimizer_gen.zero_grad()
+            torch.nn.utils.clip_grad_norm_(downsample_params, max_norm=5.0)
+            torch.nn.utils.clip_grad_norm_(decoder_params, max_norm=5.0)
+            if (step) % 2 == 0:
+                optimizer_down.step()
+                optimizer_dec.step()
+    
+                optimizer_down.zero_grad()
+                optimizer_dec.zero_grad()
             
             step +=1
             

@@ -1,5 +1,6 @@
 dataset_speech:
-  path: "/raid/home/rajivratn/hemant_rajivratn/librispeech/data/manifest/train-clean-100.tsv"
+  # path: "/raid/home/rajivratn/hemant_rajivratn/librispeech/data/manifest/train-clean-100.tsv"
+  path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeechmanifest.tsv"
 
 dataset_txt:
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/transcription.txt"
@@ -36,7 +37,9 @@ discriminator:
 
 
 train: 
-  lr_gen: 0.0005
+  lr_enc: 0.0005
+  lr_down: 0.001
+  lr_dec: 0.0005
   lr_disc: 0.0005
   num_steps: 100000
 
