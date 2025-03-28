@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 import random
+from tqdm.auto import tqdm  
 
 class Dataset_txt(Dataset):
     def __init__(self, data="/raid/home/rajivratn/hemant_rajivratn/last/data/transcription.txt"):
@@ -31,23 +32,30 @@ class Dataset_txt(Dataset):
         print(F"Vocab Size: {len(self.vocab)}")
     
     def add_question_marks(self):
-        print(self.texts[:6])
+        print(f"Preprocessing the text data adding silence tokens.")
+        
         modified_texts = []
-        for sentence in self.texts:
-            sentence = f"?{sentence}?" # Add question marks at start and end
-            
-            # Randomly insert question marks with 0.25 probability
-            modified_sentence = []
+        for sentence in tqdm(self.texts):
+            modified_sentence = ['?']# Add question marks at start 
+            previous_char = None
             for char in sentence:
-                modified_sentence.append(char)
-                if random.random() < 0.25:
+                # if  char == previous_char insert a question mark
+                if previous_char == char:
                     modified_sentence.append("?")
-
+                
+                modified_sentence.append(char)
+    
+                # Randomly insert question marks with 0.25 probability
+                if random.random() < 0.25 and modified_sentence[-1] != '?':
+                    modified_sentence.append("?")
+                
+                previous_char = char
+                    
+            if modified_sentence[-1] != '?': 
+                modified_sentence.append("?")  # Add a question mark at the end
             modified_texts.append("".join(modified_sentence))
 
         self.texts = modified_texts
-        print(self.texts[:6])
-        exit()
 
     def build_vocab(self, texts):
         """
