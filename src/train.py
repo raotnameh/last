@@ -123,10 +123,10 @@ if __name__ == "__main__":
     print(F"Parameters in codebook are trainable: {codebook.embedding.weight.requires_grad}")
 
     for name, param in encoder.named_parameters():
-        # if "10" in name or "11" in name:
-        #     param.requires_grad = True
-        # else:
-        param.requires_grad = False
+        if "10" in name or "11" in name:
+            param.requires_grad = True
+        else:
+            param.requires_grad = False
     print(f"Trainable parameters in encoder: {sum(p.numel() for p in encoder.parameters() if p.requires_grad) / 1e6}M")
 
     # ========================
@@ -160,19 +160,23 @@ if __name__ == "__main__":
     disc_params = list(discriminator.parameters())
     print(f"Parameters in discriminator: {sum(p.numel() for p in disc_params) / 1e6}M")
 
-    # optimizer_enc = optim.Adam(encoder_params, lr=config['train']['lr_enc'])
+
+    optimizer_enc = optim.Adam(encoder_params, lr=config['train']['lr_enc'])
     optimizer_down = optim.Adam(downsample_params, lr=config['train']['lr_down'])
     optimizer_dec = optim.Adam(decoder_params, lr=config['train']['lr_dec'])
 
     optimizer_disc = optim.Adam(disc_params, lr=config['train']['lr_disc'])
+
+
+
 
     # ========================
     # Losses
     # ========================
     from loss import Loss
     loss = Loss(config)
-
-
+    
+    
 
     # ========================
     # Training Loop
@@ -215,7 +219,7 @@ if __name__ == "__main__":
             output['down_out'] = down_out
             output['dmask'] = dmask
             
-            commitment_loss, diversity_loss, z_q, encoding_indices = tokenizer(down_out, codebook, dmask) # [B, T // 2, C], [B, T // 2, C], [B, T // 2] # step 3 -- all the necessary masks are already applied in the tokenizer
+            commitment_loss, diversity_loss, z_q, z_q_disc, encoding_indices, non_repeated_min_encoding_indices = tokenizer(down_out, codebook, dmask) # [B, T // 2, C], [B, T // 2, C], [B, T // 2] # step 3 -- all the necessary masks are already applied in the tokenizer
             output['commitment_loss'] = commitment_loss
             output['z_q'] = z_q
             output['encoding_indices'] = encoding_indices
@@ -279,6 +283,10 @@ if __name__ == "__main__":
     
                 optimizer_down.zero_grad()
                 optimizer_dec.zero_grad()
+                
+                if step >= config['train']['freez_steps']:
+                    optimizer_enc.step()
+                    optimizer_enc.zero_grad()
             
             step +=1
             
