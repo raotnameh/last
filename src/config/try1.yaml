@@ -41,15 +41,15 @@ train:
   lr_down: 0.0005
   lr_dec: 0.0005
   lr_disc: 0.0005
-  num_steps: 100000
+  num_steps: 10000
 
   freez_steps: 10000
 
 loss:
   recon_loss_weight: 1.0
   smooth_loss_weight: 1.0
-  commit_loss_weight: 10.0
-  diversity_loss_weight: 1.0
+  commit_loss_weight: 100.0
+  diversity_loss_weight: .5
   gen_loss_weight: 1.0
 
   disc_loss_weight: 1.0
