@@ -53,7 +53,7 @@ train:
   freeze_steps: 10000
   discriminator_freq: 2
   mixed_precision: True
-  gradient_accumulation_steps: 4
+  gradient_accumulation_steps: 1
 
   resume_checkpoint: False
   resume_path: "checkpoints/step_10000.pth"
@@ -61,7 +61,7 @@ train:
 loss:
   recon_loss_weight: 1.0
   smooth_loss_weight: 1.0
-  commit_loss_weight: 10.0
+  commit_loss_weight: 100.0
   diversity_loss_weight: 0.0
   gen_loss_weight: 1.0
 
