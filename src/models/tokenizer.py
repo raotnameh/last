@@ -41,19 +41,25 @@ class Tokenizer(nn.Module):
         # extract the embedding from z_q and pad to the length of the longest row with pad_e
         max_length = max(len(ind) for ind in chosen_indices)
         
+        mask = []
         dummy = []
         for r, ind in enumerate(chosen_indices):
             dummy.append(z_q[r, ind].unsqueeze(0))
+            b,t,c = dummy[r].shape
+            mask.append(torch.zeros(b,t,device=z_q.device))
             # pad the row with pad_e
             pad_len = max_length - len(ind)
             if pad_len > 0:
                 pad = pad_e.repeat(1, pad_len,1)
                 dummy[r] = torch.cat([dummy[r], pad], dim=1)
-        
+                mask[r] = torch.cat([mask[r], torch.ones(b, pad_len, device=z_q.device)], dim=1)
+                
         # concatenate the rows
         z_q_disc = torch.cat(dummy, dim=0)
+        # concatenate the masks
+        non_repeated_mask = torch.cat(mask, dim=0)
 
-        return z_q_disc, chosen_indices
+        return z_q_disc, chosen_indices, non_repeated_mask.bool()
 
            
     def forward(self, z, codebook, mask):
@@ -105,7 +111,7 @@ class Tokenizer(nn.Module):
         min_encoding_indices = min_encoding_indices.view(z.shape[0], z.shape[1])
 
 
-        z_q_disc, non_repeated_min_encoding_indices = self.randomly_keep_one_with_indices(min_encoding_indices, pad_e, z_q.clone())
+        z_q_disc, non_repeated_min_encoding_indices, non_repeated_mask = self.randomly_keep_one_with_indices(min_encoding_indices, pad_e, z_q.clone())
         
         
         # ----- Soft Assignment for Diversity Loss with Masking -----
@@ -126,7 +132,7 @@ class Tokenizer(nn.Module):
         codebook_prob = self.Codebook_usage(min_encoding_indices)
         
         
-        return commitment_loss, diversity_loss, z_q, z_q_disc, min_encoding_indices, non_repeated_min_encoding_indices  # commitment_loss, z_q, encoding_indices
+        return commitment_loss, diversity_loss, z_q, z_q_disc, min_encoding_indices, non_repeated_min_encoding_indices, non_repeated_mask  # commitment_loss, z_q, encoding_indices
     
     def Codebook_usage(self, encoding_indices):
         """
