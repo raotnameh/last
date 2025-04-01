@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.autograd as autograd
+from torch.autograd import Variable
 import numpy as np
 import logging
 
@@ -69,7 +70,8 @@ class GANLoss(nn.Module):
 
         alpha = torch.rand(real_data.size(0), 1, 1, device=real_data.device)
         alpha = alpha.expand(real_data.size())
-        interpolates = alpha * real_data + (1 - alpha) * fake_data
+        interpolates = (alpha * real_data + (1 - alpha) * fake_data).detach()
+        interpolates.requires_grad_(True)
   
         disc_interpolates = self.discriminator(interpolates, torch.zeros_like(interpolates).bool()[:,:,:1])
 
@@ -98,9 +100,7 @@ class Loss:
     
     def step_disc(self, output, step=0, total_steps=None):
         # fake, real, fake_x, real_x, fake_smooth=0.0, real_smooth=0.0):
-        
-        print(output['disc_fake'].shape, output['disc_real'].shape, output['disc_fake_x'].shape, output['disc_real_x'].shape)
-        
+    
         loss = self.gan_loss(output["disc_fake"], output["disc_real"], output["disc_fake_x"], output["disc_real_x"])        
         return loss
         
@@ -126,9 +126,8 @@ class Loss:
         smooth_loss *= self.config["smooth_loss_weight"]
         
         # generator loss
-        gen_loss = 0.0
-        # gen_loss = F.binary_cross_entropy_with_logits(output["disc_fake"], torch.zeros_like(output["dis_fake"]))
-        # gen_loss *= self.config["gen_loss_weight"]
+        gen_loss = F.binary_cross_entropy_with_logits(output["disc_fake"], torch.zeros_like(output["disc_fake"]))
+        gen_loss *= self.config["gen_loss_weight"]
         
         loss_components = {
             "rec_loss": rec_loss,

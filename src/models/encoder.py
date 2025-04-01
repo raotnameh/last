@@ -37,14 +37,6 @@ class Encoder(torch.nn.Module):
         
         self.model = model[0]
         self.cfg = cfg
-        
-    def freeze(self, layers=[10, 11]):
-        for param in self.model.parameters():
-            param.requires_grad = False
-        # Unfreeze only transformer layers 10 and 11
-        for layer_idx in layers:
-            for param in self.model.encoder.layers[layer_idx].parameters():
-                param.requires_grad = True
       
     def forward(self, source, padding_mask): 
         w2v_args = {
