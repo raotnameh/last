@@ -198,7 +198,31 @@ def configure_optimizers(models: Dict, config: Dict) -> Dict:
     }
     return optimizers
 
+def load_checkpoint(checkpoint_path, models, optimizers, device):
+    """Load model and optimizer states from checkpoint."""
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+    
+    # Load model states
+    for name, model in models.items():
+        if name in checkpoint['models']:
+            model.load_state_dict(checkpoint['models'][name])
+        else:
+            logging.warning(f"No weights found for {name} in checkpoint")
 
+    # Load optimizer states
+    for name, optimizer in optimizers.items():
+        if name in checkpoint['optimizers']:
+            optimizer.load_state_dict(checkpoint['optimizers'][name])
+        else:
+            logging.warning(f"No state found for {name} optimizer")
+
+    # Return additional info
+    return {
+        'step': checkpoint['step'],
+        'num_steps': checkpoint['num_steps'],
+        'config': checkpoint['config']
+    }
+    
 def main():
     config = load_config("config/try1.yaml")
     configure_logging(config['logging']['dir'])
@@ -217,13 +241,27 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     for model in models.values():
         model.to(device)
-    
+        
     # Initialize optimizers and loss
     optimizers = configure_optimizers(models, config)
     loss_module = Loss(config)
     
     # Create checkpoint directory
     os.makedirs(config['checkpoint']['dir'], exist_ok=True)
+    
+    
+    # Resume training if checkpoint specified
+    start_step = 1
+    if config['train']['resume_checkpoint']:
+        checkpoint_info = load_checkpoint(
+            config['train']['checkpoint_path'],
+            models,
+            optimizers,
+            device
+        )
+        start_step = checkpoint_info['step'] + 1
+        logging.info(f"Resuming training from step {start_step}")
+
     
     
     # Main training loop
@@ -235,7 +273,8 @@ def main():
             text_loader=text_loader,
             loss_module=loss_module,
             config=config,
-            device=device
+            device=device,
+            start_step=start_step  # Add this
         )
     except KeyboardInterrupt:
         logging.info("Training interrupted by user")
@@ -245,7 +284,7 @@ def main():
 
 
 def train(models: Dict, optimizers: Dict, speech_loader: DataLoader,
-         text_loader: DataLoader, loss_module: Loss, config: Dict, device: torch.device):
+         text_loader: DataLoader, loss_module: Loss, config: Dict, device: torch.device, start_step: int):
     
     num_steps = config['train']['num_steps']
     freeze_steps = config['train']['freeze_steps']
@@ -263,10 +302,8 @@ def train(models: Dict, optimizers: Dict, speech_loader: DataLoader,
     
     loss_module.gan_loss.training = True
 
-    for step in range(1, num_steps + 1):
+    for step in range(start_step, num_steps + 1):
         output = {}
-        logging.info(f"Step {step}")
-        
         
         # ===== Data Preparation =====
         try:
@@ -330,38 +367,15 @@ def train(models: Dict, optimizers: Dict, speech_loader: DataLoader,
         
         # Loss calculation
         loss_components = loss_module.step_gen(output)
+        total_lossg = sum(loss_components.values())
         if step % config['logging']['step'] == 0:    
-            logging.info(f"GEN-LOSS---step/total: {step}/{num_steps} rec_loss: {loss_components['rec_loss']}, commit_loss: {loss_components['commit_loss']}, smooth_loss: {loss_components['smooth_loss']}, gen_loss: {loss_components['gen_loss']}, diversity_loss: {loss_components['diversity_loss']}")
-        total_loss = sum(loss_components.values())
-
-        # Backward pass
-        if step >= freeze_steps:
-            optimizers['enc'].zero_grad()    
-        optimizers['down'].zero_grad()
-        optimizers['dec'].zero_grad()
+            logging.info(f"GEN-LOSS---step/total: {step}/{num_steps} rec_loss: {loss_components['rec_loss']}, commit_loss: {loss_components['commit_loss']}, smooth_loss: {loss_components['smooth_loss']}, gen_loss: {loss_components['gen_loss']}, diversity_loss: {loss_components['diversity_loss']}, total_loss: {total_lossg}")
         
-        # Backpropagation   
-        total_loss.backward()
 
-        # Gradient clipping
-        max_grad_norm = config['train']['grad_clip']
-        if step >= freeze_steps:
-            torch.nn.utils.clip_grad_norm_(models['encoder'].parameters(), max_grad_norm)
-        torch.nn.utils.clip_grad_norm_(models['downsample'].parameters(), max_grad_norm)
-        torch.nn.utils.clip_grad_norm_(
-            list(models['upsample'].parameters()) + list(models['decoder'].parameters()), 
-            max_grad_norm
-        )
-
-        if step >= freeze_steps:
-            optimizers['enc'].step()
-        optimizers['down'].step()
-        optimizers['dec'].step()
-        
         
         # ===== Discriminator Forward Pass =====
         # Get text batch (every 2 steps) with auto-reset
-        if step % 2 == 0:
+        if step % config['train']['discriminator_freq'] == 0:
             
             z_q_disc = z_q_disc.clone().detach()
             disc_fake = models['discriminator'](z_q_disc, non_repeated_mask.unsqueeze(-1).clone().detach())
@@ -388,15 +402,44 @@ def train(models: Dict, optimizers: Dict, speech_loader: DataLoader,
             
             
             loss_components = loss_module.step_disc(output)
-            total_loss = loss_components['total_loss']
+            total_lossd = loss_components['total_loss']
             if step % config['logging']['step'] == 0:  
                 logging.info(f"DISC-LOSS---step/total: {step}/{num_steps} real_loss: {loss_components['loss_real']}, fake_loss: {loss_components['loss_fake']}, gp_loss: {loss_components['grad_pen']}, total_loss: {loss_components['total_loss']}")
             
-            optimizers['disc'].zero_grad()
-            total_loss.backward()
-            torch.nn.utils.clip_grad_norm_(models['discriminator'].parameters(), max_grad_norm)
-            optimizers['disc'].step()
-            
+        
+        # Backpropagation   
+        if step % config['train']['discriminator_freq'] == 0:
+            total_lossg += total_lossd
+        total_lossg.backward()
+
+        if step % config['train']['gradient_accumulation_steps'] == 0:
+            # Gradient clipping
+            max_grad_norm = config['train']['grad_clip']
+            if step >= freeze_steps:
+                torch.nn.utils.clip_grad_norm_(models['encoder'].parameters(), max_grad_norm)
+            torch.nn.utils.clip_grad_norm_(models['downsample'].parameters(), max_grad_norm)
+            torch.nn.utils.clip_grad_norm_(
+                list(models['upsample'].parameters()) + list(models['decoder'].parameters()), 
+                max_grad_norm
+            )
+            if step % config['train']['discriminator_freq'] == 0:
+                torch.nn.utils.clip_grad_norm_(models['discriminator'].parameters(), max_grad_norm)
+
+            if step >= freeze_steps:
+                optimizers['enc'].step()
+            optimizers['down'].step()
+            optimizers['dec'].step()
+            if step % config['train']['discriminator_freq'] == 0:
+                optimizers['disc'].step()
+                
+            # Backward pass
+            if step >= freeze_steps:
+                optimizers['enc'].zero_grad()    
+            optimizers['down'].zero_grad()
+            optimizers['dec'].zero_grad()
+            if step % config['train']['discriminator_freq'] == 0:
+                optimizers['disc'].zero_grad()
+        
             
         # Checkpoint
         if step % config['checkpoint']['step'] == 0:
@@ -409,8 +452,6 @@ def train(models: Dict, optimizers: Dict, speech_loader: DataLoader,
                 'config': config
             }, checkpoint_path)
             logging.info(f"Saved checkpoint to {checkpoint_path}")
-
-        step += 1
         
 if __name__ == "__main__":
     main()

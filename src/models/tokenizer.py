@@ -143,14 +143,15 @@ class Tokenizer(nn.Module):
             Tensor: Histogram of shape (num_codebooks,), representing the count of each codebook entry.
         """
         # Flatten indices across batch and time
-        flattened_indices = encoding_indices.view(-1)  # Shape: (B*T,)
+        flattened_indices = encoding_indices.detach().view(-1)  # Shape: (B*T,)
 
         # Compute histogram
         histogram = torch.bincount(flattened_indices, minlength=self.num_codebooks).float()
         # Accumulate usage
-        self.codebook_usage += histogram.cpu()
+        # self.codebook_usage += histogram.cpu()
         
         plt.clf() 
+        # plt.bar(range(self.num_codebooks), torch.log(histogram).cpu().numpy())
         plt.bar(range(self.num_codebooks), histogram.cpu().numpy())
         plt.xlabel("Codebook Index")
         plt.ylabel("Count")
