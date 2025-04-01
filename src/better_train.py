@@ -8,7 +8,10 @@ import warnings
 import sys
 
 sys.path.append(f"{os.getcwd()}/models/decoder")
-
+logging.basicConfig(level=logging.INFO)
+warnings.simplefilter("ignore")
+logging.getLogger('matplotlib').disabled = True
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 import torch
 import torch.nn as nn
@@ -27,8 +30,7 @@ from models.gtruth import Gtruth
 from models.tokenizer import Tokenizer
 from loss import Loss
 
-warnings.simplefilter("ignore")
-logging.getLogger('matplotlib').disabled = True
+
 random.seed(42)
 torch.manual_seed(42)
 np.random.seed(42)
@@ -258,6 +260,8 @@ def train(models: Dict, optimizers: Dict, speech_loader: DataLoader,
     models['upsample'].train()
     models['decoder'].train()
     models['discriminator'].train()
+    
+    loss_module.gan_loss.training = True
 
     for step in range(1, num_steps + 1):
         output = {}
@@ -359,9 +363,10 @@ def train(models: Dict, optimizers: Dict, speech_loader: DataLoader,
         # Get text batch (every 2 steps) with auto-reset
         if step % 2 == 0:
             
-            disc_fake = models['discriminator'](z_q_disc.clone().detach(), non_repeated_mask.unsqueeze(-1).clone().detach())
+            z_q_disc = z_q_disc.clone().detach()
+            disc_fake = models['discriminator'](z_q_disc, non_repeated_mask.unsqueeze(-1).clone().detach())
             output['disc_fake'] = disc_fake
-            output["z_q_disc"] = z_q_disc
+            output["disc_fake_x"] = z_q_disc
         
             try:
                 text, tmask = next(text_iter)
@@ -374,12 +379,14 @@ def train(models: Dict, optimizers: Dict, speech_loader: DataLoader,
             text_emb = models['codebook'](text)
             disc_real = models['discriminator'](text_emb, tmask.unsqueeze(-1))
             output['disc_real'] = disc_real
-            output['disc_real_x'] = text
+            output['disc_real_x'] = text_emb
 
 
      
             # Discriminator training
             loss_module.gan_loss.discriminator = models['discriminator']
+            
+            
             loss_components = loss_module.step_disc(output)
             total_loss = loss_components['total_loss']
             if step % config['logging']['step'] == 0:  

@@ -99,6 +99,8 @@ class Loss:
     def step_disc(self, output, step=0, total_steps=None):
         # fake, real, fake_x, real_x, fake_smooth=0.0, real_smooth=0.0):
         
+        print(output['disc_fake'].shape, output['disc_real'].shape, output['disc_fake_x'].shape, output['disc_real_x'].shape)
+        
         loss = self.gan_loss(output["disc_fake"], output["disc_real"], output["z_q_disc"], output["disc_real_x"])        
         return loss
         
