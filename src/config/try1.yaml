@@ -13,7 +13,7 @@ dataset_txt:
 encoder:
   ckpt_path: "hubert_base_ls960.pt"
   encoder_embed_dim: 768
-  frozen_layers: ["10", "11"]
+  frozen_layers: ["11", "10", "9"]
 
 
 downsample:
@@ -45,24 +45,26 @@ discriminator:
 
 train:
   seed: 42124
-  lr_gen: 0.0005 
+  lr_enc: 0.00005
+  lr_down: 0.0005
+  lr_dec: 0.0005
   lr_disc: 0.0005
   grad_clip: 1.0
   
   num_steps: 20000
-  freeze_steps: 10000
+  freeze_steps: 1000
   discriminator_freq: 2
   mixed_precision: True
-  gradient_accumulation_steps: 2
+  gradient_accumulation_steps: 4
 
   resume_checkpoint: False
   resume_path: "checkpoints/step_10000.pth"
 
 loss:
   recon_loss_weight: 1.0
-  smooth_loss_weight: 1.0
-  commit_loss_weight: 100.0
-  diversity_loss_weight: 0.0
+  smooth_loss_weight: 0.1
+  commit_loss_weight: 1.0
+  diversity_loss_weight: 0.1
   gen_loss_weight: 1.0
 
   disc_loss_weight: 1.0

@@ -180,16 +180,16 @@ def configure_optimizers(models: Dict, config: Dict) -> Dict:
     optimizers = {
         'enc': optim.AdamW(
             [p for p in models['encoder'].parameters() if p.requires_grad],
-            lr=config['train']['lr_gen']
+            lr=config['train']['lr_enc']
         ),
         'down': optim.AdamW(
             [p for p in models['downsample'].parameters() if p.requires_grad],
-            lr=config['train']['lr_gen']
+            lr=config['train']['lr_down']
         ),
         'dec': optim.AdamW(
             [p for p in models['upsample'].parameters() if p.requires_grad] +
             [p for p in models['decoder'].parameters() if p.requires_grad],
-            lr=config['train']['lr_gen']
+            lr=config['train']['lr_dec']
         ),
         'disc': optim.AdamW(
             [p for p in models['discriminator'].parameters() if p.requires_grad],
