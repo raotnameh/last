@@ -101,7 +101,7 @@ class Loss:
         
         print(output['disc_fake'].shape, output['disc_real'].shape, output['disc_fake_x'].shape, output['disc_real_x'].shape)
         
-        loss = self.gan_loss(output["disc_fake"], output["disc_real"], output["z_q_disc"], output["disc_real_x"])        
+        loss = self.gan_loss(output["disc_fake"], output["disc_real"], output["disc_fake_x"], output["disc_real_x"])        
         return loss
         
 
