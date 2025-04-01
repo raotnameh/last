@@ -53,7 +53,7 @@ train:
   freeze_steps: 10000
   discriminator_freq: 2
   mixed_precision: True
-  gradient_accumulation_steps: 1
+  gradient_accumulation_steps: 2
 
   resume_checkpoint: False
   resume_path: "checkpoints/step_10000.pth"
