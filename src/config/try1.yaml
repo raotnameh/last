@@ -1,13 +1,20 @@
 dataset_speech:
   # path: "/raid/home/rajivratn/hemant_rajivratn/librispeech/data/manifest/train-clean-100.tsv"
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeechmanifest.tsv"
+  min_duration: 32000
+  max_duration: 320000
+  batch_size: 32
 
 dataset_txt:
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/transcription.txt"
   # path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech-lm-norm.txt"
+  batch_size: 32
 
 encoder:
   ckpt_path: "hubert_base_ls960.pt"
+  encoder_embed_dim: 768
+  frozen_layers: ["10", "11"]
+
 
 downsample:
   kernel_size: 1
@@ -36,15 +43,22 @@ discriminator:
   kernel_size: 9
 
 
-train: 
-  lr_enc: 0.00005
+train:
+  seed: 42124
+
+
+  lr_enc: 0.0005
   lr_down: 0.0005
   lr_dec: 0.0005
+  
+  lr_gen: 0.0005 
   lr_disc: 0.0005
-  num_steps: 10000
 
-  freez_steps: 10000
+  num_steps: 20000
 
+  freeze_steps: 100
+
+  grad_clip: 1.0
 loss:
   recon_loss_weight: 1.0
   smooth_loss_weight: 1.0
@@ -54,4 +68,14 @@ loss:
 
   disc_loss_weight: 1.0
   gp_weight: 1.0
+
+
+checkpoint: 
+  dir: "checkpoints"
+  step: 10
+
+logging: 
+  dir: "logs"
+  step: 10
+
 

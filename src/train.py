@@ -18,6 +18,16 @@ logging.getLogger('matplotlib').disabled = True
 random.seed(42)
 torch.manual_seed(42)
 np.random.seed(42)
+from datetime import datetime
+
+
+# Configure logging
+os.makedirs("logging", exist_ok=True)
+log_filename = datetime.now().strftime("training_%Y-%m-%d_%H-%M-%S.log")
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s',
+                    handlers=[logging.FileHandler(f"logging/{log_filename}"), logging.StreamHandler()])
+
+
 
 class ShuffledBatchSampler(BatchSampler):
     def __init__(self, sampler, batch_size, drop_last):
@@ -32,6 +42,8 @@ class ShuffledBatchSampler(BatchSampler):
 
 # step 00 :- Prepare the Hyperparameters
 config = yaml.load( open("config/try1.yaml", "r"), Loader=yaml.FullLoader)
+logging.info("Loaded Configuration:\n" + yaml.dump(config, default_flow_style=False))
+
 
 # step 01 :- Prepare the speech dataset.
 from dataset_speech import Dataset_speech
@@ -66,7 +78,7 @@ titer_data = iter(tdataloader)
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 from models.codebook import Codebook
 codebook = Codebook(vocab)
-print(f"Size of codebook: {codebook.embedding.weight.shape[0]} x {codebook.embedding.weight.shape[1]}")
+logging.info(f"Size of codebook: {codebook.embedding.weight.shape[0]} x {codebook.embedding.weight.shape[1]}")
 
 # step 04 :- Prepare the ground truth using dac codec
 from models.gtruth import Gtruth
@@ -120,30 +132,25 @@ if __name__ == "__main__":
 
     # Non trainable steps
     codebook.embedding.weight.requires_grad = False
-    print(F"Parameters in codebook are trainable: {codebook.embedding.weight.requires_grad}")
-
+    logging.info(f"Parameters in codebook are trainable: {codebook.embedding.weight.requires_grad}")
     for name, param in encoder.named_parameters():
         if "10" in name or "11" in name:
             param.requires_grad = True
         else:
             param.requires_grad = False
-    print(f"Trainable parameters in encoder: {sum(p.numel() for p in encoder.parameters() if p.requires_grad) / 1e6}M")
+    logging.info(f"Parameters in encoder are trainable: {sum(p.numel() for p in encoder.parameters() if p.requires_grad) / 1e6}M")
 
     # ========================
     # Parameters count in millions
     # ========================
-    print(f"Parameters in codebook: {sum(p.numel() for p in codebook.parameters()) / 1e6}M")
-    print(f"Parameters in encoder: {sum(p.numel() for p in encoder.parameters()) / 1e6}M")
-    print(f"Parameters in downsample: {sum(p.numel() for p in downsample.parameters()) / 1e6}M")
-    print(f"Parameters in tokenizer: {sum(p.numel() for p in tokenizer.parameters()) / 1e6}M")
-    print(f"Parameters in upsample: {sum(p.numel() for p in upsample.parameters()) / 1e6}M")
-    print(f"Parameters in decoder: {sum(p.numel() for p in decoder.parameters()) / 1e6}M")
-    print(f"Parameters in discriminator: {sum(p.numel() for p in discriminator.parameters()) / 1e6}M")
-
-
-
-
-
+    logging.info(f"Parameters in codebook: {sum(p.numel() for p in codebook.parameters()) / 1e6}M")
+    logging.info(f"Parameters in encoder: {sum(p.numel() for p in encoder.parameters()) / 1e6}M")
+    logging.info(f"Parameters in downsample: {sum(p.numel() for p in downsample.parameters()) / 1e6}M")
+    logging.info(f"Parameters in tokenizer: {sum(p.numel() for p in tokenizer.parameters()) / 1e6}M")
+    logging.info(f"Parameters in upsample: {sum(p.numel() for p in upsample.parameters()) / 1e6}M")
+    logging.info(f"Parameters in decoder: {sum(p.numel() for p in decoder.parameters()) / 1e6}M")
+    logging.info(f"Parameters in discriminator: {sum(p.numel() for p in discriminator.parameters()) / 1e6}M")
+    
 
 
     # ========================
@@ -156,9 +163,13 @@ if __name__ == "__main__":
     downsample_params = list([p for p in downsample.parameters() if p.requires_grad])
     decoder_params = list([p for p in upsample.parameters() if p.requires_grad]) 
     decoder_params += list([p for p in decoder.parameters() if p.requires_grad])
+    logging.info(f"Parameters in encoder: {sum(p.numel() for p in encoder_params) / 1e6}M")
+    logging.info(f"Parameters in downsample: {sum(p.numel() for p in downsample_params) / 1e6}M")
+    logging.info(f"Parameters in upsample: {sum(p.numel() for p in decoder_params) / 1e6}M")
+    logging.info(f"Parameters in decoder: {sum(p.numel() for p in decoder_params) / 1e6}M")
 
     disc_params = list(discriminator.parameters())
-    print(f"Parameters in discriminator: {sum(p.numel() for p in disc_params) / 1e6}M")
+    logging.info(f"Parameters in discriminator: {sum(p.numel() for p in disc_params) / 1e6}M")
 
 
     optimizer_enc = optim.Adam(encoder_params, lr=config['train']['lr_enc'])
@@ -183,7 +194,7 @@ if __name__ == "__main__":
     # ========================
     step = 1
     while True:
-        encoder.eval()
+        encoder.train()
         downsample.train()
         upsample.train()
         decoder.train()
@@ -202,8 +213,7 @@ if __name__ == "__main__":
             padding_masks = enc_out['padding_mask'] # [B, T // 320] 
             output["cnn_out"] = enc_out['cnn_out'] # [B, T // 320] 
             output['encoder_out'] = enc_out['encoder_out'] # [B, T // 320] 
-            output['padding_mask'] = padding_masks # [B, T // 320] 
-            # print(output['encoder_out'])
+            output['padding_mask'] = padding_masks # [B, T // 320] ``
             
             mask = ~padding_masks # B,T//320,1 # 0 for masked positions.
             mask = mask.unsqueeze(-1).float()
@@ -219,7 +229,7 @@ if __name__ == "__main__":
             output['down_out'] = down_out
             output['dmask'] = dmask
             
-            commitment_loss, diversity_loss, z_q, z_q_disc, encoding_indices, non_repeated_min_encoding_indices = tokenizer(down_out, codebook, dmask) # [B, T // 2, C], [B, T // 2, C], [B, T // 2] # step 3 -- all the necessary masks are already applied in the tokenizer
+            commitment_loss, diversity_loss, z_q, z_q_disc, encoding_indices, non_repeated_min_encoding_indices, non_repeated_mask = tokenizer(down_out, codebook, dmask) # [B, T // 2, C], [B, T // 2, C], [B, T // 2] # step 3 -- all the necessary masks are already applied in the tokenizer
             output['commitment_loss'] = commitment_loss
             output['z_q'] = z_q
             output['encoding_indices'] = encoding_indices
@@ -246,16 +256,16 @@ if __name__ == "__main__":
             #     output['dis_real_x'] = text
             #     output['tmask'] = tmask
                 
-            #     # ===== Loss Computation =====
-            #     loss.gan_loss.discriminator = discriminator
-            #     total_loss = loss.step_disc(output, step, num_steps)
-            #     # ===== Backward Pass ===== 
-            #     optimizer_disc.zero_grad()
-            #     total_loss.backward()
-            #     torch.nn.utils.clip_grad_norm_(disc_params, max_norm=5.0)
-            #     optimizer_disc.step()
+                # # ===== Loss Computation =====
+                # loss.gan_loss.discriminator = discriminator
+                # total_loss = loss.step_disc(output, step, num_steps)
+                # # ===== Backward Pass ===== 
+                # optimizer_disc.zero_grad()
+                # total_loss.backward()
+                # torch.nn.utils.clip_grad_norm_(disc_params, max_norm=5.0)
+                # optimizer_disc.step()
                 
-            #     step += 1
+                # step += 1
             #     continue
                  
             # ===== Generator Forward Pass Continued =====
@@ -272,7 +282,11 @@ if __name__ == "__main__":
             output['dec_mask'] = dec_mask
             
             # ===== Loss Computation =====
-            total_loss = loss.step_gen(output, step, num_steps)
+            loss_components = loss.step_gen(output)
+            if step % 10 == 0:    
+                logging.info(f"GEN-LOSS---step/total: {step}/{num_steps} rec_loss: {loss_components['rec_loss']}, commit_loss: {loss_components['commit_loss']}, smooth_loss: {loss_components['smooth_loss']}, gen_loss: {loss_components['gen_loss']}, diversity_loss: {loss_components['diversity_loss']}")
+            total_loss = sum(loss_components.values())
+            
             # ===== Backward Pass ===== 
             total_loss.backward()
             torch.nn.utils.clip_grad_norm_(downsample_params, max_norm=5.0)
