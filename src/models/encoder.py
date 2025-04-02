@@ -36,6 +36,7 @@ class Encoder(torch.nn.Module):
         model[0].remove_pretraining_modules()
         
         self.model = model[0]
+    
         self.cfg = cfg
       
     def forward(self, source, padding_mask): 
