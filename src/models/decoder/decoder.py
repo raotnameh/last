@@ -6,11 +6,11 @@ import torch.nn.functional as F
 
 
 class Upsample(nn.Module):
-    def __init__(self, input_dim, output_dim=256, kernel_size=9, stride=2):
+    def __init__(self, input_dim, output_dim=256, kernel_size=9, stride=2, groups=1):
         super().__init__()
         
         self.norm = torch.nn.LayerNorm(input_dim)
-        self.conv = nn.ConvTranspose1d( input_dim, output_dim, kernel_size, stride=stride,padding=((kernel_size - 1)) // 2, output_padding=stride - 1)
+        self.conv = nn.ConvTranspose1d( input_dim, output_dim, kernel_size, stride=stride,padding=((kernel_size - 1)) // 2, output_padding=stride - 1, groups=groups)
           
     def forward(self, x): # B x T x C 
         x = self.norm(x)

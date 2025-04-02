@@ -1,3 +1,14 @@
+checkpoint: 
+  dir: "checkpoints"
+  step: 10000
+
+logging: 
+  dir: "logs"
+  step: 20
+
+device: "cuda"
+
+
 dataset_speech:
   # path: "/raid/home/rajivratn/hemant_rajivratn/librispeech/data/manifest/train-clean-100.tsv"
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeechmanifest.tsv"
@@ -19,12 +30,14 @@ encoder:
   frozen_layers: ["11", "10", "9"]
 
 downsample:
-  kernel_size: 1
+  kernel_size: &kernel_size_value 9
   stride: &stride_value 2
+  groups: &groups_value 128
 
 upsample:
-  kernel_size: 1
+  kernel_size: *kernel_size_value
   stride: *stride_value
+  groups: *groups_value
 
 decoder:
   speaker:
@@ -73,15 +86,6 @@ loss:
 
   disc_loss_weight: 1.0
   gp_weight: 0.1
-
-
-checkpoint: 
-  dir: "checkpoints"
-  step: 10000
-
-logging: 
-  dir: "logs"
-  step: 20
 
 
 

@@ -143,6 +143,7 @@ def setup_models(config: Dict, vocab: nn.Module) -> Dict:
         output_dim=models['codebook'].embedding.weight.shape[1],
         kernel_size=config['downsample']['kernel_size'],
         stride=config['downsample']['stride'],
+        groups=config['downsample']['groups'],
         )
     
     models['tokenizer'] = Tokenizer(
@@ -154,6 +155,7 @@ def setup_models(config: Dict, vocab: nn.Module) -> Dict:
         output_dim=config["decoder"]["transformer"]["decoder_hidden"],
         kernel_size=config['upsample']['kernel_size'],
         stride=config['upsample']['stride'],
+        groups=config['upsample']['groups'],
         )
  
     models['decoder'] = Decoder(config['decoder'])
@@ -171,11 +173,11 @@ def setup_models(config: Dict, vocab: nn.Module) -> Dict:
     total_params = 0
     for name, model in models.items():
         cur_params = sum(p.numel() for p in model.parameters()) / 1e6
-        logging.info("%s parameters: %.1fM", 
+        logging.info("%s parameters: %.4fM", 
                     name.capitalize(), 
                     cur_params)
         total_params += cur_params
-    logging.info("Total parameters: %.1fM", total_params)
+    logging.info("Total parameters: %.4fM", total_params)
     
     return models
 
@@ -197,11 +199,11 @@ def configure_training_mode(models: Dict, config: Dict) -> None:
     total_params = 0
     for name, model in models.items():
         cur_params = sum(p.numel() for p in model.parameters() if p.requires_grad) / 1e6
-        logging.info("%s trainable parameters: %.1fM",
+        logging.info("%s trainable parameters: %.4fM",
                     name.capitalize(), 
                     cur_params)
         total_params += cur_params
-    logging.info("Total trainable parameters: %.1fM", total_params)  
+    logging.info("Total trainable parameters: %.4fM", total_params)  
 
 
 # step :- Prepare the optimizer
@@ -440,7 +442,9 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
         # Backpropagation   
         if step % config['train']['discriminator_freq'] == 0:
             total_lossg += total_lossd
+        total_lossg /= config['train']['gradient_accumulation_steps']
         total_lossg.backward()
+        
 
         if step % config['train']['gradient_accumulation_steps'] == 0:
             # Gradient clipping
@@ -468,14 +472,9 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             # scheduler step
             for scheduler in schedulers.values():
                 scheduler.step()
-            
-            if step >= freeze_steps:
-                optimizers['enc'].zero_grad()    
-            optimizers['down'].zero_grad()
-            optimizers['dec'].zero_grad()
-            if step % config['train']['discriminator_freq'] == 0:
-                optimizers['disc'].zero_grad()
-                optimizers['codebook'].zero_grad()
+            # Zero gradients after the step
+            for optimizer in optimizers.values():
+                optimizer.zero_grad()
         
             
         # Checkpoint
@@ -523,7 +522,7 @@ def main():
     configure_training_mode(models, config)
     
     # Move models to device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device(config.get("device"))
     for model in models.values():
         model.to(device)
         
