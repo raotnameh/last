@@ -3,6 +3,8 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 import random
 from tqdm.auto import tqdm  
+import logging
+
 
 class Dataset_txt(Dataset):
     def __init__(self, data="/raid/home/rajivratn/hemant_rajivratn/last/data/transcription.txt"):
@@ -27,12 +29,13 @@ class Dataset_txt(Dataset):
         
         self.char_to_idx = {char: idx for idx, char in enumerate(self.vocab)} # char to index mapping
         self.idx_to_char = {idx: char for idx, char in enumerate(self.vocab)} # index to char mapping
-        print(F"Vocab: {self.vocab}")
-        print(F"-p- is for padding and -?- is for silence")
-        print(F"Vocab Size: {len(self.vocab)}")
+        
+        logging.info(f"Vocab Size: {len(self.vocab)}")
+        logging.info(f"Vocab: {self.vocab}")
+        logging.info(f"-p- is for padding and -?- is for silence")
     
     def add_question_marks(self):
-        print(f"Preprocessing the text data adding silence tokens.")
+        logging.info(f"Preprocessing the text data by adding silence tokens.")
         
         modified_texts = []
         for sentence in tqdm(self.texts):
@@ -69,8 +72,10 @@ class Dataset_txt(Dataset):
         """Encodes text into a list of indices."""
         return [self.char_to_idx[char] for char in text]
 
-    def decode(self, indices):
+    def decode(self, indices, keep_special_tokens=False):
         """Decodes indices back into text, removing all special tokens."""
+        if keep_special_tokens:
+            return "".join(self.idx_to_char[idx] for idx in indices)
         return "".join(self.idx_to_char[idx] for idx in indices if self.idx_to_char[idx] not in {"p", "?"})
 
     def __len__(self):

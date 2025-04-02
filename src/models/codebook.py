@@ -1,12 +1,14 @@
 import torch
 import torch.nn as nn
 
+from transformers import AutoTokenizer, AutoModel
+        
+        
 class Codebook(nn.Module):
     def __init__(self, vocab, model_name="meta-llama/Llama-3.2-1B-Instruct"):
         super(Codebook, self).__init__()
         
         # Initialize the model and tokenizer 
-        from transformers import AutoTokenizer, AutoModel
         tokenizer = AutoTokenizer.from_pretrained(model_name)
         model = AutoModel.from_pretrained(model_name)
 

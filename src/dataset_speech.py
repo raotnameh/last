@@ -1,9 +1,12 @@
 import os
+import logging
+
 
 import torch
 import soundfile as sf
 from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
+
 
 
 class Dataset_speech(Dataset):
@@ -27,8 +30,8 @@ class Dataset_speech(Dataset):
                     max_dur = max(max_dur, duration)
                     tot_dur += duration
                     
-        print(f"Speech dataset duration range in seconds: {min_dur/16000:.2f} - {max_dur/16000:.2f} | Total duration in hours: {tot_dur/16000/3600:.2f}")
-        print(f"Max duration: {max_dur}")
+        logging.info(f"Speech dataset duration range in seconds: {min_dur/16000:.2f} - {max_dur/16000:.2f} | Total duration in hours: {tot_dur/16000/3600:.2f}")
+        logging.info(f"Max duration: {max_dur}")
         # Sort by duration
         paths.sort(key=lambda x: x[1])
         self.paths = paths
