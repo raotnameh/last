@@ -80,12 +80,12 @@ train:
 loss:
   recon_loss_weight: 1.0
   smooth_loss_weight: 0.1
-  commit_loss_weight: 1.0
+  commit_loss_weight: 10.0
   diversity_loss_weight: 0.0
   gen_loss_weight: 1.0
 
   disc_loss_weight: 1.0
-  gp_weight: 0.1
+  gp_weight: 1.0
 
 
 
