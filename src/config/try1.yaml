@@ -19,7 +19,7 @@ dataset_speech:
 dataset_txt:
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/transcription.txt"
   # path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech-lm-norm.txt"
-  batch_size: 32
+  batch_size: 64
 
 codebook:
   model_name: "meta-llama/Llama-3.2-1B-Instruct"
@@ -32,12 +32,18 @@ encoder:
 downsample:
   kernel_size: &kernel_size_value 9
   stride: &stride_value 2
-  groups: &groups_value 128
+  groups: &groups_value 64
 
 upsample:
   kernel_size: *kernel_size_value
   stride: *stride_value
   groups: *groups_value
+
+discriminator:
+  hidden_dim: 256
+  kernel_size: 9
+  groups: *groups_value
+
 
 decoder:
   speaker:
@@ -53,9 +59,6 @@ decoder:
     dac_hidden: 1024
   max_seq_len: 1000
 
-discriminator:
-  hidden_dim: 256
-  kernel_size: 9
 
 
 train:
@@ -63,26 +66,26 @@ train:
 
   lr_codebook: 0.00005
   lr_enc: 0.00005
-  lr_down: 0.005
+  lr_down: 0.00005
   lr_dec: 0.005
   lr_disc: 0.0005
-  grad_clip: 1.0
+  grad_clip: 10.0
   
   num_steps: 20000
-  freeze_steps: 10000
-  discriminator_freq: 20000
-  mixed_precision: False
+  freeze_steps: 1000
+  discriminator_freq: 10
   gradient_accumulation_steps: 1
 
+  mixed_precision: True
   resume_checkpoint: False
   resume_path: "checkpoints/step_10000.pth"
 
 loss:
   recon_loss_weight: 1.0
   smooth_loss_weight: 1.0
-  commit_loss_weight: 1.0
-  diversity_loss_weight: 1.0
-  gen_loss_weight: 0.0
+  commit_loss_weight: 10.0
+  diversity_loss_weight: 0.01
+  gen_loss_weight: 1.0
 
   disc_loss_weight: 1.0
   gp_weight: 1.0

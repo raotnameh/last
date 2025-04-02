@@ -4,7 +4,7 @@ import torch.nn as nn
 # torch.nn.LayerNorm(input_dim)
 
 class Conv1dBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, dilation=1, stride=1):
+    def __init__(self, in_channels, out_channels, kernel_size, dilation=1, stride=1, groups=1):
         super().__init__()
         
         self.layernorm = nn.LayerNorm(in_channels)  # Normalize over channel dim
@@ -15,6 +15,7 @@ class Conv1dBlock(nn.Module):
             stride=stride, 
             dilation=dilation, 
             padding=((kernel_size - 1) * dilation) // 2,
+            groups=groups,
         )
         
 
@@ -33,22 +34,16 @@ class Conv1dBlock(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, in_channels=256, hidden_dim=256, kernel_size=11):
+    def __init__(self, in_channels=256, hidden_dim=256, kernel_size=11, groups=1):
         super().__init__()
         
         self.disc_layers = nn.ModuleList([
-            Conv1dBlock(in_channels, hidden_dim, 1),
+            Conv1dBlock(in_channels, hidden_dim, kernel_size=kernel_size, groups=groups),
             nn.GELU(),
             nn.Dropout(0.1),
             Conv1dBlock(hidden_dim, hidden_dim, kernel_size),
             nn.GELU(),
             nn.Dropout(0.1),
-            # Conv1dBlock(hidden_dim, hidden_dim, kernel_size),
-            # nn.GELU(),
-            # nn.Dropout(0.1),
-            # Conv1dBlock(hidden_dim, hidden_dim, kernel_size),
-            # nn.GELU(),
-            # nn.Dropout(0.1),
             # Conv1dBlock(hidden_dim, hidden_dim, kernel_size),
             # nn.GELU(),
             # nn.Dropout(0.1),
