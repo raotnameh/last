@@ -21,6 +21,8 @@ import torch.optim as optim
 import yaml
 from torch.utils.data import DataLoader, SequentialSampler, BatchSampler
 from torch.optim.lr_scheduler import LambdaLR
+from torch.utils.tensorboard import SummaryWriter
+
 
 # Local imports
 from dataset_speech import Dataset_speech
@@ -131,7 +133,7 @@ def initialize_datasets(config: Dict) -> Tuple[DataLoader, DataLoader, Dict]:
 def setup_models(config: Dict, vocab: nn.Module) -> Dict:
     """Initialize and configure model components."""
     models = {
-        'codebook': Codebook(vocab), # Always non trainable
+        'codebook': Codebook(vocab, config['codebook']['model_name']),
         'gtruth': Gtruth(), # Always non trainable
         'encoder': Encoder(config['encoder']['ckpt_path']),
     }
@@ -166,10 +168,14 @@ def setup_models(config: Dict, vocab: nn.Module) -> Dict:
 
     
     # Log model parameters
+    total_params = 0
     for name, model in models.items():
+        cur_params = sum(p.numel() for p in model.parameters()) / 1e6
         logging.info("%s parameters: %.1fM", 
                     name.capitalize(), 
-                    sum(p.numel() for p in model.parameters()) / 1e6)
+                    cur_params)
+        total_params += cur_params
+    logging.info("Total parameters: %.1fM", total_params)
     
     return models
 
@@ -177,7 +183,7 @@ def setup_models(config: Dict, vocab: nn.Module) -> Dict:
 def configure_training_mode(models: Dict, config: Dict) -> None:
     """Set model training modes and parameter requirements."""
     # Freeze codebook
-    models['codebook'].embedding.weight.requires_grad_(False)
+    # models['codebook'].embedding.weight.requires_grad_(False)
     
     # Partially freeze encoder
     for name, param in models['encoder'].named_parameters():
@@ -188,8 +194,14 @@ def configure_training_mode(models: Dict, config: Dict) -> None:
                 param.requires_grad = False
     
     # Log trainable parameters
-    trainable_params = sum(p.numel() for p in models['encoder'].parameters() if p.requires_grad)
-    logging.info("Trainable encoder parameters: %.1fM", trainable_params / 1e6)
+    total_params = 0
+    for name, model in models.items():
+        cur_params = sum(p.numel() for p in model.parameters() if p.requires_grad) / 1e6
+        logging.info("%s trainable parameters: %.1fM",
+                    name.capitalize(), 
+                    cur_params)
+        total_params += cur_params
+    logging.info("Total trainable parameters: %.1fM", total_params)  
 
 
 # step :- Prepare the optimizer
@@ -215,6 +227,11 @@ def configure_optimizers(models: Dict, config: Dict) -> Dict:
             lr=config['train']['lr_disc']
         )
     }
+    
+    optimizers["codebook"] = optim.AdamW(
+            [p for p in models['codebook'].parameters() if p.requires_grad],
+            lr=config['train']['lr_codebook']
+            )
     
     def tri_stage_scheduler(optimizer, total_steps, phase_ratio=[0.03, 0.9, 0.07]):
         """
@@ -250,7 +267,8 @@ def configure_optimizers(models: Dict, config: Dict) -> Dict:
         'enc': tri_stage_scheduler(optimizers['enc'], total_steps, phase_ratio),
         'down': tri_stage_scheduler(optimizers['down'], total_steps, phase_ratio),
         'dec': tri_stage_scheduler(optimizers['dec'], total_steps, phase_ratio),
-        'disc': tri_stage_scheduler(optimizers['disc'], total_steps, phase_ratio)
+        'disc': tri_stage_scheduler(optimizers['disc'], total_steps, phase_ratio),
+        'codebook': tri_stage_scheduler(optimizers['codebook'], total_steps, phase_ratio)
     }
     
     return optimizers, schedulers
@@ -282,6 +300,9 @@ def load_checkpoint(checkpoint_path, models, optimizers, device):
     
 
 def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLoader, text_loader: DataLoader, loss_module: Loss, config: Dict, device: torch.device, start_step: int):
+    
+    # Initialize TensorBoard writer
+    writer = SummaryWriter(log_dir=config['logging'].get('log_dir', './logs'))
     
     num_steps = config['train']['num_steps']
     freeze_steps = config['train']['freeze_steps']
@@ -363,12 +384,19 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
         output['disc_fake'] = disc_fake
         
         # Loss calculation
-        loss_components = loss_module.step_gen(output)
-        total_lossg = sum(loss_components.values())
+        gen_loss_components = loss_module.step_gen(output)
+        total_lossg = sum(gen_loss_components.values())
         if step % config['logging']['step'] == 0:    
-            logging.info(f"GEN-LOSS---step/total: {step}/{num_steps} rec_loss: {loss_components['rec_loss']}, commit_loss: {loss_components['commit_loss']}, smooth_loss: {loss_components['smooth_loss']}, gen_loss: {loss_components['gen_loss']}, diversity_loss: {loss_components['diversity_loss']}, total_loss: {total_lossg}")
+            logging.info(f"GEN-LOSS---step/total: {step}/{num_steps} rec_loss: {gen_loss_components['rec_loss']}, commit_loss: {gen_loss_components['commit_loss']}, smooth_loss: {gen_loss_components['smooth_loss']}, gen_loss: {gen_loss_components['gen_loss']}, diversity_loss: {gen_loss_components['diversity_loss']}, total_loss: {total_lossg}")
+            
+            writer.add_scalar('loss/rec_loss', gen_loss_components['rec_loss'], step)
+            writer.add_scalar('loss/commit_loss', gen_loss_components['commit_loss'], step)
+            writer.add_scalar('loss/smooth_loss', gen_loss_components['smooth_loss'], step)
+            writer.add_scalar('loss/gen_loss', gen_loss_components['gen_loss'], step)
+            writer.add_scalar('loss/diversity_loss', gen_loss_components['diversity_loss'], step)
+            writer.add_scalar('loss/total_loss_gen', total_lossg, step)
         
-
+        
         
         # ===== Discriminator Forward Pass =====
         # Get text batch (every 2 steps) with auto-reset
@@ -398,11 +426,16 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             loss_module.gan_loss.discriminator = models['discriminator']
             
             
-            loss_components = loss_module.step_disc(output)
-            total_lossd = loss_components['total_loss']
+            disc_loss_components = loss_module.step_disc(output)
+            total_lossd = disc_loss_components['total_loss']
             if step % config['logging']['step'] == 0:  
-                logging.info(f"DISC-LOSS---step/total: {step}/{num_steps} real_loss: {loss_components['loss_real']}, fake_loss: {loss_components['loss_fake']}, gp_loss: {loss_components['grad_pen']}, total_loss: {loss_components['total_loss']}")
-            
+                logging.info(f"DISC-LOSS---step/total: {step}/{num_steps} real_loss: {disc_loss_components['loss_real']}, fake_loss: {disc_loss_components['loss_fake']}, gp_loss: {disc_loss_components['grad_pen']}, total_loss: {disc_loss_components['total_loss']}")
+                
+                writer.add_scalar('loss/discriminator_total_loss', total_lossd, step)
+                writer.add_scalar('loss/discriminator_real_loss', disc_loss_components['loss_real'], step)
+                writer.add_scalar('loss/discriminator_fake_loss', disc_loss_components['loss_fake'], step)
+                writer.add_scalar('loss/discriminator_gp_loss', disc_loss_components['grad_pen'], step)
+        
         
         # Backpropagation   
         if step % config['train']['discriminator_freq'] == 0:
@@ -421,6 +454,7 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             )
             if step % config['train']['discriminator_freq'] == 0:
                 torch.nn.utils.clip_grad_norm_(models['discriminator'].parameters(), max_grad_norm)
+                torch.nn.utils.clip_grad_norm_(models['codebook'].parameters(), max_grad_norm)
 
             # Optimizer step
             if step >= freeze_steps:
@@ -429,6 +463,7 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             optimizers['dec'].step()
             if step % config['train']['discriminator_freq'] == 0:
                 optimizers['disc'].step()
+                optimizers['codebook'].step()
             
             # scheduler step
             for scheduler in schedulers.values():
@@ -440,6 +475,7 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             optimizers['dec'].zero_grad()
             if step % config['train']['discriminator_freq'] == 0:
                 optimizers['disc'].zero_grad()
+                optimizers['codebook'].zero_grad()
         
             
         # Checkpoint
@@ -454,7 +490,7 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             }, checkpoint_path)
             logging.info(f"Saved checkpoint to {checkpoint_path}")
 
-
+    writer.close()
 
 
 
@@ -511,7 +547,6 @@ def main():
         start_step = checkpoint_info['step'] + 1
         logging.info(f"Resuming training from step {start_step}")
 
-    
     
     # Main training loop
     try:
