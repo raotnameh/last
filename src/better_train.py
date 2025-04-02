@@ -388,6 +388,7 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
         # Loss calculation
         gen_loss_components = loss_module.step_gen(output)
         total_lossg = sum(gen_loss_components.values())
+        
         if step % config['logging']['step'] == 0:    
             logging.info(f"GEN-LOSS---step/total: {step}/{num_steps} rec_loss: {gen_loss_components['rec_loss']}, commit_loss: {gen_loss_components['commit_loss']}, smooth_loss: {gen_loss_components['smooth_loss']}, gen_loss: {gen_loss_components['gen_loss']}, diversity_loss: {gen_loss_components['diversity_loss']}, total_loss: {total_lossg}")
             
@@ -438,7 +439,9 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
                 writer.add_scalar('Discriminator_loss/discriminator_fake_loss', disc_loss_components['loss_fake'], step)
                 writer.add_scalar('Discriminator_loss/discriminator_gp_loss', disc_loss_components['grad_pen'], step)
         
-        
+        if step % config['logging']['step'] == 0:  
+            print(f"LR enc: {schedulers['enc'].get_last_lr()[0]}, LR down: {schedulers['down'].get_last_lr()[0]}, LR dec: {schedulers['dec'].get_last_lr()[0]}, LR disc: {schedulers['disc'].get_last_lr()[0]}, LR codebook: {schedulers['codebook'].get_last_lr()[0]}")
+            
         # Backpropagation   
         if step % config['train']['discriminator_freq'] == 0:
             total_lossg += total_lossd
