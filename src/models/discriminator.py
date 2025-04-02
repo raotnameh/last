@@ -38,15 +38,12 @@ class Discriminator(nn.Module):
         super().__init__()
         
         self.disc_layers = nn.ModuleList([
-            Conv1dBlock(in_channels, hidden_dim, kernel_size=kernel_size, groups=groups),
+            Conv1dBlock(in_channels, hidden_dim, kernel_size=1, groups=groups),
             nn.GELU(),
             nn.Dropout(0.1),
             Conv1dBlock(hidden_dim, hidden_dim, kernel_size),
             nn.GELU(),
             nn.Dropout(0.1),
-            # Conv1dBlock(hidden_dim, hidden_dim, kernel_size),
-            # nn.GELU(),
-            # nn.Dropout(0.1),
         ])
         
         self.proj = Conv1dBlock(hidden_dim, 1, kernel_size)
