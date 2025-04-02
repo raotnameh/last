@@ -458,7 +458,8 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             )
             if step % config['train']['discriminator_freq'] == 0:
                 torch.nn.utils.clip_grad_norm_(models['discriminator'].parameters(), max_grad_norm)
-                torch.nn.utils.clip_grad_norm_(models['codebook'].parameters(), max_grad_norm)
+                if step >= freeze_steps:
+                    torch.nn.utils.clip_grad_norm_(models['codebook'].parameters(), max_grad_norm)
 
             # Optimizer step
             if step >= freeze_steps:
@@ -467,7 +468,8 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             optimizers['dec'].step()
             if step % config['train']['discriminator_freq'] == 0:
                 optimizers['disc'].step()
-                optimizers['codebook'].step()
+                if step >= freeze_steps:
+                    optimizers['codebook'].step()
             
             # scheduler step
             for scheduler in schedulers.values():
