@@ -111,7 +111,7 @@ def initialize_datasets(config: Dict) -> Tuple[DataLoader, DataLoader, Dict]:
         num_workers=6
     )
 
-    return speech_loader, text_loader, text_dataset.vocab
+    return speech_loader, text_dataset, text_loader, text_dataset.vocab
 
 
 # step :- Prepare the codebook
@@ -284,7 +284,7 @@ def load_checkpoint(checkpoint_path, models, optimizers, device):
     }
     
 
-def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLoader, text_loader: DataLoader, loss_module: Loss, config: Dict, device: torch.device, start_step: int):
+def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLoader, text_dataset, text_loader: DataLoader, loss_module: Loss, config: Dict, device: torch.device, start_step: int):
     
     # Initialize TensorBoard writer
     writer = SummaryWriter(log_dir=config['logging'].get('log_dir', './logs'))
@@ -381,7 +381,18 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             gen_loss_components = loss_module.step_gen(output)
             total_lossg = sum(gen_loss_components.values())
             
-            if step % config['logging']['step'] == 0:    
+            if step % config['logging']['step'] == 0:
+                tensor_list = encoding_indices[0].detach().cpu().tolist()
+                result_list = []
+                prev = None
+                for value in tensor_list:
+                    if prev is None or value != prev:
+                        result_list.append(value)
+                    prev = value
+
+                print(text_dataset.decode(result_list,keep_special_tokens=True))
+                print(text_dataset.decode(result_list))
+                    
                 logging.info(
                 f"GEN-LOSS---step/total: {step}/{num_steps} "
                 f"rec_loss: {gen_loss_components['rec_loss']:.4f}, "
@@ -541,7 +552,7 @@ def main():
     np.random.seed(config['train']['seed'])
     
     # Initialize datasets and models
-    speech_loader, text_loader, vocab = initialize_datasets(config)
+    speech_loader, text_dataset, text_loader, vocab = initialize_datasets(config)
     models = setup_models(config, vocab)
     configure_training_mode(models, config)
     
@@ -579,6 +590,7 @@ def main():
             schedulers=schedulers,
             speech_loader=speech_loader,
             text_loader=text_loader,
+            text_dataset=text_dataset,
             loss_module=loss_module,
             config=config,
             device=device,

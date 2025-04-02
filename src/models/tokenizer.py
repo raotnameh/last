@@ -91,7 +91,6 @@ class Tokenizer(nn.Module):
         min_encoding_indices = torch.argmin(d, dim=1).unsqueeze(1)
         min_encodings = torch.zeros(min_encoding_indices.shape[0], e.shape[0], device=z.device)
         min_encodings.scatter_(1, min_encoding_indices, 1)    
-        
         # get tokenized latent vectors
         z_q = torch.matmul(min_encodings, e).view(z.shape)
 
@@ -131,6 +130,7 @@ class Tokenizer(nn.Module):
         
         
         codebook_prob = self.Codebook_usage(min_encoding_indices)
+        # codebook_prob = self.Codebook_usage(non_repeated_min_encoding_indices)
         
         
         return commitment_loss, diversity_loss, z_q, z_q_disc, min_encoding_indices, non_repeated_min_encoding_indices, non_repeated_mask  # commitment_loss, z_q, encoding_indices
@@ -145,6 +145,12 @@ class Tokenizer(nn.Module):
         """
         # Flatten indices across batch and time
         flattened_indices = encoding_indices.detach().view(-1)  # Shape: (B*T,)
+        # flattened_indices = []
+        # for ind in encoding_indices:
+        #     for i in ind:
+        #         flattened_indices.append(i)
+        # flattened_indices = torch.tensor(flattened_indices, device=encoding_indices[0].device)
+            
 
         # Compute histogram
         histogram = torch.bincount(flattened_indices, minlength=self.num_codebooks).float()
