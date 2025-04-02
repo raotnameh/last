@@ -389,12 +389,12 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
         if step % config['logging']['step'] == 0:    
             logging.info(f"GEN-LOSS---step/total: {step}/{num_steps} rec_loss: {gen_loss_components['rec_loss']}, commit_loss: {gen_loss_components['commit_loss']}, smooth_loss: {gen_loss_components['smooth_loss']}, gen_loss: {gen_loss_components['gen_loss']}, diversity_loss: {gen_loss_components['diversity_loss']}, total_loss: {total_lossg}")
             
-            writer.add_scalar('loss/rec_loss', gen_loss_components['rec_loss'], step)
-            writer.add_scalar('loss/commit_loss', gen_loss_components['commit_loss'], step)
-            writer.add_scalar('loss/smooth_loss', gen_loss_components['smooth_loss'], step)
-            writer.add_scalar('loss/gen_loss', gen_loss_components['gen_loss'], step)
-            writer.add_scalar('loss/diversity_loss', gen_loss_components['diversity_loss'], step)
-            writer.add_scalar('loss/total_loss_gen', total_lossg, step)
+            writer.add_scalar('generator_loss/rec_loss', gen_loss_components['rec_loss'], step)
+            writer.add_scalar('generator_loss/commit_loss', gen_loss_components['commit_loss'], step)
+            writer.add_scalar('generator_loss/smooth_loss', gen_loss_components['smooth_loss'], step)
+            writer.add_scalar('generator_loss/gen_loss', gen_loss_components['gen_loss'], step)
+            writer.add_scalar('generator_loss/diversity_loss', gen_loss_components['diversity_loss'], step)
+            writer.add_scalar('generator_loss/total_loss_gen', total_lossg, step)
         
         
         
@@ -431,10 +431,10 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             if step % config['logging']['step'] == 0:  
                 logging.info(f"DISC-LOSS---step/total: {step}/{num_steps} real_loss: {disc_loss_components['loss_real']}, fake_loss: {disc_loss_components['loss_fake']}, gp_loss: {disc_loss_components['grad_pen']}, total_loss: {disc_loss_components['total_loss']}")
                 
-                writer.add_scalar('loss/discriminator_total_loss', total_lossd, step)
-                writer.add_scalar('loss/discriminator_real_loss', disc_loss_components['loss_real'], step)
-                writer.add_scalar('loss/discriminator_fake_loss', disc_loss_components['loss_fake'], step)
-                writer.add_scalar('loss/discriminator_gp_loss', disc_loss_components['grad_pen'], step)
+                writer.add_scalar('Discriminator_loss/discriminator_total_loss', total_lossd, step)
+                writer.add_scalar('Discriminator_loss/discriminator_real_loss', disc_loss_components['loss_real'], step)
+                writer.add_scalar('Discriminator_loss/discriminator_fake_loss', disc_loss_components['loss_fake'], step)
+                writer.add_scalar('Discriminator_loss/discriminator_gp_loss', disc_loss_components['grad_pen'], step)
         
         
         # Backpropagation   
