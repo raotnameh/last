@@ -1,3 +1,4 @@
+import argparse
 import logging
 import random
 from datetime import datetime
@@ -6,10 +7,11 @@ import numpy as np
 import os
 import warnings
 import sys
+import matplotlib
 
 sys.path.append(f"{os.getcwd()}/models/decoder")
-logging.basicConfig(level=logging.INFO)
 warnings.simplefilter("ignore")
+matplotlib.set_loglevel("critical")
 logging.getLogger('matplotlib').disabled = True
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
@@ -36,6 +38,16 @@ torch.manual_seed(42)
 np.random.seed(42)
 
 
+# step :- Prepare the command line arguments
+def parse_args():
+    parser = argparse.ArgumentParser(description="Training Script")
+    parser.add_argument("-c", "--config", type=str, required=True, help="Path to the config file.")
+    parser.add_argument("-r", "--resume_checkpoint", type=str, default=None, help="Path to a checkpoint to resume training.")
+    parser.add_argument("-d", "--device", type=str, choices=["cpu", "cuda"], default=None, help="Device to run on (overrides config).")
+    parser.add_argument("-l", "--log_dir", type=str, default=None, help="Directory for logs (overrides config).")
+    
+    return parser.parse_args()
+
 # step :- Prepare the Hyperparameters
 def load_config(config_path: str) -> Dict:
     """Load and log training configuration from YAML file."""
@@ -50,6 +62,11 @@ def configure_logging(dir='logs/') -> None:
     os.makedirs(dir, exist_ok=True)
     log_filename = datetime.now().strftime("training_%Y-%m-%d_%H-%M-%S.log")
     
+    # Clear any existing handlers
+    root_logger = logging.getLogger()
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+        
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
@@ -223,65 +240,6 @@ def load_checkpoint(checkpoint_path, models, optimizers, device):
         'config': checkpoint['config']
     }
     
-def main():
-    config = load_config("config/try1.yaml")
-    configure_logging(config['logging']['dir'])
-    
-    # Set random seeds
-    random.seed(config['train']['seed'])
-    torch.manual_seed(config['train']['seed'])
-    np.random.seed(config['train']['seed'])
-    
-    # Initialize datasets and models
-    speech_loader, text_loader, vocab = initialize_datasets(config)
-    models = setup_models(config, vocab)
-    configure_training_mode(models, config)
-    
-    # Move models to device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    for model in models.values():
-        model.to(device)
-        
-    # Initialize optimizers and loss
-    optimizers = configure_optimizers(models, config)
-    loss_module = Loss(config)
-    
-    # Create checkpoint directory
-    os.makedirs(config['checkpoint']['dir'], exist_ok=True)
-    
-    
-    # Resume training if checkpoint specified
-    start_step = 1
-    if config['train']['resume_checkpoint']:
-        checkpoint_info = load_checkpoint(
-            config['train']['checkpoint_path'],
-            models,
-            optimizers,
-            device
-        )
-        start_step = checkpoint_info['step'] + 1
-        logging.info(f"Resuming training from step {start_step}")
-
-    
-    
-    # Main training loop
-    try:
-        train(
-            models=models,
-            optimizers=optimizers,
-            speech_loader=speech_loader,
-            text_loader=text_loader,
-            loss_module=loss_module,
-            config=config,
-            device=device,
-            start_step=start_step  # Add this
-        )
-    except KeyboardInterrupt:
-        logging.info("Training interrupted by user")
-    except Exception as e:
-        logging.exception("Unexpected error occurred during training")
-        
-
 
 def train(models: Dict, optimizers: Dict, speech_loader: DataLoader,
          text_loader: DataLoader, loss_module: Loss, config: Dict, device: torch.device, start_step: int):
@@ -452,6 +410,83 @@ def train(models: Dict, optimizers: Dict, speech_loader: DataLoader,
                 'config': config
             }, checkpoint_path)
             logging.info(f"Saved checkpoint to {checkpoint_path}")
+
+
+
+
+
+def main():
+    args = parse_args()
+    config = load_config(args.config) 
+    configure_logging(config['logging']['dir'])
+    # Override config if command-line args are provided
+    if args.resume_checkpoint:
+        config['train']['resume_checkpoint'] = True
+        config['train']['checkpoint_path'] = args.resume_checkpoint
+    if args.device:
+        config['device'] = args.device
+    if args.log_dir:
+        config['logging']['dir'] = args.log_dir
+    logging.info(f"Loaded config from {args.config}")
+    logging.info(f"Command-line args: {args}")   
+    logging.info(f"Config after command-line overrides: {config}")
+
+    
+    
+    # Set random seeds
+    random.seed(config['train']['seed'])
+    torch.manual_seed(config['train']['seed'])
+    np.random.seed(config['train']['seed'])
+    
+    # Initialize datasets and models
+    speech_loader, text_loader, vocab = initialize_datasets(config)
+    models = setup_models(config, vocab)
+    configure_training_mode(models, config)
+    
+    # Move models to device
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    for model in models.values():
+        model.to(device)
         
+    # Initialize optimizers and loss
+    optimizers = configure_optimizers(models, config)
+    loss_module = Loss(config)
+    
+    # Create checkpoint directory
+    os.makedirs(config['checkpoint']['dir'], exist_ok=True)
+    
+    
+    # Resume training if checkpoint specified
+    start_step = 1
+    if config['train']['resume_checkpoint']:
+        checkpoint_info = load_checkpoint(
+            config['train']['checkpoint_path'],
+            models,
+            optimizers,
+            device
+        )
+        start_step = checkpoint_info['step'] + 1
+        logging.info(f"Resuming training from step {start_step}")
+
+    
+    
+    # Main training loop
+    try:
+        train(
+            models=models,
+            optimizers=optimizers,
+            speech_loader=speech_loader,
+            text_loader=text_loader,
+            loss_module=loss_module,
+            config=config,
+            device=device,
+            start_step=start_step  # Add this
+        )
+    except KeyboardInterrupt:
+        logging.info("Training interrupted by user")
+    except Exception as e:
+        logging.exception("Unexpected error occurred during training")
+        
+
 if __name__ == "__main__":
     main()
