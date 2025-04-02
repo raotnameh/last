@@ -20,8 +20,9 @@ class Dataset_txt(Dataset):
             with open(data, "r") as f:
                 out = f.readlines()
             texts = [x.strip() for x in out if len(x) > 10 and len(x) < 500] # filtering out short texts that 2 second.
-            
-        self.texts = sorted(texts, key=len)
+        
+        self.texts = texts
+        self.texts = sorted(self.texts, key=len)
         self.add_question_marks()
         
         # creating the vocab.
