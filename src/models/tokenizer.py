@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import os
 import random
 
+
 class Tokenizer(nn.Module):
     def __init__(self, num_codebooks, save_dir="histogram_frames"):
         super(Tokenizer, self).__init__()
