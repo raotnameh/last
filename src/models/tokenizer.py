@@ -152,8 +152,8 @@ class Tokenizer(nn.Module):
         # self.codebook_usage += histogram.cpu()
         
         plt.clf() 
-        # plt.bar(range(self.num_codebooks), torch.log(histogram).cpu().numpy())
-        plt.bar(range(self.num_codebooks), histogram.cpu().numpy())
+        plt.bar(range(self.num_codebooks), torch.log(histogram).cpu().numpy())
+        # plt.bar(range(self.num_codebooks), histogram.cpu().numpy())
         plt.xlabel("Codebook Index")
         plt.ylabel("Count")
         plt.title("Codebook Usage Histogram")
