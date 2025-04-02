@@ -20,7 +20,8 @@ import torch.nn as nn
 import torch.optim as optim
 import yaml
 from torch.utils.data import DataLoader, SequentialSampler, BatchSampler
-from torch.optim.lr_scheduler import LambdaLR
+from torch.cuda.amp import autocast, GradScaler
+
 
 # Local imports
 from dataset_speech import Dataset_speech
@@ -215,45 +216,7 @@ def configure_optimizers(models: Dict, config: Dict) -> Dict:
             lr=config['train']['lr_disc']
         )
     }
-    
-    def tri_stage_scheduler(optimizer, total_steps, phase_ratio=[0.03, 0.9, 0.07]):
-        """
-        Tri-stage LR scheduler that applies:
-        - Warmup phase: LR increases linearly from 0 to base LR.
-        - Constant phase: LR stays constant.
-        - Decay phase: LR decreases linearly to 0.
-        
-        phase_ratio: a list with ratios for [warmup, constant, decay] phases.
-        """
-        warmup_steps = int(phase_ratio[0] * total_steps)
-        constant_steps = int(phase_ratio[1] * total_steps)
-        decay_steps = int(phase_ratio[2] * total_steps)
-
-        def lr_lambda(current_step):
-            if current_step < warmup_steps:
-                # Linear warmup: from 0 to 1
-                return float(current_step) / float(max(1, warmup_steps))
-            elif current_step < warmup_steps + constant_steps:
-                # Constant phase: LR stays at base value (multiplier 1)
-                return 1.0
-            else:
-                # Linear decay: from 1 down to 0 over decay_steps
-                decay_step = current_step - (warmup_steps + constant_steps)
-                return max(0.0, 1.0 - float(decay_step) / float(max(1, decay_steps)))
-        return LambdaLR(optimizer, lr_lambda)
-
-    
-    phase_ratio = config.get('lr_scheduler', {}).get('phase_ratio', [0.1, 0.7, 0.2])
-    total_steps = config['train']['num_steps']
-    
-    schedulers = {
-        'enc': tri_stage_scheduler(optimizers['enc'], total_steps, phase_ratio),
-        'down': tri_stage_scheduler(optimizers['down'], total_steps, phase_ratio),
-        'dec': tri_stage_scheduler(optimizers['dec'], total_steps, phase_ratio),
-        'disc': tri_stage_scheduler(optimizers['disc'], total_steps, phase_ratio)
-    }
-    
-    return optimizers, schedulers
+    return optimizers
 
 def load_checkpoint(checkpoint_path, models, optimizers, device):
     """Load model and optimizer states from checkpoint."""
@@ -281,7 +244,8 @@ def load_checkpoint(checkpoint_path, models, optimizers, device):
     }
     
 
-def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLoader, text_loader: DataLoader, loss_module: Loss, config: Dict, device: torch.device, start_step: int):
+def train(models: Dict, optimizers: Dict, speech_loader: DataLoader,
+         text_loader: DataLoader, loss_module: Loss, config: Dict, device: torch.device, start_step: int, scaler: GradScaler):
     
     num_steps = config['train']['num_steps']
     freeze_steps = config['train']['freeze_steps']
@@ -313,101 +277,103 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
         
     
         # ===== Generator Forward Pass =====
-        enc_out = models['encoder'](waveforms, padding_masks)  # [B, T, C] # step 1
-        output["cnn_out"] = enc_out['cnn_out'] # [B, T // 320] 
-        output['encoder_out'] = enc_out['encoder_out'] # [B, T // 320] 
-        
-        mask = ~enc_out['padding_mask'] # B,T//320,1 # 0 for masked positions.
-        mask = mask.unsqueeze(-1).float()
-        output['enc_mask'] = mask
-        
-        # ===== Ground Truth =====
-        with torch.no_grad():
-            gt = models['gtruth'].encode(waveforms.unsqueeze(1)) # [B, T//320, 1024] 
-            gt = gt[:,:mask.shape[1],:] * mask # [B, T, 1024]
-            output['gt'] = gt 
-        
-        # ===== Generator Forward Pass Cont. =====
-        down_out = models['downsample'](enc_out['encoder_out']) # [B, T // 2, C] 
-        dmask = mask[:, ::config["upsample"]['stride']] # [B, T // config["upsample"]['stride'], 1]
-        down_out = down_out[:,:dmask.shape[1],:] * dmask # [B, T // 2, C]
-        output['down_out'] = down_out
-        output['dmask'] = dmask
-        
-        commitment_loss, diversity_loss, z_q, z_q_disc, encoding_indices, non_repeated_min_encoding_indices, non_repeated_mask = models['tokenizer'](
-            down_out, 
-            models['codebook'], 
-            dmask
-        ) # [B, T // 2, C], [B, T // 2, C], [B, T // 2] # step 3 -- all the necessary masks are already applied in the tokenizer
-        output['commitment_loss'] = commitment_loss
-        output['diversity_loss'] = diversity_loss
-        
-        up_out = models['upsample'](z_q)
-        up_out = up_out[:,:mask.shape[1],:] * mask # [B, T, C]       
-        output['up_out'] = up_out
-        
-        dec_out, dec_out2, dec_mask = models['decoder'](
-            x=up_out,
-            mask=enc_out['padding_mask'],
-            s=enc_out['cnn_out'],
-            use_s=config['decoder']['speaker']['use_s']
-        )
-        dec_out = dec_out[:,:dec_mask.shape[1],:] * dec_mask
-        dec_out2 = dec_out2[:,:dec_mask.shape[1],:] * dec_mask
-        output['dec_out'] = dec_out
-        output['dec_out2'] = dec_out2
-        output['dec_mask'] = dec_mask
-        
-        # Generator discriminator prediction
-        disc_fake = models['discriminator'](z_q_disc, non_repeated_mask.unsqueeze(-1))
-        output['disc_fake'] = disc_fake
-        
-        # Loss calculation
-        loss_components = loss_module.step_gen(output)
-        total_lossg = sum(loss_components.values())
-        if step % config['logging']['step'] == 0:    
-            logging.info(f"GEN-LOSS---step/total: {step}/{num_steps} rec_loss: {loss_components['rec_loss']}, commit_loss: {loss_components['commit_loss']}, smooth_loss: {loss_components['smooth_loss']}, gen_loss: {loss_components['gen_loss']}, diversity_loss: {loss_components['diversity_loss']}, total_loss: {total_lossg}")
-        
-
-        
-        # ===== Discriminator Forward Pass =====
-        # Get text batch (every 2 steps) with auto-reset
-        if step % config['train']['discriminator_freq'] == 0:
+        with autocast(enabled=config['train']['mixed_precision']):
+            enc_out = models['encoder'](waveforms, padding_masks)  # [B, T, C] # step 1
+            output["cnn_out"] = enc_out['cnn_out'] # [B, T // 320] 
+            output['encoder_out'] = enc_out['encoder_out'] # [B, T // 320] 
             
-            z_q_disc = z_q_disc.clone().detach()
-            disc_fake = models['discriminator'](z_q_disc, non_repeated_mask.unsqueeze(-1).clone().detach())
+            mask = ~enc_out['padding_mask'] # B,T//320,1 # 0 for masked positions.
+            mask = mask.unsqueeze(-1).float()
+            output['enc_mask'] = mask
+            
+            # ===== Ground Truth =====
+            with torch.no_grad():
+                gt = models['gtruth'].encode(waveforms.unsqueeze(1)) # [B, T//320, 1024] 
+                gt = gt[:,:mask.shape[1],:] * mask # [B, T, 1024]
+                output['gt'] = gt 
+            
+            # ===== Generator Forward Pass Cont. =====
+            down_out = models['downsample'](enc_out['encoder_out']) # [B, T // 2, C] 
+            dmask = mask[:, ::config["upsample"]['stride']] # [B, T // config["upsample"]['stride'], 1]
+            down_out = down_out[:,:dmask.shape[1],:] * dmask # [B, T // 2, C]
+            output['down_out'] = down_out
+            output['dmask'] = dmask
+            
+            commitment_loss, diversity_loss, z_q, z_q_disc, encoding_indices, non_repeated_min_encoding_indices, non_repeated_mask = models['tokenizer'](
+                down_out, 
+                models['codebook'], 
+                dmask
+            ) # [B, T // 2, C], [B, T // 2, C], [B, T // 2] # step 3 -- all the necessary masks are already applied in the tokenizer
+            output['commitment_loss'] = commitment_loss
+            output['diversity_loss'] = diversity_loss
+            
+            up_out = models['upsample'](z_q)
+            up_out = up_out[:,:mask.shape[1],:] * mask # [B, T, C]       
+            output['up_out'] = up_out
+            
+            dec_out, dec_out2, dec_mask = models['decoder'](
+                x=up_out,
+                mask=enc_out['padding_mask'],
+                s=enc_out['cnn_out'],
+                use_s=config['decoder']['speaker']['use_s']
+            )
+            dec_out = dec_out[:,:dec_mask.shape[1],:] * dec_mask
+            dec_out2 = dec_out2[:,:dec_mask.shape[1],:] * dec_mask
+            output['dec_out'] = dec_out
+            output['dec_out2'] = dec_out2
+            output['dec_mask'] = dec_mask
+            
+            # Generator discriminator prediction
+            disc_fake = models['discriminator'](z_q_disc, non_repeated_mask.unsqueeze(-1))
             output['disc_fake'] = disc_fake
-            output["disc_fake_x"] = z_q_disc
+            
+            # Loss calculation
+            loss_components = loss_module.step_gen(output)
+            total_lossg = sum(loss_components.values())
+            if step % config['logging']['step'] == 0:    
+                logging.info(f"GEN-LOSS---step/total: {step}/{num_steps} rec_loss: {loss_components['rec_loss']}, commit_loss: {loss_components['commit_loss']}, smooth_loss: {loss_components['smooth_loss']}, gen_loss: {loss_components['gen_loss']}, diversity_loss: {loss_components['diversity_loss']}, total_loss: {total_lossg}")
+            
+
+            
+            # ===== Discriminator Forward Pass =====
+            # Get text batch (every 2 steps) with auto-reset
+            if step % config['train']['discriminator_freq'] == 0:
+                
+                z_q_disc = z_q_disc.clone().detach()
+                disc_fake = models['discriminator'](z_q_disc, non_repeated_mask.unsqueeze(-1).clone().detach())
+                output['disc_fake'] = disc_fake
+                output["disc_fake_x"] = z_q_disc
+            
+                try:
+                    text, tmask = next(text_iter)
+                except StopIteration:
+                    text_iter = iter(text_loader)
+                    text, tmask = next(text_iter)
+                text = text.to(device)
+                tmask = tmask.to(device)
+                
+                text_emb = models['codebook'](text)
+                disc_real = models['discriminator'](text_emb, tmask.unsqueeze(-1))
+                output['disc_real'] = disc_real
+                output['disc_real_x'] = text_emb
+
+
         
-            try:
-                text, tmask = next(text_iter)
-            except StopIteration:
-                text_iter = iter(text_loader)
-                text, tmask = next(text_iter)
-            text = text.to(device)
-            tmask = tmask.to(device)
-            
-            text_emb = models['codebook'](text)
-            disc_real = models['discriminator'](text_emb, tmask.unsqueeze(-1))
-            output['disc_real'] = disc_real
-            output['disc_real_x'] = text_emb
-
-
-     
-            # Discriminator training
-            loss_module.gan_loss.discriminator = models['discriminator']
-            
-            
-            loss_components = loss_module.step_disc(output)
-            total_lossd = loss_components['total_loss']
-            if step % config['logging']['step'] == 0:  
-                logging.info(f"DISC-LOSS---step/total: {step}/{num_steps} real_loss: {loss_components['loss_real']}, fake_loss: {loss_components['loss_fake']}, gp_loss: {loss_components['grad_pen']}, total_loss: {loss_components['total_loss']}")
-            
+                # Discriminator training
+                loss_module.gan_loss.discriminator = models['discriminator']
+                
+                
+                loss_components = loss_module.step_disc(output)
+                total_lossd = loss_components['total_loss']
+                if step % config['logging']['step'] == 0:  
+                    logging.info(f"DISC-LOSS---step/total: {step}/{num_steps} real_loss: {loss_components['loss_real']}, fake_loss: {loss_components['loss_fake']}, gp_loss: {loss_components['grad_pen']}, total_loss: {loss_components['total_loss']}")
+                
         
         # Backpropagation   
         if step % config['train']['discriminator_freq'] == 0:
             total_lossg += total_lossd
-        total_lossg.backward()
+        scaler.scale(total_lossg).backward()
+        # total_lossg.backward()
 
         if step % config['train']['gradient_accumulation_steps'] == 0:
             # Gradient clipping
@@ -422,18 +388,14 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             if step % config['train']['discriminator_freq'] == 0:
                 torch.nn.utils.clip_grad_norm_(models['discriminator'].parameters(), max_grad_norm)
 
-            # Optimizer step
             if step >= freeze_steps:
                 optimizers['enc'].step()
             optimizers['down'].step()
             optimizers['dec'].step()
             if step % config['train']['discriminator_freq'] == 0:
                 optimizers['disc'].step()
-            
-            # scheduler step
-            for scheduler in schedulers.values():
-                scheduler.step()
-            
+                
+            # Backward pass
             if step >= freeze_steps:
                 optimizers['enc'].zero_grad()    
             optimizers['down'].zero_grad()
@@ -492,7 +454,7 @@ def main():
         model.to(device)
         
     # Initialize optimizers and loss
-    optimizers, schedulers = configure_optimizers(models, config)
+    optimizers = configure_optimizers(models, config)
     loss_module = Loss(config)
     
     # Create checkpoint directory
@@ -512,19 +474,21 @@ def main():
         logging.info(f"Resuming training from step {start_step}")
 
     
+    # Initialize GradScaler
+    scaler = GradScaler(enabled=config['train']['mixed_precision'])
     
     # Main training loop
     try:
         train(
             models=models,
             optimizers=optimizers,
-            schedulers=schedulers,
             speech_loader=speech_loader,
             text_loader=text_loader,
             loss_module=loss_module,
             config=config,
             device=device,
-            start_step=start_step  # Add this
+            start_step=start_step,
+            scaler=scaler,
         )
     except KeyboardInterrupt:
         logging.info("Training interrupted by user")
