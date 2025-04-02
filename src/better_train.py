@@ -364,6 +364,8 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
         ) # [B, T // 2, C], [B, T // 2, C], [B, T // 2] # step 3 -- all the necessary masks are already applied in the tokenizer
         output['commitment_loss'] = commitment_loss
         output['diversity_loss'] = diversity_loss
+        output['z_q'] = z_q
+        output['z_q_disc'] = z_q_disc
         
         up_out = models['upsample'](z_q)
         up_out = up_out[:,:mask.shape[1],:] * mask # [B, T, C]       
@@ -439,8 +441,6 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
                 writer.add_scalar('Discriminator_loss/discriminator_fake_loss', disc_loss_components['loss_fake'], step)
                 writer.add_scalar('Discriminator_loss/discriminator_gp_loss', disc_loss_components['grad_pen'], step)
         
-        if step % config['logging']['step'] == 0:  
-            print(f"LR enc: {schedulers['enc'].get_last_lr()[0]}, LR down: {schedulers['down'].get_last_lr()[0]}, LR dec: {schedulers['dec'].get_last_lr()[0]}, LR disc: {schedulers['disc'].get_last_lr()[0]}, LR codebook: {schedulers['codebook'].get_last_lr()[0]}")
             
         # Backpropagation   
         if step % config['train']['discriminator_freq'] == 0:
@@ -476,7 +476,8 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             
             # scheduler step
             for scheduler in schedulers.values():
-                scheduler.step()
+                scheduler.step()    
+           
             # Zero gradients after the step
             for optimizer in optimizers.values():
                 optimizer.zero_grad()
