@@ -12,14 +12,7 @@ class Tokenizer(nn.Module):
     def __init__(self, vocab):
         super(Tokenizer, self).__init__()
         '''
-        Tokenizer module that tokenizes the speech encoder output by finding the closest codebook vector. in turn gives us discrete indices.
-        It return 
-        1. commitment loss
-        2. tokenized latent vectors z_q
-        3. encoding indices
-        4. non_repeated consecutive encoding indices
-        5. non_repeated mask
-        6. diversity loss
+        Tokenizer module that tokenizes the speech encoder output by finding the closest codebook
         '''
 
         self.vocab = vocab[1:] # remove the padding token

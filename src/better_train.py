@@ -111,6 +111,9 @@ def initialize_datasets(config: Dict) -> Tuple[DataLoader, DataLoader, Dict]:
         num_workers=6
     )
 
+    logging.info(f"Number of batches in speech dataset: {len(speech_loader)}")
+    logging.info(f"Number of batches in text dataset: {len(text_loader)}")
+    
     return speech_loader, text_dataset, text_loader, text_dataset.vocab
 
 

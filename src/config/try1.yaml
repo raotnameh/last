@@ -72,7 +72,7 @@ train:
   grad_clip: 10.0
   
   num_steps: 20000
-  freeze_steps: 1000
+  freeze_steps: 5000
   discriminator_freq: 2
   gradient_accumulation_steps: 1
 
@@ -84,7 +84,6 @@ loss:
   recon_loss_weight: 1.0
   smooth_loss_weight: 1.0
   commit_loss_weight: 1.0
-  diversity_loss_weight: 0.1
   gen_loss_weight: 1.0
 
   disc_loss_weight: 1.0

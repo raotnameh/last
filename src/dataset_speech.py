@@ -14,7 +14,7 @@ class Dataset_speech(Dataset):
         super().__init__()
 
         paths = []
-        min_dur, max_dur, tot_dur = min_duration, max_duration, 0
+        min_dur, max_dur, tot_dur = min_duration, 0, 0
         with open(input_manifest, "r") as infile:
             root_dir = infile.readline().strip()  # First line is the root directory
             
