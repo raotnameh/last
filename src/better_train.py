@@ -345,14 +345,16 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             output['down_out'] = down_out
             output['dmask'] = dmask
             
-            commitment_loss, z_q, z_q_disc,  z_q_disc_mask = models['tokenizer'](
+            commitment_loss, z_q, z_q_disc, z_q_disc_mask, selected_encodings_list = models['tokenizer'](
                 down_out, 
                 models['codebook'], 
                 dmask
-            ) # [B, T // 2, C], [B, T // 2, C], [B, T // 2] # step 3 -- all the necessary masks are already applied in the tokenizer
+            )
+            z_q_disc_mask = ~z_q_disc_mask.bool() # [B, T // 2, 1]
+           
             output['commitment_loss'] = commitment_loss
-            output['z_q'] = z_q
-            output['z_q_disc'] = z_q_disc
+            output['z_q'] = z_q # already masked
+            output['z_q_disc'] = z_q_disc # already masked
             
             up_out = models['upsample'](z_q)
             up_out = up_out[:,:mask.shape[1],:] * mask # [B, T, C]       
@@ -379,14 +381,7 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             total_lossg = sum(gen_loss_components.values())
             
             if step % config['logging']['step'] == 0:
-                tensor_list = encoding_indices[0].detach().cpu().tolist()
-                result_list = []
-                prev = None
-                for value in tensor_list:
-                    if prev is None or value != prev:
-                        result_list.append(value)
-                    prev = value
-
+                result_list = selected_encodings_list[0]
                 print(text_dataset.decode(result_list,keep_special_tokens=True))
                 print(text_dataset.decode(result_list))
                     
@@ -396,14 +391,12 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
                 f"commit_loss: {gen_loss_components['commit_loss']:.4f}, "
                 f"smooth_loss: {gen_loss_components['smooth_loss']:.4f}, "
                 f"gen_loss: {gen_loss_components['gen_loss']:.4f}, "
-                f"diversity_loss: {gen_loss_components['diversity_loss']:.4f}, "
                 f"total_loss: {total_lossg:.4f}"
                         )                
                 writer.add_scalar('generator_loss/rec_loss', gen_loss_components['rec_loss'], step)
                 writer.add_scalar('generator_loss/commit_loss', gen_loss_components['commit_loss'], step)
                 writer.add_scalar('generator_loss/smooth_loss', gen_loss_components['smooth_loss'], step)
                 writer.add_scalar('generator_loss/gen_loss', gen_loss_components['gen_loss'], step)
-                writer.add_scalar('generator_loss/diversity_loss', gen_loss_components['diversity_loss'], step)
                 writer.add_scalar('generator_loss/total_loss_gen', total_lossg, step)
             
             
@@ -413,7 +406,7 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             if step % config['train']['discriminator_freq'] == 0:
                 
                 z_q_disc = z_q_disc.clone().detach()
-                disc_fake = models['discriminator'](z_q_disc, non_repeated_mask.unsqueeze(-1).clone().detach())
+                disc_fake = models['discriminator'](z_q_disc, z_q_disc_mask)
                 output['disc_fake'] = disc_fake
                 output["disc_fake_x"] = z_q_disc
             

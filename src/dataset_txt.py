@@ -58,7 +58,10 @@ class Dataset_txt(Dataset):
             if modified_sentence[-1] != '?': 
                 modified_sentence.append("?")  # Add a question mark at the end
             modified_texts.append("".join(modified_sentence))
-
+        logging.info(f"Preprocessing done.")
+        logging.info(f"Modified text sample")
+        logging.info(f"{random.choice(modified_texts)}")
+        logging.info(f"{random.choice(modified_texts)}")
         self.texts = modified_texts
 
     def build_vocab(self, texts):

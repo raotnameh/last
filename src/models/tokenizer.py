@@ -77,44 +77,51 @@ class Tokenizer(nn.Module):
         
         ##### Discriminator codebooks without repeated indices #####
         encodings = min_encoding_indices.view(z.shape[0], z.shape[1]).clone()
-        n_z_q, n_mask = self.remove_consecutive_repeated_indices( encodings, mask.squeeze(-1), z_q) # randomly pick one index from each group of consecutive repeating elements # shape (B,T) and also returns the mask 
+        n_z_q, n_mask, selected_encodings_list = self.remove_consecutive_repeated_indices( encodings, mask.squeeze(-1), z_q) # randomly pick one index from each group of consecutive repeating elements # shape (B,T) and also returns the mask 
     
         
-        return commitment_loss, z_q, n_z_q, n_mask # commitment_loss, z_q, n_z_q, n_mask
+        return commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list # commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list
 
         
     def remove_consecutive_repeated_indices(self, min_encoding_indices, mask, z_q):
         B, T = min_encoding_indices.shape
         selected_indices_list = []
+        selected_encodings_list = []
         max_len = 0
 
         for b in range(B):
             indices = min_encoding_indices[b]
             selected_indices = []
+            selected_encodings = []
             start = 0
             for i in range(1, T):
                 if mask[b, i] == 0:
                     break
                 if indices[i] != indices[i - 1]:
-                    selected_indices.append(random.randint(start, i - 1))
+                    ii = random.randint(start, i - 1)
+                    selected_indices.append(ii)
+                    selected_encodings.append(indices[ii].item()+1) # +1 to avoid padding token
                     start = i
-            selected_indices.append(random.randint(start, T - 1))
+            ii = random.randint(start, T - 1)
+            selected_indices.append(ii)
+            selected_encodings.append(indices[ii].item()+1) # +1 to avoid padding token
 
+            selected_encodings_list.append(selected_encodings)
             selected_indices_list.append(torch.tensor(selected_indices))
             max_len = max(max_len, len(selected_indices))
 
         # Pad and create mask in a vectorized way
-        padded_indices = torch.zeros((B, max_len), dtype=min_encoding_indices.dtype)
-        masks = torch.zeros((B, max_len), dtype=torch.float)
+        padded_indices = torch.zeros((B, max_len), dtype=min_encoding_indices.dtype, device=min_encoding_indices.device)
+        masks = torch.zeros((B, max_len), dtype=torch.float, device=min_encoding_indices.device)
 
         for b, indices in enumerate(selected_indices_list):
             length = len(indices)
             padded_indices[b, :length] = indices
             masks[b, :length] = 1
-
+        masks = masks.unsqueeze(-1)
         # Gather and apply mask
         out = padded_indices.unsqueeze(-1).expand(-1, -1, z_q.shape[-1])
         n_z_q = z_q.gather(dim=1, index=out)
-        n_z_q *= masks.unsqueeze(-1)
+        n_z_q *= masks
 
-        return n_z_q, masks # shape (B, max_len, channels), mask shape (B, max_len, 1)
+        return n_z_q, masks, selected_encodings_list # shape (B, max_len, channels), mask shape (B, max_len, 1), list of selected encodings
