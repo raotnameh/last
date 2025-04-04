@@ -384,9 +384,11 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             total_lossg = sum(gen_loss_components.values())
             
             if step % config['logging']['step'] == 0:
-                result_list = selected_encodings_list[0]
-                print(text_dataset.decode(result_list,keep_special_tokens=True))
-                print(text_dataset.decode(result_list))
+
+                logging.info(
+                    f"Generator decoded text with special tokens: {text_dataset.decode(selected_encodings_list[0],keep_special_tokens=True)}"
+                    f"Generator decoded text without special tokens: {text_dataset.decode(selected_encodings_list[0])}"
+                )
                     
                 logging.info(
                 f"GEN-LOSS---step/total: {step}/{num_steps} "
