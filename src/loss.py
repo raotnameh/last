@@ -118,8 +118,6 @@ class Loss:
         
         # commitment loss
         commit_loss = output["commitment_loss"] * self.config["commit_loss_weight"] 
-        # Diversity loss
-        diversity_loss = output["diversity_loss"] * self.config["diversity_loss_weight"]
         
         # smoothness loss :- down_out shifted by 1
         smooth_loss = self.mse_loss(output["down_out"][:,:-1,:], output["down_out"][:,1:,:])
@@ -134,7 +132,6 @@ class Loss:
             "commit_loss": commit_loss,
             "smooth_loss": smooth_loss,
             "gen_loss": gen_loss,
-            "diversity_loss": diversity_loss
         }     
         # loss_components = rec_loss + commit_loss + smooth_loss + gen_loss + diversity_loss
         
