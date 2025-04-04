@@ -31,11 +31,10 @@ class Dataset_speech(Dataset):
                     tot_dur += duration
                     
         logging.info(f"Speech dataset duration range in seconds: {min_dur/16000:.2f} - {max_dur/16000:.2f} | Total duration in hours: {tot_dur/16000/3600:.2f}")
-        logging.info(f"Max duration: {max_dur}")
         # Sort by duration
         paths.sort(key=lambda x: x[1])
         self.paths = paths
-        # self.paths = paths[:32]  # For testing
+        # self.paths = paths[:320]  # For testing
         # print(f"Testing Mode: Using only {len(self.paths)} samples")
         
     def __len__(self):
@@ -73,11 +72,12 @@ class Dataset_speech(Dataset):
 if __name__ == "__main__":
     # Create the dataset and dataloader
     input_manifest = "/raid/home/rajivratn/hemant_rajivratn/librispeech/data/manifest/train-clean-100.tsv"
+    input_manifest = "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeechmanifest.tsv"
     
     dataset = Dataset_speech(input_manifest=input_manifest, min_duration=32000, max_duration=250000)
 
     dataloader = DataLoader(dataset, batch_size=32, shuffle=False, num_workers=1, collate_fn=dataset.collate_fn)
 
     for i, (waveforms, padding_masks) in enumerate(dataloader):
-        print(waveforms.shape, padding_masks)
+        # print(waveforms.shape, padding_masks)
         break

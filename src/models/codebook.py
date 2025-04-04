@@ -5,6 +5,7 @@ from transformers import AutoTokenizer, AutoModel
         
         
 class Codebook(nn.Module):
+    
     def __init__(self, vocab, model_name="meta-llama/Llama-3.2-1B-Instruct"):
         super(Codebook, self).__init__()
         
@@ -22,6 +23,8 @@ class Codebook(nn.Module):
             tok = tokenizer(char, add_special_tokens=False)["input_ids"][0] # returns the list of token ids, 
             if char != "p": # not padding token 
                 embedding.weight.data[i] = model.embed_tokens(torch.tensor(tok)).detach().clone()
+            else:
+                embedding.weight.data[i] *= 0.0 # padding token embedding is zero
                 
         self.embedding = embedding
         

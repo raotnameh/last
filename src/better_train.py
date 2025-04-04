@@ -174,7 +174,7 @@ def configure_training_mode(models: Dict, config: Dict) -> None:
     # Partially freeze encoder
     for name, param in models['encoder'].named_parameters():
         for n in config['encoder']['frozen_layers']:
-            if str(n) in name :
+            if str(f"model.encoder.layers.{n}") in name :
                 param.requires_grad = True
             else:
                 param.requires_grad = False
@@ -214,10 +214,10 @@ def configure_optimizers(models: Dict, config: Dict) -> Dict:
         )
     }
     
-    optimizers["codebook"] = optim.AdamW(
-            [p for p in models['codebook'].parameters() if p.requires_grad],
-            lr=config['train']['lr_codebook']
-            )
+    # optimizers["codebook"] = optim.AdamW(
+            # [p for p in models['codebook'].parameters() if p.requires_grad],
+            # lr=config['train']['lr_codebook']
+            # )
     
     def tri_stage_scheduler(optimizer, total_steps, phase_ratio=[0.03, 0.9, 0.07]):
         """
@@ -246,7 +246,7 @@ def configure_optimizers(models: Dict, config: Dict) -> Dict:
         return LambdaLR(optimizer, lr_lambda)
 
     
-    phase_ratio = config.get('lr_scheduler', {}).get('phase_ratio', [0.1, 0.7, 0.2])
+    phase_ratio = config['lr_scheduler']['phase_ratio']
     total_steps = config['train']['num_steps']
     
     schedulers = {
@@ -254,7 +254,7 @@ def configure_optimizers(models: Dict, config: Dict) -> Dict:
         'down': tri_stage_scheduler(optimizers['down'], total_steps, phase_ratio),
         'dec': tri_stage_scheduler(optimizers['dec'], total_steps, phase_ratio),
         'disc': tri_stage_scheduler(optimizers['disc'], total_steps, phase_ratio),
-        'codebook': tri_stage_scheduler(optimizers['codebook'], total_steps, phase_ratio)
+        # 'codebook': tri_stage_scheduler(optimizers['codebook'], total_steps, phase_ratio)
     }
     
     return optimizers, schedulers
@@ -293,25 +293,19 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
     # Initialize GradScaler
     scaler = GradScaler(enabled=config['train']['mixed_precision'])
     
-    num_steps = config['train']['num_steps']
+    num_steps = config['train']['num_steps'] * config['train']['gradient_accumulation_steps']
     freeze_steps = config['train']['freeze_steps']
     
     # Initialize iterators
     speech_iter = iter(speech_loader)
     text_iter = iter(text_loader)
     
-    # Training setup
-    models['encoder'].train()
-    models['downsample'].train()
-    models['upsample'].train()
-    models['decoder'].train()
-    models['discriminator'].train()
-    
     loss_module.gan_loss.training = True
 
     for optimizer in optimizers.values():
         optimizer.zero_grad()
     
+
     for step in range(start_step, num_steps + 1):
         output = {}
         
@@ -385,10 +379,8 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             
             if step % config['logging']['step'] == 0:
 
-                logging.info(
-                    f"Generator decoded text with special tokens: {text_dataset.decode(selected_encodings_list[0],keep_special_tokens=True)}"
-                    f"Generator decoded text without special tokens: {text_dataset.decode(selected_encodings_list[0])}"
-                )
+                logging.info( f"Generator decoded text with special tokens: --{text_dataset.decode(selected_encodings_list[0],keep_special_tokens=True)}--" )
+                logging.info( f"Generator decoded text without special tokens: --{text_dataset.decode(selected_encodings_list[0])}--" )
                     
                 logging.info(
                 f"GEN-LOSS---step/total: {step}/{num_steps} "
@@ -410,8 +402,7 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             # Get text batch (every 2 steps) with auto-reset
             if step % config['train']['discriminator_freq'] == 0:
                 
-                z_q_disc = z_q_disc.clone().detach()
-                disc_fake = models['discriminator'](z_q_disc, z_q_disc_mask)
+                disc_fake = models['discriminator'](z_q_disc.clone().detach(), z_q_disc_mask)
                 output['disc_fake'] = disc_fake
                 output["disc_fake_x"] = z_q_disc
             
@@ -422,7 +413,6 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
                     text, tmask = next(text_iter)
                 text = text.to(device)
                 tmask = tmask.to(device)
-                
                 text_emb = models['codebook'](text)
                 disc_real = models['discriminator'](text_emb, tmask.unsqueeze(-1))
                 output['disc_real'] = disc_real
@@ -455,26 +445,27 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             total_lossg += total_lossd
         total_lossg /= config['train']['gradient_accumulation_steps']
         scaler.scale(total_lossg).backward() if config['train']['mixed_precision'] else total_lossg.backward()
-        
+
 
         if step % config['train']['gradient_accumulation_steps'] == 0:
+            
             # Gradient clipping
             if config['train']['mixed_precision']:
                 for optimizer in optimizers.values():
                     scaler.unscale_(optimizer)
                 
             max_grad_norm = config['train']['grad_clip']
-            if step >= freeze_steps:
-                torch.nn.utils.clip_grad_norm_(models['encoder'].parameters(), max_grad_norm)
-            torch.nn.utils.clip_grad_norm_(models['downsample'].parameters(), max_grad_norm)
             torch.nn.utils.clip_grad_norm_(
-                list(models['upsample'].parameters()) + list(models['decoder'].parameters()), 
+                list(models['encoder'].parameters()) +
+                list(models['downsample'].parameters()) + 
+                list(models['upsample'].parameters()) + 
+                list(models['decoder'].parameters()), 
                 max_grad_norm
             )
             if step % config['train']['discriminator_freq'] == 0:
                 torch.nn.utils.clip_grad_norm_(models['discriminator'].parameters(), max_grad_norm)
-                if step >= freeze_steps:
-                    torch.nn.utils.clip_grad_norm_(models['codebook'].parameters(), max_grad_norm)
+                # if step >= freeze_steps:
+                #     torch.nn.utils.clip_grad_norm_(models['codebook'].parameters(), max_grad_norm)
 
             # Optimizer step
             if config['train']['mixed_precision']:
@@ -484,8 +475,8 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
                 scaler.step(optimizers['dec'])
                 if step % config['train']['discriminator_freq'] == 0:
                     scaler.step(optimizers['disc'])
-                    if step >= freeze_steps:
-                        scaler.step(optimizers['codebook'])
+                    # if step >= freeze_steps:
+                    #     scaler.step(optimizers['codebook'])
                         
                 scaler.update()
             else:
@@ -495,8 +486,8 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
                 optimizers['dec'].step()
                 if step % config['train']['discriminator_freq'] == 0:
                     optimizers['disc'].step()
-                    if step >= freeze_steps:
-                        optimizers['codebook'].step()
+                    # if step >= freeze_steps:
+                    #     optimizers['codebook'].step()
                 
             # scheduler step
             for scheduler in schedulers.values():
@@ -549,6 +540,12 @@ def main():
     # Initialize datasets and models
     speech_loader, text_dataset, text_loader, vocab = initialize_datasets(config)
     models = setup_models(config, vocab)
+    # Training setup
+    models['encoder'].train()
+    models['downsample'].train()
+    models['upsample'].train()
+    models['decoder'].train()
+    models['discriminator'].train()
     configure_training_mode(models, config)
     
     # Move models to device
