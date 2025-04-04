@@ -10,9 +10,9 @@ import torch.nn.functional as F
 
 
 class Dataset_speech(Dataset):
-    def __init__(self, input_manifest, min_duration=0, max_duration=float("inf")):
+    def __init__(self, input_manifest, split = "train", min_duration=0, max_duration=float("inf")):
         super().__init__()
-
+        
         paths = []
         min_dur, max_dur, tot_dur = min_duration, 0, 0
         with open(input_manifest, "r") as infile:
@@ -34,6 +34,8 @@ class Dataset_speech(Dataset):
         # Sort by duration
         paths.sort(key=lambda x: x[1])
         self.paths = paths
+        
+            
         # self.paths = paths[:320]  # For testing
         # print(f"Testing Mode: Using only {len(self.paths)} samples")
         
