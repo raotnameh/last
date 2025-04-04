@@ -8,6 +8,9 @@ class Codebook(nn.Module):
     def __init__(self, vocab, model_name="meta-llama/Llama-3.2-1B-Instruct"):
         super(Codebook, self).__init__()
         
+        self.vocab = vocab
+        self.model_name = model_name
+        
         # Initialize the model and tokenizer 
         tokenizer = AutoTokenizer.from_pretrained(model_name)
         model = AutoModel.from_pretrained(model_name)
@@ -16,8 +19,10 @@ class Codebook(nn.Module):
         embedding = nn.Embedding(len(vocab), model.embed_tokens.weight.shape[1], padding_idx=0)
         # Initialize the embedding matrix with the pretrained model's embedding matrix with detaching the gradients
         for i, char in enumerate(vocab):
-            tok = tokenizer(char, add_special_tokens=False)["input_ids"][0]
-            embedding.weight.data[i] = model.embed_tokens(torch.tensor(tok)).detach().clone()
+            tok = tokenizer(char, add_special_tokens=False)["input_ids"][0] # returns the list of token ids, 
+            if char != "p": # not padding token 
+                embedding.weight.data[i] = model.embed_tokens(torch.tensor(tok)).detach().clone()
+                
         self.embedding = embedding
         
         # Remove the model and tokenizer

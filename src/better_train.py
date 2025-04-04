@@ -131,9 +131,7 @@ def setup_models(config: Dict, vocab: nn.Module) -> Dict:
         groups=config['downsample']['groups'],
         )
     
-    models['tokenizer'] = Tokenizer(
-        num_codebooks=models['codebook'].embedding.weight.shape[0],
-        )
+    models['tokenizer'] = Tokenizer(vocab=models['codebook'].vocab)
     
     models['upsample'] = Upsample(
         input_dim=models['codebook'].embedding.weight.shape[1],
@@ -327,12 +325,12 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
         # ===== Generator Forward Pass =====
         with autocast(enabled=config['train']['mixed_precision']):
             enc_out = models['encoder'](waveforms, padding_masks)  # [B, T, C] # step 1
-            output["cnn_out"] = enc_out['cnn_out'] # [B, T // 320] 
-            output['encoder_out'] = enc_out['encoder_out'] # [B, T // 320] 
+            output["cnn_out"] = enc_out['cnn_out'] # [B, T // 320, C] 
+            output['encoder_out'] = enc_out['encoder_out'] # [B, T // 320, C] 
             
-            mask = ~enc_out['padding_mask'] # B,T//320,1 # 0 for masked positions.
-            mask = mask.unsqueeze(-1).float()
-            output['enc_mask'] = mask
+            mask = ~enc_out['padding_mask'] # B,T//320 # 0 for masked positions.
+            mask = mask.unsqueeze(-1).float() # [B, T // 320, 1]
+            output['mask'] = mask
             
             # ===== Ground Truth =====
             with torch.no_grad():
@@ -347,13 +345,12 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             output['down_out'] = down_out
             output['dmask'] = dmask
             
-            commitment_loss, diversity_loss, z_q, z_q_disc, encoding_indices, non_repeated_min_encoding_indices, non_repeated_mask = models['tokenizer'](
+            commitment_loss, z_q, z_q_disc,  z_q_disc_mask = models['tokenizer'](
                 down_out, 
                 models['codebook'], 
                 dmask
             ) # [B, T // 2, C], [B, T // 2, C], [B, T // 2] # step 3 -- all the necessary masks are already applied in the tokenizer
             output['commitment_loss'] = commitment_loss
-            output['diversity_loss'] = diversity_loss
             output['z_q'] = z_q
             output['z_q_disc'] = z_q_disc
             
@@ -374,7 +371,7 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             output['dec_mask'] = dec_mask
             
             # Generator discriminator prediction
-            disc_fake = models['discriminator'](z_q_disc, non_repeated_mask.unsqueeze(-1))
+            disc_fake = models['discriminator'](z_q_disc, z_q_disc_mask)
             output['disc_fake'] = disc_fake
             
             # Loss calculation
