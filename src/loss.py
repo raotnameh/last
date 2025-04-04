@@ -133,7 +133,6 @@ class Loss:
             "smooth_loss": smooth_loss,
             "gen_loss": gen_loss,
         }     
-        # loss_components = rec_loss + commit_loss + smooth_loss + gen_loss + diversity_loss
         
         return  loss_components
     

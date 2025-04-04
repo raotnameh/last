@@ -293,7 +293,7 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
     # Initialize GradScaler
     scaler = GradScaler(enabled=config['train']['mixed_precision'])
     
-    num_steps = config['train']['num_steps'] * config['train']['gradient_accumulation_steps']
+    num_steps = config['train']['num_steps']
     freeze_steps = config['train']['freeze_steps']
     
     # Initialize iterators
@@ -375,7 +375,11 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             
             # Loss calculation
             gen_loss_components = loss_module.step_gen(output)
-            total_lossg = sum(gen_loss_components.values())
+            # total_lossg = sum(gen_loss_components.values())
+            total_lossg = gen_loss_components['rec_loss'] 
+            total_lossg = total_lossg + gen_loss_components['commit_loss'] 
+            total_lossg = total_lossg + gen_loss_components['gen_loss']
+            # total_lossg += gen_loss_components['smooth_loss']
             
             if step % config['logging']['step'] == 0:
 
@@ -530,7 +534,7 @@ def main():
     logging.info(f"Command-line args: {args}")   
     logging.info(f"Config after command-line overrides: {config}")
 
-    
+    config['train']['num_steps'] *= config['train']['gradient_accumulation_steps']
     
     # Set random seeds
     random.seed(config['train']['seed'])

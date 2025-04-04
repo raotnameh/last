@@ -11,7 +11,7 @@ device: "cuda"
 
 dataset_speech:
   # path: "/raid/home/rajivratn/hemant_rajivratn/librispeech/data/manifest/train-clean-100.tsv"
-  path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeechmanifest_trian.tsv"
+  path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeechmanifest_train.tsv"
   min_duration: 32000
   max_duration: 320000
   batch_size: 64
@@ -28,21 +28,21 @@ codebook:
 encoder:
   ckpt_path: "hubert_base_ls960.pt"
   encoder_embed_dim: 768
-  frozen_layers: ["11", "10", "9"]
+  frozen_layers: ["11", "10"]
 
 downsample:
-  kernel_size: &kernel_size_value 9
+  kernel_size: &kernel_size_value 51
   stride: &stride_value 2
-  groups: &groups_value 64
+  groups: &groups_value 32
 
 upsample:
-  kernel_size: *kernel_size_value
+  kernel_size: 1
   stride: *stride_value
-  groups: *groups_value
+  groups: 1
 
 discriminator:
   hidden_dim: 256
-  kernel_size: 9
+  kernel_size: 11
   groups: *groups_value
 
 
@@ -68,7 +68,7 @@ train:
   lr_codebook: 0.0000
   lr_enc: 0.00005
   lr_down: 0.0005
-  lr_dec: 0.005
+  lr_dec: 0.0005
   lr_disc: 0.0005
   grad_clip: 10.0
   
@@ -83,9 +83,9 @@ train:
 
 loss:
   recon_loss_weight: 1.0
-  smooth_loss_weight: 0.1
-  commit_loss_weight: 0.1
-  gen_loss_weight: 1.0
+  smooth_loss_weight: 1.0
+  commit_loss_weight: 1.0
+  gen_loss_weight: 0.1
 
   disc_loss_weight: 1.0
   gp_weight: 2.0
