@@ -4,7 +4,9 @@ from torch.utils.data import Dataset, DataLoader
 import random
 from tqdm.auto import tqdm  
 import logging
-
+from collections import Counter
+import numpy as np
+import matplotlib.pyplot as plt
 
 class Dataset_txt(Dataset):
     def __init__(self, data="/raid/home/rajivratn/hemant_rajivratn/last/data/transcription.txt"):
@@ -28,13 +30,32 @@ class Dataset_txt(Dataset):
         # creating the vocab.
         self.vocab = self.build_vocab(texts)
         
+        self.save_histogram()
+        
         self.char_to_idx = {char: idx for idx, char in enumerate(self.vocab)} # char to index mapping
         self.idx_to_char = {idx: char for idx, char in enumerate(self.vocab)} # index to char mapping
         
         logging.info(f"Vocab Size: {len(self.vocab)}")
         logging.info(f"Vocab: {self.vocab}")
         logging.info(f"-p- is for padding and -?- is for silence")
-    
+        
+    def save_histogram(self):
+        logging.info(f"Saving histogram of the REAL text data.")
+        char_counts = Counter("".join(self.texts))  # Example output: [('a', 2), ('d', 1)]
+        char_counts = dict(char_counts)
+        c = [char_counts[v] for v in self.vocab if v != "p"]  # Exclude the padding token
+        c = np.array(c, dtype=np.float32)
+        c /= c.sum()  # Normalize the counts to get probabilities
+        # Plotting the histogram
+        plt.figure(figsize=(10, 6))
+        plt.bar(self.vocab[1:], c, color='blue', alpha=0.7)
+        plt.xlabel('Codebook Entry (Char)')
+        plt.ylabel('Probability')
+        plt.title('Codebook Usage Distribution')
+        plt.grid(axis='y')
+        plt.savefig('REAL_codebook_usage_distribution.png', bbox_inches='tight')
+        
+        
     def add_question_marks(self):
         logging.info(f"Preprocessing the text data by adding silence tokens.")
         
