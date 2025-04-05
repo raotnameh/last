@@ -14,13 +14,13 @@ dataset_speech:
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeechmanifest_train.tsv"
   min_duration: 32000
   max_duration: 320000
-  batch_size: 64
+  batch_size: 16
 
 dataset_txt:
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/transcription.txt"
   # path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech-lm-norm.txt"
   
-  batch_size: 64
+  batch_size: 16
 
 codebook:
   model_name: "meta-llama/Llama-3.2-1B-Instruct"
@@ -73,9 +73,9 @@ train:
   grad_clip: 10.0
   
   num_steps: 40000
-  freeze_steps: 20000
-  discriminator_freq: 2
-  gradient_accumulation_steps: 2
+  freeze_steps: 10000
+  discriminator_freq: 200000000
+  gradient_accumulation_steps: 1
 
   mixed_precision: True
   resume_checkpoint: False
@@ -84,8 +84,8 @@ train:
 loss:
   recon_loss_weight: 1.0
   smooth_loss_weight: 1.0
-  commit_loss_weight: 1.0
-  gen_loss_weight: 0.1
+  commit_loss_weight: 0.1
+  gen_loss_weight: 0.0
 
   disc_loss_weight: 1.0
   gp_weight: 2.0
