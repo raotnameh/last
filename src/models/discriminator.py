@@ -32,21 +32,6 @@ class Conv1dBlock(nn.Module):
         
         return x
 
-class StatisticalPooling(nn.Module):
-    def __init__(self):
-        super(StatisticalPooling, self).__init__()
-
-    def forward(self, x, padding_mask):
-        # Remove padded positions
-        x = x.masked_fill(padding_mask, 0)
-        
-        # Compute statistics
-        x_mean = x.mean(dim=1)  # Mean along time axis
-        x_max = x.max(dim=1)[0]  # Max along time axis
-        x_var = x.var(dim=1)  # Variance along time axis
-
-        # You can add more statistics like min, std, etc.
-        return torch.cat([x_mean, x_max, x_var], dim=1)  # Concatenate the statistics
 
 
 class Discriminator(nn.Module):
@@ -71,8 +56,6 @@ class Discriminator(nn.Module):
             nn.GELU(),
             nn.Dropout(0.1),
         ])
-        
-        self.pooling = StatisticalPooling()
         
         self.proj = Conv1dBlock(hidden_dim, 1, kernel_size)
 
