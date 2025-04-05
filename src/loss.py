@@ -90,6 +90,7 @@ class GANLoss(nn.Module):
     
 class Loss:
     def __init__(self, config):
+
         self.config = config["loss"]
         
         self.mse_loss = nn.MSELoss(reduction='mean') # smoothness loss
@@ -98,14 +99,14 @@ class Loss:
         
         self.gan_loss = GANLoss(gp_weight=self.config["gp_weight"])
     
-    def step_disc(self, output, step=0, total_steps=None):
+    def step_disc(self, output):
         # fake, real, fake_x, real_x, fake_smooth=0.0, real_smooth=0.0):
     
         loss = self.gan_loss(output["disc_fake"], output["disc_real"], output["disc_fake_x"], output["disc_real_x"])        
         return loss
         
 
-    def step_gen(self, output):
+    def step_gen(self, output, step=1, total_steps=1):
         
         # reconstrunction loss :- decoder 
         valid_count = output["dec_mask"].sum() * output["dec_out"].shape[-1]        
@@ -117,7 +118,11 @@ class Loss:
         rec_loss *= self.config["recon_loss_weight"]
         
         # commitment loss
-        commit_loss = output["commitment_loss"] * self.config["commit_loss_weight"] 
+        commit_w = max(
+            self.config["commit_loss_weight"] , 
+            self.config["commit_loss_weight"] * (step / total_steps)
+            )
+        commit_loss = output["commitment_loss"] * commit_w
         
         # smoothness loss :- down_out shifted by 1
         smooth_loss = output["smoothness_loss"] * self.config["smooth_loss_weight"]

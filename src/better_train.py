@@ -370,7 +370,7 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             output['disc_fake'] = disc_fake
             
             # Loss calculation
-            gen_loss_components = loss_module.step_gen(output)
+            gen_loss_components = loss_module.step_gen(output, step=step, total_steps=num_steps)
             # total_lossg = sum(gen_loss_components.values())
             total_lossg = gen_loss_components['rec_loss'] 
             total_lossg = total_lossg + gen_loss_components['commit_loss'] 
