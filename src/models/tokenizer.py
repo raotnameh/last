@@ -56,10 +56,19 @@ class Tokenizer(nn.Module):
         
         # commitment loss
         ################ no need to detach z_q since e is not trainable
-        commitment_loss = F.mse_loss(z, z_q, reduction='none') * mask # (batch, time, channels) 
+        # Normalize z_flattened and e using p2 normalization 
+        # because in high dimensions, the cosine distance is equivalent to the euclidean distance
+        commitment_loss = F.mse_loss(F.normalize(z, p=2, dim=1), F.normalize(z_q, p=2, dim=1), reduction='none') * mask # (batch, time, channels) 
         # MSE loss between z and z_q ignoring padding positions
         valid_count = mask.sum() * z.shape[-1] # Total number of valid (non-masked) elements
         commitment_loss = commitment_loss.sum() / valid_count 
+        
+        # Smoothness loss
+        smoothness_loss = F.mse_loss(z_q[:, :-1, :], z_q[:, 1:, :], reduction='none') * mask[:, 1:, :] # (batch, time-1, channels)
+        # MSE loss between z_q[t] and z_q[t+1] ignoring padding positions
+        valid_count = mask[:, 1:, :].sum() * z.shape[-1]
+        smoothness_loss = smoothness_loss.sum() / valid_count
+
                 
         # preserve gradients
         z_q = z + z_q - z.detach()
@@ -73,7 +82,7 @@ class Tokenizer(nn.Module):
         n_z_q, n_mask, selected_encodings_list = self.remove_consecutive_repeated_indices( encodings, mask.squeeze(-1), z_q) # randomly pick one index from each group of consecutive repeating elements # shape (B,T) and also returns the mask 
     
         
-        return commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list # commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list
+        return smoothness_loss, commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list # commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list
 
         
     def remove_consecutive_repeated_indices(self, min_encoding_indices, mask, z_q):

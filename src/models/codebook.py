@@ -2,10 +2,11 @@ import torch
 import torch.nn as nn
 
 from transformers import AutoTokenizer, AutoModel
-        
+from sklearn.decomposition import PCA
+import numpy as np 
         
 class Codebook(nn.Module):
-    
+        
     def __init__(self, vocab, model_name="meta-llama/Llama-3.2-1B-Instruct"):
         super(Codebook, self).__init__()
         

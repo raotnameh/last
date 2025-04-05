@@ -120,8 +120,7 @@ class Loss:
         commit_loss = output["commitment_loss"] * self.config["commit_loss_weight"] 
         
         # smoothness loss :- down_out shifted by 1
-        smooth_loss = self.mse_loss(output["down_out"][:,:-1,:], output["down_out"][:,1:,:])
-        smooth_loss *= self.config["smooth_loss_weight"]
+        smooth_loss = output["smoothness_loss"] * self.config["smooth_loss_weight"]
         
         # generator loss
         gen_loss = F.binary_cross_entropy_with_logits(output["disc_fake"], torch.zeros_like(output["disc_fake"]))
