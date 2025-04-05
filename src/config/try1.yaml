@@ -26,7 +26,7 @@ codebook:
   model_name: "meta-llama/Llama-3.2-1B-Instruct"
 
 encoder:
-  ckpt_path: "hubert_base_ls960.pt"
+  ckpt_path: "../models/hubert_base_ls960.pt"
   encoder_embed_dim: 768
   frozen_layers: ["11", "10"]
 
