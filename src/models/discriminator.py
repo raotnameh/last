@@ -37,6 +37,11 @@ class Discriminator(nn.Module):
     def __init__(self, in_channels=256, hidden_dim=256, kernel_size=11, groups=1):
         super().__init__()
         
+        self.mask_token_idx = 0
+        self.mask_prob = 0.15
+        self.masked_embedding = nn.Parameter(torch.randn(1, 1, 256)) if self.mask_token_idx else None
+
+        
         self.disc_layers = nn.ModuleList([
             Conv1dBlock(in_channels, hidden_dim, kernel_size=1, groups=groups),
             nn.GELU(),
@@ -53,6 +58,19 @@ class Discriminator(nn.Module):
         x: (batch, time, channels)
         padding_mask: (batch, time, 1) where True indicates a padded timestep.
         """
+        if self.mask_token_idx:
+            batch_size, seq_len, channels = x.shape
+            
+            # Step 1: Create mask with `mask_prob` probability
+            rand = torch.rand(batch_size, seq_len, device=x.device)
+            mask = rand < self.mask_prob
+
+            # Step 2: Exclude positions that are padded
+            mask = mask & ~padding_mask.squeeze(-1)
+            
+            # Step 3: Apply masking: replace with masked_embedding
+            x = torch.where(mask.unsqueeze(-1), self.masked_embedding.expand(batch_size, seq_len, channels), x)
+
 
         for layer in self.disc_layers:
             if isinstance(layer, Conv1dBlock):
