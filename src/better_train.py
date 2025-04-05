@@ -419,11 +419,7 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
                 output['disc_real'] = disc_real
                 output['disc_real_x'] = text_emb
 
-
-        
-                # Discriminator training
                 loss_module.gan_loss.discriminator = models['discriminator']
-                
                 
                 disc_loss_components = loss_module.step_disc(output)
                 total_lossd = disc_loss_components['total_loss']

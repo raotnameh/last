@@ -17,10 +17,12 @@ class Tokenizer(nn.Module):
 
         self.vocab = vocab[1:] # remove the padding token
     
-    def codebook_usage(self, min_encodings):
+    def codebook_usage(self, min_encodings, mask):
         
         # prob for each character
-        e_mean_np = torch.mean(min_encodings, dim=0).cpu().numpy() # (vocab_size,)
+        mask_bool = (mask == 1).squeeze(1)  # shape: (B,), True where we keep
+        valid_encodings = min_encodings[mask_bool]  # shape: (B', C)
+        e_mean_np = valid_encodings.mean(dim=0).cpu().numpy()
         # Plot
         plt.figure(figsize=(10, 6))
         plt.bar(self.vocab, e_mean_np, color='blue', alpha=0.7)
@@ -37,6 +39,8 @@ class Tokenizer(nn.Module):
         codebook (nn.Module): A module with a weight attribute of shape (vocab_size, embed_dim).
         mask (torch.Tensor): Mask of shape (batch, time, 1) with 1s for valid positions and 0s for padding.
         """
+        # Normalize z 
+        z = F.normalize(z, p=2, dim=-1) # (batch, time, channels)
         
         # Using fixed codebook embeddings
         e = codebook.embedding.weight.clone().detach() # (vocab_size+1, embed_dim) 
@@ -48,32 +52,31 @@ class Tokenizer(nn.Module):
         d = (torch.sum(z_flattened**2, dim=1, keepdim=True) + torch.sum(e**2, dim=1) - 2 * torch.matmul(z_flattened, e.t())) # (batch*time, vocab_size)
         
         # find closest encodings
-        min_encoding_indices = torch.argmin(d, dim=1).unsqueeze(1) # (batch*time, 1)
+        min_encoding_indices = torch.argmin(d, dim=1).unsqueeze(1) # (batch*time, 1) This has 0 to vocab_size-1 except for padding token which was 0.
         min_encodings = torch.zeros(min_encoding_indices.shape[0], e.shape[0], device=z.device) # (batch*time, vocab_size)
         min_encodings.scatter_(1, min_encoding_indices, 1) # (batch*time, vocab_size)
         z_q = torch.matmul(min_encodings, e).view(z.shape) # (batch, time, channels) # get tokenized latent vectors
         z_q *= mask # mask out padding positions of index 0. REASON: our data is sequential compared to the original VQVAE paper where the data is not sequential (images) which did not need padding.
+        
+        # codebook usage Distribution
+        self.codebook_usage(min_encodings, mask.contiguous().view(-1, 1))
         
         # commitment loss
         ################ no need to detach z_q since e is not trainable
         # Normalize z_flattened and e using p2 normalization 
         commitment_loss = F.mse_loss(z, z_q.detach(), reduction='none') * mask # (batch, time, channels) 
         # MSE loss between z and z_q ignoring padding positions
-        valid_count = mask.sum() * z.shape[-1] # Total number of valid (non-masked) elements
+        valid_count = mask.sum() #* z.shape[-1] # Total number of valid (non-masked) elements
         commitment_loss = commitment_loss.sum() / valid_count 
-        
                 
         # preserve gradients
         z_q = z + z_q - z.detach()
         
         # Smoothness loss
-        smoothness_loss = F.mse_loss(z_q[:, :-1, :], z_q[:, 1:, :], reduction='none') * mask[:, 1:, :] # (batch, time-1, channels)
+        smoothness_loss = F.mse_loss(z[:, :-1, :], z[:, 1:, :], reduction='none') * mask[:, 1:, :] # (batch, time-1, channels)
         # MSE loss between z_q[t] and z_q[t+1] ignoring padding positions
-        valid_count = mask[:, 1:, :].sum() * z.shape[-1]
+        valid_count = mask[:, 1:, :].sum() #* z.shape[-1]
         smoothness_loss = smoothness_loss.sum() / valid_count
-
-        # codebook usage Distribution
-        self.codebook_usage(min_encodings)
         
         ##### Discriminator codebooks without repeated indices #####
         encodings = min_encoding_indices.view(z.shape[0], z.shape[1]).clone()

@@ -118,11 +118,7 @@ class Loss:
         rec_loss *= self.config["recon_loss_weight"]
         
         # commitment loss
-        commit_w = max(
-            self.config["commit_loss_weight"] , 
-            self.config["commit_loss_weight"] * (step / total_steps)
-            )
-        commit_loss = output["commitment_loss"] * commit_w
+        commit_loss = output["commitment_loss"] * self.config["commit_loss_weight"]
         
         # smoothness loss :- down_out shifted by 1
         smooth_loss = output["smoothness_loss"] * self.config["smooth_loss_weight"]

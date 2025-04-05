@@ -36,9 +36,9 @@ downsample:
   groups: &groups_value 32
 
 upsample:
-  kernel_size: 1
+  kernel_size: *kernel_size_value
   stride: *stride_value
-  groups: 1
+  groups: *groups_value 
 
 discriminator:
   hidden_dim: 256
@@ -61,19 +61,18 @@ decoder:
   max_seq_len: 1000
 
 
-
 train:
   seed: 42124
 
-  lr_enc: 0.00001
+  lr_enc: 0.00005
   lr_down: 0.0005
   lr_dec: 0.0005
   lr_disc: 0.0005
-  grad_clip: 1.0
+  grad_clip: 10.0
   
   num_steps: 40000
-  freeze_steps: 10000
-  discriminator_freq: 200000
+  freeze_steps: 1000
+  discriminator_freq: 2
   gradient_accumulation_steps: 1
 
   mixed_precision: True
@@ -83,8 +82,8 @@ train:
 loss:
   recon_loss_weight: 1.0
   smooth_loss_weight: 10.0
-  commit_loss_weight: 0.01
-  gen_loss_weight: 0.0
+  commit_loss_weight: 10.0
+  gen_loss_weight: 0.1
 
   disc_loss_weight: 1.0
   gp_weight: 2.0
