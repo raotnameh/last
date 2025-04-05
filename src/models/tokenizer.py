@@ -57,11 +57,14 @@ class Tokenizer(nn.Module):
         # commitment loss
         ################ no need to detach z_q since e is not trainable
         # Normalize z_flattened and e using p2 normalization 
-        # because in high dimensions, the cosine distance is equivalent to the euclidean distance
-        commitment_loss = F.mse_loss(F.normalize(z, p=2, dim=1), F.normalize(z_q, p=2, dim=1), reduction='none') * mask # (batch, time, channels) 
+        commitment_loss = F.mse_loss(z, z_q.detach(), reduction='none') * mask # (batch, time, channels) 
         # MSE loss between z and z_q ignoring padding positions
         valid_count = mask.sum() * z.shape[-1] # Total number of valid (non-masked) elements
         commitment_loss = commitment_loss.sum() / valid_count 
+        
+                
+        # preserve gradients
+        z_q = z + z_q - z.detach()
         
         # Smoothness loss
         smoothness_loss = F.mse_loss(z_q[:, :-1, :], z_q[:, 1:, :], reduction='none') * mask[:, 1:, :] # (batch, time-1, channels)
@@ -69,13 +72,8 @@ class Tokenizer(nn.Module):
         valid_count = mask[:, 1:, :].sum() * z.shape[-1]
         smoothness_loss = smoothness_loss.sum() / valid_count
 
-                
-        # preserve gradients
-        z_q = z + z_q - z.detach()
-        
         # codebook usage Distribution
         self.codebook_usage(min_encodings)
-
         
         ##### Discriminator codebooks without repeated indices #####
         encodings = min_encoding_indices.view(z.shape[0], z.shape[1]).clone()

@@ -19,7 +19,7 @@ dataset_speech:
 dataset_txt:
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/transcription.txt"
   # path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech-lm-norm.txt"
-  batch_size: 16
+  batch_size: 64
 
 codebook:
   model_name: "meta-llama/Llama-3.2-1B-Instruct"
@@ -43,7 +43,7 @@ upsample:
 discriminator:
   hidden_dim: 256
   kernel_size: 11
-  groups: *groups_value
+  groups: 1
 
 
 decoder:
@@ -69,11 +69,11 @@ train:
   lr_down: 0.0005
   lr_dec: 0.0005
   lr_disc: 0.0005
-  grad_clip: 10.0
+  grad_clip: 1.0
   
   num_steps: 40000
   freeze_steps: 10000
-  discriminator_freq: 200000000
+  discriminator_freq: 200000
   gradient_accumulation_steps: 1
 
   mixed_precision: True
@@ -83,7 +83,7 @@ train:
 loss:
   recon_loss_weight: 1.0
   smooth_loss_weight: 10.0
-  commit_loss_weight: 0.1
+  commit_loss_weight: 0.01
   gen_loss_weight: 0.0
 
   disc_loss_weight: 1.0
