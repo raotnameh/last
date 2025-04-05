@@ -19,14 +19,14 @@ dataset_speech:
 dataset_txt:
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/transcription.txt"
   # path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech-lm-norm.txt"
-  
   batch_size: 16
 
 codebook:
   model_name: "meta-llama/Llama-3.2-1B-Instruct"
 
 encoder:
-  ckpt_path: "../models/hubert_base_ls960.pt"
+  # ckpt_path: "../weights/hubert_base_ls960.pt"
+  ckpt_path: "../weights/hubert_base_ls960_iter3.pt"
   encoder_embed_dim: 768
   frozen_layers: ["11", "10"]
 
