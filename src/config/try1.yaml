@@ -14,7 +14,7 @@ dataset_speech:
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeechmanifest_train.tsv"
   min_duration: 32000
   max_duration: 320000
-  batch_size: 16
+  batch_size: 64
 
 dataset_txt:
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/transcription.txt"
@@ -65,13 +65,13 @@ train:
   seed: 42124
 
   lr_enc: 0.00005
-  lr_down: 0.0005
+  lr_down: 0.00005
   lr_dec: 0.0005
-  lr_disc: 0.0005
-  grad_clip: 10.0
+  lr_disc: 0.0001
+  grad_clip: 1.0
   
   num_steps: 40000
-  freeze_steps: 1000
+  freeze_steps: 10000
   discriminator_freq: 2
   gradient_accumulation_steps: 1
 
@@ -81,8 +81,8 @@ train:
 
 loss:
   recon_loss_weight: 1.0
-  smooth_loss_weight: 10.0
-  commit_loss_weight: 10.0
+  smooth_loss_weight: 0.1
+  commit_loss_weight: 0.1
   gen_loss_weight: 0.1
 
   disc_loss_weight: 1.0

@@ -42,6 +42,7 @@ class Tokenizer(nn.Module):
         # Normalize z 
         z = F.normalize(z, p=2, dim=-1) # (batch, time, channels)
         
+        
         # Using fixed codebook embeddings
         e = codebook.embedding.weight.clone().detach() # (vocab_size+1, embed_dim) 
         e = e[1:,:] # remove the padding embedding from the codebook # (vocab_size, embed_dim)        
@@ -66,14 +67,14 @@ class Tokenizer(nn.Module):
         # Normalize z_flattened and e using p2 normalization 
         commitment_loss = F.mse_loss(z, z_q.detach(), reduction='none') * mask # (batch, time, channels) 
         # MSE loss between z and z_q ignoring padding positions
-        valid_count = mask.sum() #* z.shape[-1] # Total number of valid (non-masked) elements
+        valid_count = mask.sum() # * z.shape[-1] # Total number of valid (non-masked) elements
         commitment_loss = commitment_loss.sum() / valid_count 
                 
         # preserve gradients
         z_q = z + z_q - z.detach()
         
         # Smoothness loss
-        smoothness_loss = F.mse_loss(z[:, :-1, :], z[:, 1:, :], reduction='none') * mask[:, 1:, :] # (batch, time-1, channels)
+        smoothness_loss = F.mse_loss(z_q[:, :-1, :], z_q[:, 1:, :], reduction='none') * mask[:, 1:, :] # (batch, time-1, channels)
         # MSE loss between z_q[t] and z_q[t+1] ignoring padding positions
         valid_count = mask[:, 1:, :].sum() #* z.shape[-1]
         smoothness_loss = smoothness_loss.sum() / valid_count
