@@ -473,11 +473,12 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
                     scaler.unscale_(optimizer)
                 
             max_grad_norm = config['train']['grad_clip']
+            if step >= freeze_steps:
+                torch.nn.utils.clip_grad_norm_(models['encoder'].parameters(), max_grad_norm)
             torch.nn.utils.clip_grad_norm_(
-                list(models['encoder'].parameters()) +
                 list(models['downsample'].parameters()) + 
                 list(models['upsample'].parameters()) + 
-                list(models['decoder'].parameters()), 
+                list(models['decoder'].parameters()),
                 max_grad_norm
             )
             if step % config['train']['discriminator_freq'] == 0:

@@ -89,4 +89,4 @@ loss:
   gp_weight: 2.0
 
 lr_scheduler:
-  phase_ratio: [0.01, 0.5, 0.49]
+  phase_ratio: [0.2, 0.5, 0.3]
