@@ -214,10 +214,6 @@ def configure_optimizers(models: Dict, config: Dict) -> Dict:
         )
     }
     
-    # optimizers["codebook"] = optim.AdamW(
-            # [p for p in models['codebook'].parameters() if p.requires_grad],
-            # lr=config['train']['lr_codebook']
-            # )
     
     def tri_stage_scheduler(optimizer, total_steps, phase_ratio=[0.03, 0.9, 0.07]):
         """
@@ -254,7 +250,6 @@ def configure_optimizers(models: Dict, config: Dict) -> Dict:
         'down': tri_stage_scheduler(optimizers['down'], total_steps, phase_ratio),
         'dec': tri_stage_scheduler(optimizers['dec'], total_steps, phase_ratio),
         'disc': tri_stage_scheduler(optimizers['disc'], total_steps, phase_ratio),
-        # 'codebook': tri_stage_scheduler(optimizers['codebook'], total_steps, phase_ratio)
     }
     
     return optimizers, schedulers
@@ -311,10 +306,10 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
         
         # ===== Data Preparation =====
         try:
-            waveforms, padding_masks = next(speech_iter)
+            waveforms, padding_masks, paths = next(speech_iter)
         except StopIteration:
             speech_iter = iter(speech_loader)
-            waveforms, padding_masks = next(speech_iter)
+            waveforms, padding_masks, paths = next(speech_iter)
         waveforms = waveforms.to(device) # [B, T]
         padding_masks = padding_masks.to(device) # [B, T] true for masked, false for not masked means [False, False, ..., True, True]
         
@@ -342,13 +337,14 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             output['down_out'] = down_out
             output['dmask'] = dmask
             
-            commitment_loss, z_q, z_q_disc, z_q_disc_mask, selected_encodings_list = models['tokenizer'](
+            smoothness_loss, commitment_loss, z_q, z_q_disc, z_q_disc_mask, selected_encodings_list = models['tokenizer'](
                 down_out, 
                 models['codebook'], 
                 dmask
             )
             z_q_disc_mask = ~z_q_disc_mask.bool() # [B, T // 2, 1]
            
+            output['smoothness_loss'] = smoothness_loss
             output['commitment_loss'] = commitment_loss
             output['z_q'] = z_q # already masked
             output['z_q_disc'] = z_q_disc # already masked
@@ -379,10 +375,11 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             total_lossg = gen_loss_components['rec_loss'] 
             total_lossg = total_lossg + gen_loss_components['commit_loss'] 
             total_lossg = total_lossg + gen_loss_components['gen_loss']
-            # total_lossg += gen_loss_components['smooth_loss']
+            total_lossg = total_lossg + gen_loss_components['smooth_loss']
             
             if step % config['logging']['step'] == 0:
-
+                
+                logging.info(f"Generator encoded text path: --{paths[0]}--")
                 logging.info( f"Generator decoded text with special tokens: --{text_dataset.decode(selected_encodings_list[0],keep_special_tokens=True)}--" )
                 logging.info( f"Generator decoded text without special tokens: --{text_dataset.decode(selected_encodings_list[0])}--" )
                     
@@ -468,9 +465,7 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             )
             if step % config['train']['discriminator_freq'] == 0:
                 torch.nn.utils.clip_grad_norm_(models['discriminator'].parameters(), max_grad_norm)
-                # if step >= freeze_steps:
-                #     torch.nn.utils.clip_grad_norm_(models['codebook'].parameters(), max_grad_norm)
-
+                
             # Optimizer step
             if config['train']['mixed_precision']:
                 if step >= freeze_steps:
@@ -479,9 +474,7 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
                 scaler.step(optimizers['dec'])
                 if step % config['train']['discriminator_freq'] == 0:
                     scaler.step(optimizers['disc'])
-                    # if step >= freeze_steps:
-                    #     scaler.step(optimizers['codebook'])
-                        
+                   
                 scaler.update()
             else:
                 if step >= freeze_steps:
@@ -490,9 +483,7 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
                 optimizers['dec'].step()
                 if step % config['train']['discriminator_freq'] == 0:
                     optimizers['disc'].step()
-                    # if step >= freeze_steps:
-                    #     optimizers['codebook'].step()
-                
+                    
             # scheduler step
             for scheduler in schedulers.values():
                 scheduler.step()    
@@ -535,6 +526,7 @@ def main():
     logging.info(f"Config after command-line overrides: {config}")
 
     config['train']['num_steps'] *= config['train']['gradient_accumulation_steps']
+    config['train']['freeze_steps'] *= config['train']['gradient_accumulation_steps']
     
     # Set random seeds
     random.seed(config['train']['seed'])

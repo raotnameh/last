@@ -26,7 +26,7 @@ codebook:
 
 encoder:
   # ckpt_path: "../weights/hubert_base_ls960.pt"
-  ckpt_path: "../weights/hubert_base_ls960_iter3.pt"
+  ckpt_path: "../weights/convert_iter3.pt"
   encoder_embed_dim: 768
   frozen_layers: ["11", "10"]
 
@@ -65,8 +65,7 @@ decoder:
 train:
   seed: 42124
 
-  lr_codebook: 0.0000
-  lr_enc: 0.00005
+  lr_enc: 0.00001
   lr_down: 0.0005
   lr_dec: 0.0005
   lr_disc: 0.0005
@@ -83,7 +82,7 @@ train:
 
 loss:
   recon_loss_weight: 1.0
-  smooth_loss_weight: 1.0
+  smooth_loss_weight: 10.0
   commit_loss_weight: 0.1
   gen_loss_weight: 0.0
 

@@ -48,7 +48,7 @@ class Dataset_speech(Dataset):
         assert sample_rate == 16000, "Sampling rate must be 16000"
         
         waveform = torch.from_numpy(waveform).float()
-        return waveform, duration # (seq_len), (duration)
+        return waveform, duration, path # (seq_len), (duration)
     
     # collate function to pad the waveforms to the same length wrt the maximum duration
     def collate_fn(self, batches):
@@ -67,8 +67,8 @@ class Dataset_speech(Dataset):
             
             waveforms.append(padded_waveform)
             padding_masks.append(padding_mask) # 1 for masked position and 0 for non-masked position
-        
-        return torch.stack(waveforms), torch.stack(padding_masks) # (bsz, seq_len) for waveforms and padding_masks
+        paths = [batch[2] for batch in batches]
+        return torch.stack(waveforms), torch.stack(padding_masks), paths # (bsz, seq_len) for waveforms and padding_masks
 
 
 if __name__ == "__main__":
