@@ -4,6 +4,7 @@ import torch.nn as nn
 from transformers import AutoTokenizer, AutoModel
 from sklearn.decomposition import PCA
 import numpy as np 
+import torch.nn.functional as F
         
 class Codebook(nn.Module):
         
@@ -28,6 +29,8 @@ class Codebook(nn.Module):
                 embedding.weight.data[i] *= 0.0 # padding token embedding is zero
                 
         self.embedding = embedding
+        # p2 Normalize the embedding matrix
+        self.embedding.weight.data = F.normalize(self.embedding.weight.data, p=2, dim=1)
         
         # Remove the model and tokenizer
         del model
