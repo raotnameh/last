@@ -19,7 +19,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import yaml
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, SequentialSampler, BatchSampler
 from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.tensorboard import SummaryWriter
 from torch.cuda.amp import autocast, GradScaler
@@ -83,7 +83,16 @@ def configure_logging(dir='logs/') -> None:
 # step :- Prepare the dataset.
 def initialize_datasets(config: Dict) -> Tuple[DataLoader, DataLoader, Dict]:
     """Initialize and configure speech/text datasets with samplers."""
-    
+    class ShuffledBatchSampler(BatchSampler):
+        """Custom batch sampler that shuffles batch order while maintaining sequence order within batches."""
+        def __init__(self, sampler, batch_size, drop_last):
+            super().__init__(sampler, batch_size, drop_last)  
+
+        def __iter__(self):
+            batches = list(super().__iter__())  
+            random.shuffle(batches)  # Shuffle batch order
+            return iter(batches)
+
     # step 1 :- Prepare the speech dataset.
     speech_dataset = Dataset_speech(
         input_manifest=config['dataset_speech']['path'],
@@ -93,12 +102,24 @@ def initialize_datasets(config: Dict) -> Tuple[DataLoader, DataLoader, Dict]:
 
     speech_loader = DataLoader(
         speech_dataset,
-        batch_size=config['dataset_txt']['batch_size'],
+        batch_sampler=ShuffledBatchSampler(
+            sampler=SequentialSampler(speech_dataset),
+            batch_size=config['dataset_speech']['batch_size'],
+            drop_last=False,
+        ),
         collate_fn=speech_dataset.collate_fn,
         pin_memory=True,
-        shuffle=True,
         num_workers=6
     )
+    
+    # speech_loader = DataLoader(
+    #     speech_dataset,
+    #     batch_size=config['dataset_txt']['batch_size'],
+    #     collate_fn=speech_dataset.collate_fn,
+    #     pin_memory=True,
+    #     shuffle=True,
+    #     num_workers=6
+    # )
 
     # step 2 :- Prepare the text dataset.
     text_dataset = Dataset_txt(data=config['dataset_txt']['path'])
@@ -523,6 +544,8 @@ def main():
 
     config['train']['num_steps'] *= config['train']['gradient_accumulation_steps']
     config['train']['freeze_steps'] *= config['train']['gradient_accumulation_steps']
+    config['checkpoint']['step'] *= config['train']['gradient_accumulation_steps']
+    
     
     # Set random seeds
     random.seed(config['train']['seed'])

@@ -44,12 +44,6 @@ class Discriminator(nn.Module):
             Conv1dBlock(hidden_dim, hidden_dim, kernel_size),
             nn.GELU(),
             nn.Dropout(0.1),
-            Conv1dBlock(hidden_dim, hidden_dim, kernel_size),
-            nn.GELU(),
-            nn.Dropout(0.1),
-            Conv1dBlock(hidden_dim, hidden_dim, kernel_size),
-            nn.GELU(),
-            nn.Dropout(0.1),
         ])
         
         self.proj = Conv1dBlock(hidden_dim, 1, kernel_size)
