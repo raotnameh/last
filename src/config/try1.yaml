@@ -14,7 +14,7 @@ dataset_speech:
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeechmanifest_train.tsv"
   min_duration: 32000
   max_duration: 320000
-  batch_size: 64
+  batch_size: 16
 
 dataset_txt:
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/transcription.txt"
@@ -28,12 +28,12 @@ encoder:
   # ckpt_path: "../weights/hubert_base_ls960.pt"
   ckpt_path: "../weights/convert_iter3.pt"
   encoder_embed_dim: 768
-  frozen_layers: ["11", "10"]
+  frozen_layers: ["11"]
 
 downsample:
   kernel_size: &kernel_size_value 51
   stride: &stride_value 2
-  groups: &groups_value 32
+  groups: &groups_value 64
 
 upsample:
   kernel_size: *kernel_size_value
@@ -42,7 +42,7 @@ upsample:
 
 discriminator:
   hidden_dim: 256
-  kernel_size: 11
+  kernel_size: 9
   groups: 1
 
 
@@ -65,13 +65,13 @@ train:
   seed: 42124
 
   lr_enc: 0.00005
-  lr_down: 0.0005
-  lr_dec: 0.0005
-  lr_disc: 0.0005
+  lr_down: 0.00005
+  lr_dec: 0.005
+  lr_disc: 0.0001
   grad_clip: 1.0
   
   num_steps: 40000
-  freeze_steps: 10000
+  freeze_steps: 1000
   discriminator_freq: 2
   gradient_accumulation_steps: 1
 
@@ -81,7 +81,7 @@ train:
 
 loss:
   recon_loss_weight: 1.0
-  smooth_loss_weight: 0.0
+  smooth_loss_weight: 0.1
   commit_loss_weight: 0.1
   gen_loss_weight: 0.1
 
@@ -89,4 +89,4 @@ loss:
   gp_weight: 2.0
 
 lr_scheduler:
-  phase_ratio: [0.1, 0.0, 0.9]
+  phase_ratio: [0.01, 0.0, 0.9]

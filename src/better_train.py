@@ -173,6 +173,10 @@ def setup_models(config: Dict, vocab: nn.Module) -> Dict:
     
     logging.info(f"Size of codebook: {models['codebook'].embedding.weight.shape[0]} x {models['codebook'].embedding.weight.shape[1]}")
 
+    print(models['downsample'])
+    print(models['upsample'])
+    print(models['decoder'])
+    print(models['discriminator'])
     
     # Log model parameters
     total_params = 0
@@ -183,6 +187,7 @@ def setup_models(config: Dict, vocab: nn.Module) -> Dict:
                     cur_params)
         total_params += cur_params
     logging.info("Total parameters: %.4fM", total_params)
+
     
     return models
 
@@ -273,46 +278,6 @@ def configure_optimizers(models: Dict, config: Dict) -> Dict:
     
     return optimizers, schedulers
 
-def load_checkpoint(checkpoint_path, models, optimizers, device):
-    """Load model and optimizer states from checkpoint."""
-    checkpoint = torch.load(checkpoint_path, map_location=device)
-    
-    # Load model states
-    for name, model in models.items():
-        if name in checkpoint['models']:
-            model.load_state_dict(checkpoint['models'][name])
-        else:
-            logging.warning(f"No weights found for {name} in checkpoint")
-
-    # Load optimizer states
-    for name, optimizer in optimizers.items():
-        if name in checkpoint['optimizers']:
-            optimizer.load_state_dict(checkpoint['optimizers'][name])
-        else:
-            logging.warning(f"No state found for {name} optimizer")
-
-    # Return additional info
-    return {
-        'step': checkpoint['step'],
-        'num_steps': checkpoint['num_steps'],
-        'config': checkpoint['config']
-    }
-
-
-def load_or_compute_gt_from_path(waveform, model, path, CACHE_DIR):
-    # Sanitize path to make it a valid filename
-    filename = os.path.basename(path).replace("/", "_").replace("\\", "_")
-    cache_path =  os.path.join(CACHE_DIR, f"{filename}.pt")
-
-    
-    if os.path.exists(cache_path):
-        gt = torch.load(cache_path, map_location=waveform.device)
-    else:
-        with torch.no_grad():
-            gt = model.encode(waveform.unsqueeze(0).unsqueeze(1))  # [1, T_enc, 1024]
-            torch.save(gt.squeeze(0), cache_path)
-    return gt.squeeze(0)
-
 
 def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLoader, text_dataset, text_loader: DataLoader, loss_module: Loss, config: Dict, device: torch.device, start_step: int):
     
@@ -352,7 +317,8 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
         
     
         # ===== Generator Forward Pass =====
-        with autocast(enabled=config['train']['mixed_precision']):
+        with autocast(enabled=config['train']['mixed_precision']):     
+            # ===== Encoder =====
             enc_out = models['encoder'](waveforms, padding_masks)  # [B, T, C] # step 1
             output["cnn_out"] = enc_out['cnn_out'] # [B, T // 320, C] 
             output['encoder_out'] = enc_out['encoder_out'] # [B, T // 320, C] 
@@ -372,6 +338,7 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             output['down_out'] = down_out
             output['dmask'] = dmask
             
+            # ===== Tokenizer =====
             smoothness_loss, commitment_loss, z_q, z_q_disc, z_q_disc_mask, selected_encodings_list = models['tokenizer'](
                 down_out, 
                 models['codebook'], 
@@ -384,6 +351,7 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             output['z_q'] = z_q # already masked
             output['z_q_disc'] = z_q_disc # already masked
             
+            # ===== UpSample =====
             up_out = models['upsample'](z_q)
             up_out = up_out[:,:mask.shape[1],:] * mask # [B, T, C]       
             output['up_out'] = up_out
@@ -400,7 +368,7 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             output['dec_out2'] = dec_out2
             output['dec_mask'] = dec_mask
             
-            # Generator discriminator prediction
+            # ===== Discriminator Generator Update =====
             disc_fake = models['discriminator'](z_q_disc, z_q_disc_mask)
             output['disc_fake'] = disc_fake
             
@@ -533,11 +501,44 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
                 'num_steps': num_steps,
                 'models': {k: v.state_dict() for k, v in models.items()},
                 'optimizers': {k: v.state_dict() for k, v in optimizers.items()},
+                'schedulers': {k: v.state_dict() for k, v in schedulers.items()},
                 'config': config
             }, checkpoint_path)
             logging.info(f"Saved checkpoint to {checkpoint_path}")
 
     writer.close()
+
+
+
+def load_checkpoint(checkpoint_path, models, optimizers, schedulers, device):
+    """Load model and optimizer states from checkpoint."""
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+    
+    # Load model states
+    for name, model in models.items():
+        if name in checkpoint['models']:
+            model.load_state_dict(checkpoint['models'][name])
+        else:
+            logging.warning(f"No weights found for {name} in checkpoint")
+
+    # Load optimizer states
+    for name, optimizer in optimizers.items():
+        if name in checkpoint['optimizers']:
+            optimizer.load_state_dict(checkpoint['optimizers'][name])
+        else:
+            logging.warning(f"No state found for {name} optimizer")
+    
+    # Load schedulers
+    for name, scheduler in schedulers.items():
+        if name in checkpoint['schedulers']:
+            scheduler.load_state_dict(checkpoint['schedulers'][name])
+
+    # Return additional info
+    return {
+        'step': checkpoint['step'],
+        'num_steps': checkpoint['num_steps'],
+        'config': checkpoint['config']
+    }
 
 
 
@@ -553,6 +554,10 @@ def main():
         config['device'] = args.device
     if args.log_dir:
         config['logging']['dir'] = args.log_dir
+    if args.fp16:
+        config['train']['mixed_precision'] = True
+        
+        
     logging.info(f"Loaded config from {args.config}")
     logging.info(f"Command-line args: {args}")   
     logging.info(f"Config after command-line overrides: {config}")
@@ -590,7 +595,6 @@ def main():
     # Create checkpoint directory
     os.makedirs(config['checkpoint']['dir'], exist_ok=True)
     
-    
     # Resume training if checkpoint specified
     start_step = 1
     if config['train']['resume_checkpoint']:
@@ -598,6 +602,7 @@ def main():
             config['train']['checkpoint_path'],
             models,
             optimizers,
+            schedulers,
             device
         )
         start_step = checkpoint_info['step'] + 1
