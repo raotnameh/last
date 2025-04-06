@@ -88,7 +88,8 @@ class Dataset_speech(Dataset):
     # collate function to pad the waveforms to the same length wrt the maximum duration
     def collate_fn(self, batches):
         max_dur = max(batch[1] for batch in batches)
-        dur = [batch[1] for batch in batches]
+        dur = [batch[1] / 16000.0 for batch in batches]
+        
         gt_list = [batch[3] for batch in batches]
         gt = pad_sequence(gt_list, batch_first=True, padding_value=0)
         waveforms = []
