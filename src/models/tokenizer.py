@@ -80,7 +80,7 @@ class Tokenizer(nn.Module):
         smoothness_loss = smoothness_loss.sum() / valid_count
         
         ##### Discriminator codebooks without repeated indices #####
-        encodings = min_encoding_indices.view(z.shape[0], z.shape[1]).clone()
+        encodings = min_encoding_indices.view(z.shape[0], z.shape[1])
         n_z_q, n_mask, selected_encodings_list = self.remove_consecutive_repeated_indices( encodings, mask.squeeze(-1), z_q) # randomly pick one index from each group of consecutive repeating elements # shape (B,T) and also returns the mask 
     
         

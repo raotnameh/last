@@ -110,15 +110,6 @@ def initialize_datasets(config: Dict) -> Tuple[DataLoader, DataLoader, Dict]:
         pin_memory=True,
         num_workers=6
     )
-    
-    # speech_loader = DataLoader(
-    #     speech_dataset,
-    #     batch_size=config['dataset_txt']['batch_size'],
-    #     collate_fn=speech_dataset.collate_fn,
-    #     pin_memory=True,
-    #     shuffle=True,
-    #     num_workers=6
-    # )
 
     # step 2 :- Prepare the text dataset.
     text_dataset = Dataset_txt(data=config['dataset_txt']['path'])
@@ -307,8 +298,6 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
         try:
             waveforms, padding_masks, paths, gt = next(speech_iter)
         except StopIteration:
-            print("Speech dataset exhausted, resetting iterator.")
-            
             speech_iter = iter(speech_loader)
             waveforms, padding_masks, paths, gt = next(speech_iter)
         waveforms = waveforms.to(device) # [B, T]
