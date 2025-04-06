@@ -472,6 +472,13 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
                 if step % config['train']['discriminator_freq'] == 0:
                     optimizers['disc'].step()
                     
+            # logging lr 
+            writer.add_scalar('learning_rate/encoder', schedulers['enc'].get_last_lr()[0], step)
+            writer.add_scalar('learning_rate/downsample', schedulers['down'].get_last_lr()[0], step)
+            writer.add_scalar('learning_rate/decoder', schedulers['dec'].get_last_lr()[0], step)
+            writer.add_scalar('learning_rate/discriminator', schedulers['disc'].get_last_lr()[0], step)
+            
+            
             # scheduler step
             for scheduler in schedulers.values():
                 scheduler.step()    
@@ -480,6 +487,8 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             for optimizer in optimizers.values():
                 optimizer.zero_grad()
         
+            
+            
             
         # Checkpoint
         if step % config['checkpoint']['step'] == 0:
