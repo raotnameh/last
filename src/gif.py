@@ -10,7 +10,6 @@ image_files = []
 step = 0
 while True:
     filename = f'{prefix}{step}{ext}'
-    print(filename)
     if not os.path.exists(filename):
         break  # Stop when the file doesn't exist
     image_files.append(filename)
