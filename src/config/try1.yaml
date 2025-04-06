@@ -68,7 +68,7 @@ train:
   lr_down: 0.00005
   lr_dec: 0.0005
   lr_disc: 0.0001
-  grad_clip: 1.0
+  grad_clip: 10.0
   
   num_steps: 40000
   freeze_steps: 4000
@@ -78,6 +78,7 @@ train:
   mixed_precision: True
   resume_checkpoint: False
   resume_path: "checkpoints/step_10000.pth"
+
 
 loss:
   recon_loss_weight: 1.0
