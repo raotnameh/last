@@ -24,8 +24,8 @@ class Dataset_txt(Dataset):
             texts = [x.strip() for x in out if len(x) > 10 and len(x) < 500] # filtering out short texts that 2 second.
         
         self.texts = texts
+        self.texts = self.add_question_marks(self.texts)
         self.texts = sorted(self.texts, key=len)
-        self.add_question_marks()
         
         # creating the vocab.
         self.vocab = self.build_vocab(texts)
@@ -56,11 +56,11 @@ class Dataset_txt(Dataset):
         plt.savefig('REAL_codebook_usage_distribution.png', bbox_inches='tight')
         
         
-    def add_question_marks(self):
+    def add_question_marks(self, texts=[]):
         logging.info(f"Preprocessing the text data by adding silence tokens.")
         
         modified_texts = []
-        for sentence in tqdm(self.texts):
+        for sentence in tqdm(texts):
             modified_sentence = ['?']# Add question marks at start 
             previous_char = None
             for char in sentence:
@@ -83,7 +83,7 @@ class Dataset_txt(Dataset):
         logging.info(f"Modified text sample")
         logging.info(f"{random.choice(modified_texts)}")
         logging.info(f"{random.choice(modified_texts)}")
-        self.texts = modified_texts
+        texts = modified_texts
 
     def build_vocab(self, texts):
         """

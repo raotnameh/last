@@ -71,7 +71,7 @@ train:
   
   num_steps: 40000
   freeze_steps: 1000
-  discriminator_freq: 2
+  discriminator_freq: 1
   gradient_accumulation_steps: 1
 
   mixed_precision: True
