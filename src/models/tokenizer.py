@@ -79,7 +79,7 @@ class Tokenizer(nn.Module):
         
         # find closest encodings
         min_encoding_indices = torch.argmin(d, dim=1).unsqueeze(1) # (batch*time, 1) This has 0 to vocab_size-1 except for padding token which was 0.
-        min_encodings = torch.zeros(min_encoding_indices.shape[0], e.shape[0], device=z.device) # (batch*time, vocab_size)
+        min_encodings = torch.zeros(min_encoding_indices.shape[0], e.shape[0], device=z.device) # (batch*time, vocab_size) 
         min_encodings.scatter_(1, min_encoding_indices, 1) # (batch*time, vocab_size)
         z_q = torch.matmul(min_encodings, e).view(z.shape) # (batch, time, channels) # get tokenized latent vectors
         z_q *= mask # mask out padding positions of index 0. REASON: our data is sequential compared to the original VQVAE paper where the data is not sequential (images) which did not need padding.
