@@ -11,13 +11,16 @@ class Upsample(nn.Module):
         
         self.norm = torch.nn.LayerNorm(input_dim)
         self.conv = nn.ConvTranspose1d( input_dim, output_dim, kernel_size, stride=stride,padding=((kernel_size - 1)) // 2, output_padding=stride - 1, groups=groups)
-          
+        
+        self.norm2 = torch.nn.LayerNorm(output_dim)
     def forward(self, x): # B x T x C 
         x = self.norm(x)
 
         x = x.transpose(1, 2)
         x = self.conv(x)
         x = x.transpose(1, 2)
+        
+        x = self.norm2(x)
 
         return x # B x T x C 
     
