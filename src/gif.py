@@ -2,7 +2,7 @@ import imageio
 import os
 
 # Directory where your images are stored
-prefix = 'codebook_usage_distribution_'
+prefix = 'plots/codebook_usage_distribution_'
 ext = '.png'
 
 # Gather all image file paths in order of step
