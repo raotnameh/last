@@ -53,6 +53,26 @@ class Tokenizer(nn.Module):
         pred = pred + epsilon
         prior = prior + epsilon
         
+        def dice_loss(inputs, targets):
+            # Flatten the tensors to simplify the computation
+            inputs = inputs.view(-1)
+            targets = targets.view(-1)
+            smooth = 1e-6  # Smoothing term to avoid division by zero
+            intersection = (inputs * targets).sum()
+            dice = (2.0 * intersection + smooth) / (inputs.sum() + targets.sum() + smooth)
+            return 1 - dice
+        return dice_loss(pred, prior)
+        
+
+        def js_divergence(p, q, epsilon=1e-8):
+            # Jensen-Shannon Divergence (JS Divergence)
+            m = 0.5 * (p + q)
+            return 0.5 * (
+                torch.sum(p * (torch.log(p) - torch.log(m)), dim=-1) +
+                torch.sum(q * (torch.log(q) - torch.log(m)), dim=-1)
+            )
+        
+        return js_divergence(pred, prior)
         return torch.sum(pred * (torch.log(pred) - torch.log(prior)))
      
     def forward(self, z, codebook, mask, logits, prior):
