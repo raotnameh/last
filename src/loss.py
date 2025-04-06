@@ -31,9 +31,15 @@ class GANLoss(nn.Module):
         super().__init__()
         self.gp_weight = gp_weight
 
-    def forward(self, fake, real, fake_x, real_x, fake_smooth=0.0, real_smooth=0.0):
+    def forward(self, fake, real, fake_x, real_x, fake_smooth=0.1, real_smooth=0.1):
         # using zero class for real and one class for fake
         """Computes adversarial loss and gradient penalty."""
+        
+        # with 5 percent probability, switch fake and real data
+        if np.random.rand() < 0.05:
+            fake, real = real, fake
+            fake_x, real_x = real_x, fake_x
+            
         loss_fake = F.binary_cross_entropy_with_logits(
             fake, torch.ones_like(fake) - fake_smooth, reduction="sum"
         )

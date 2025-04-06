@@ -365,8 +365,8 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             # total_lossg = sum(gen_loss_components.values())
             total_lossg = gen_loss_components['rec_loss'] 
             total_lossg = total_lossg + gen_loss_components['commit_loss'] 
-            total_lossg = total_lossg + gen_loss_components['gen_loss']
             total_lossg = total_lossg + gen_loss_components['smooth_loss']
+            total_lossg = total_lossg + gen_loss_components['gen_loss']
             
             if step % config['logging']['step'] == 0:
                 
