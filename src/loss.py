@@ -36,9 +36,9 @@ class GANLoss(nn.Module):
         """Computes adversarial loss and gradient penalty."""
         
         # with 5 percent probability, switch fake and real data
-        # if np.random.rand() < 0.05:
-        #     fake, real = real, fake
-        #     fake_x, real_x = real_x, fake_x
+        if np.random.rand() < 0.05:
+            fake, real = real, fake
+            fake_x, real_x = real_x, fake_x
             
         loss_fake = F.binary_cross_entropy_with_logits(
             fake, torch.ones_like(fake) - fake_smooth, reduction="sum"

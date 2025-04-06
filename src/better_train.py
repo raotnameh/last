@@ -82,15 +82,15 @@ def configure_logging(dir='logs/') -> None:
 # step :- Prepare the dataset.
 def initialize_datasets(config: Dict) -> Tuple[DataLoader, DataLoader, Dict]:
     """Initialize and configure speech/text datasets with samplers."""
-    class ShuffledBatchSampler(BatchSampler):
-        """Custom batch sampler that shuffles batch order while maintaining sequence order within batches."""
-        def __init__(self, sampler, batch_size, drop_last):
-            super().__init__(sampler, batch_size, drop_last)  
+    # class ShuffledBatchSampler(BatchSampler):
+    #     """Custom batch sampler that shuffles batch order while maintaining sequence order within batches."""
+    #     def __init__(self, sampler, batch_size, drop_last):
+    #         super().__init__(sampler, batch_size, drop_last)  
 
-        def __iter__(self):
-            batches = list(super().__iter__())  
-            random.shuffle(batches)  # Shuffle batch order
-            return iter(batches)
+    #     def __iter__(self):
+    #         batches = list(super().__iter__())  
+    #         random.shuffle(batches)  # Shuffle batch order
+    #         return iter(batches)
 
     # step 1 :- Prepare the speech dataset.
     speech_dataset = Dataset_speech(
@@ -98,18 +98,26 @@ def initialize_datasets(config: Dict) -> Tuple[DataLoader, DataLoader, Dict]:
         min_duration=config['dataset_speech']['min_duration'],
         max_duration=config['dataset_speech']['max_duration'],
     )
-
     speech_loader = DataLoader(
         speech_dataset,
-        batch_sampler=ShuffledBatchSampler(
-            sampler=SequentialSampler(speech_dataset),
-            batch_size=config['dataset_speech']['batch_size'],
-            drop_last=False,
-        ),
+        batch_size=config['dataset_txt']['batch_size'],
         collate_fn=speech_dataset.collate_fn,
         pin_memory=True,
-        num_workers=6
+        shuffle=True,  
+        num_workers=4
     )
+    
+    # speech_loader = DataLoader(
+    #     speech_dataset,
+    #     batch_sampler=ShuffledBatchSampler(
+    #         sampler=SequentialSampler(speech_dataset),
+    #         batch_size=config['dataset_speech']['batch_size'],
+    #         drop_last=False,
+    #     ),
+    #     collate_fn=speech_dataset.collate_fn,
+    #     pin_memory=True,
+    #     num_workers=6
+    # )
 
     # step 2 :- Prepare the text dataset.
     text_dataset = Dataset_txt(data=config['dataset_txt']['path'])
@@ -119,7 +127,7 @@ def initialize_datasets(config: Dict) -> Tuple[DataLoader, DataLoader, Dict]:
         collate_fn=text_dataset.collate_fn,
         pin_memory=True,
         shuffle=True,
-        num_workers=6
+        num_workers=4
     )
 
     logging.info(f"Number of batches in speech dataset: {len(speech_loader)}")
@@ -387,7 +395,12 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
                 writer.add_scalar('generator_loss/smooth_loss', gen_loss_components['smooth_loss'], step)
                 writer.add_scalar('generator_loss/gen_loss', gen_loss_components['gen_loss'], step)
                 writer.add_scalar('generator_loss/total_loss_gen', total_lossg, step)
-            
+
+                # logging lr 
+                writer.add_scalar('learning_rate/encoder', schedulers['enc'].get_last_lr()[0], step)
+                writer.add_scalar('learning_rate/downsample', schedulers['down'].get_last_lr()[0], step)
+                writer.add_scalar('learning_rate/decoder', schedulers['dec'].get_last_lr()[0], step)
+                writer.add_scalar('learning_rate/discriminator', schedulers['disc'].get_last_lr()[0], step)
             
             
             # ===== Discriminator Forward Pass =====
@@ -471,12 +484,6 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
                 optimizers['dec'].step()
                 if step % config['train']['discriminator_freq'] == 0:
                     optimizers['disc'].step()
-                    
-            # logging lr 
-            writer.add_scalar('learning_rate/encoder', schedulers['enc'].get_last_lr()[0], step)
-            writer.add_scalar('learning_rate/downsample', schedulers['down'].get_last_lr()[0], step)
-            writer.add_scalar('learning_rate/decoder', schedulers['dec'].get_last_lr()[0], step)
-            writer.add_scalar('learning_rate/discriminator', schedulers['disc'].get_last_lr()[0], step)
             
             
             # scheduler step

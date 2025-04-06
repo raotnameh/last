@@ -70,9 +70,9 @@ train:
   lr_disc: 0.0001
   grad_clip: 10.0
   
-  num_steps: 40000
-  freeze_steps: 4000
-  discriminator_freq: 2
+  num_steps: 100000
+  freeze_steps: 10000
+  discriminator_freq: 5
   gradient_accumulation_steps: 1
 
   mixed_precision: True
@@ -84,10 +84,10 @@ loss:
   recon_loss_weight: 1.0
   smooth_loss_weight: 0.1
   commit_loss_weight: 0.1
-  gen_loss_weight: 1.0
+  gen_loss_weight: 0.1
 
   disc_loss_weight: 1.0
   gp_weight: 2.0
 
 lr_scheduler:
-  phase_ratio: [0.2, 0.0, 0.8]
+  phase_ratio: [0.1, 0.0, 0.9]
