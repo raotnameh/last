@@ -20,7 +20,7 @@ while True:
 output_gif_path = f'codebook_usage_distribution.gif'
 
 # Create the GIF
-with imageio.get_writer(output_gif_path, mode='I', duration=0.1) as writer:
+with imageio.get_writer(output_gif_path, mode='I', duration=0.5) as writer:
     for filename in image_files:
         image = imageio.imread(filename)
         writer.append_data(image)

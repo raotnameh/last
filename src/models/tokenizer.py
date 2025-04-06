@@ -39,7 +39,7 @@ class Tokenizer(nn.Module):
         
         plt.close()
     
-    def kl_divergence_loss(self, logits, prior, mask epsilon=1e-8):
+    def kl_divergence_loss(self, logits, prior, mask, epsilon=1e-8):
         # Diversity loss
         logits = logits.contiguous().view(-1, logits.shape[-1]) # (batch*time, vocab_size)
         logits = F.softmax(logits, dim=-1) # apply softmax to logits
@@ -53,8 +53,7 @@ class Tokenizer(nn.Module):
         pred = pred + epsilon
         prior = prior + epsilon
         
-        kl_div = torch.sum(pred * (torch.log(pred) - torch.log(prior)))
-        return kl_div
+        return torch.sum(pred * (torch.log(pred) - torch.log(prior)))
      
     def forward(self, z, codebook, mask, logits, prior):
         """
@@ -63,22 +62,8 @@ class Tokenizer(nn.Module):
         mask (torch.Tensor): Mask of shape (batch, time, 1) with 1s for valid positions and 0s for padding.
         """
         
-        # Diversity loss
-        logits = logits.contiguous().view(-1, logits.shape[-1]) # (batch*time, vocab_size)
-        logits = F.softmax(logits, dim=-1) # apply softmax to logits
-        # prob for each character
-        mask_bool = (mask.contiguous().view(-1, 1) == 1).squeeze(1)  # shape: (B,), True where we keep
-        
-        valid_logits = logits[mask_bool]  # shape: (B', C)
-        pred = valid_logits.mean(dim=0) # shape: (vocab_size,)
-        # kl loss 
-        def kl_divergence_loss(p, q, epsilon=1e-8):
-            p = p + epsilon
-            q = q + epsilon
-            kl_div = torch.sum(p * (torch.log(p) - torch.log(q)))
-            return kl_div
-        prior = torch.from_numpy(prior).to(logits.device) # (vocab_size,)
-        diversity_loss = kl_divergence_loss(logits, prior, mask) # KL divergence between the predicted distribution and the prior distribution 
+        # KL divergence between the predicted distribution and the prior distribution 
+        diversity_loss = self.kl_divergence_loss(logits, torch.from_numpy(prior).to(logits.device), mask) 
       
         
         # Normalize z 
