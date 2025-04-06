@@ -126,6 +126,7 @@ class Discriminator(nn.Module):
         x = self.pre(x, padding_mask) 
         
         x = self.norm(x)
+        
         x = self.decoder(x, padding_mask.squeeze(-1))  # (batch, time, hidden_dim), (batch, time)
         
         # Extract the valid last timestep for each sequence in the batch
