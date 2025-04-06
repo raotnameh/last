@@ -57,7 +57,7 @@ class Encoder(torch.nn.Module):
         
 
 class Downsample(torch.nn.Module):
-    def __init__(self, input_dim=768, output_dim=256, kernel_size=9, stride=2, groups=1, , vocab_size=256):
+    def __init__(self, input_dim=768, output_dim=256, kernel_size=9, stride=2, groups=1, vocab_size=256):
         super().__init__()
         
         self.norm = torch.nn.LayerNorm(input_dim)

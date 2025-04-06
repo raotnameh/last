@@ -150,6 +150,7 @@ def setup_models(config: Dict, vocab: nn.Module) -> Dict:
         kernel_size=config['downsample']['kernel_size'],
         stride=config['downsample']['stride'],
         groups=config['downsample']['groups'],
+        vocab_size=models['codebook'].embedding.weight.shape[0]-1, # -1 for padding    
         )
     
     models['tokenizer'] = Tokenizer(vocab=models['codebook'].vocab)
@@ -160,7 +161,7 @@ def setup_models(config: Dict, vocab: nn.Module) -> Dict:
         kernel_size=config['upsample']['kernel_size'],
         stride=config['upsample']['stride'],
         groups=config['upsample']['groups'],
-        vocab_size=models['codebook'].embedding.weight.shape[0]-1, # -1 for padding    
+        
         )
  
     models['decoder'] = Decoder(config['decoder'])

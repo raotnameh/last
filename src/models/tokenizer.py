@@ -47,13 +47,11 @@ class Tokenizer(nn.Module):
         """
         
         # Diversity loss
-        logits = logits.contiguous().view(-1, logits.shape[1]) # (batch*time, vocab_size)
+        logits = logits.contiguous().view(-1, logits.shape[-1]) # (batch*time, vocab_size)
         logits = F.softmax(logits, dim=-1) # apply softmax to logits
-        # only keep the valid positions 
-        logits = logits * mask # (batch*time, vocab_size)
-
         # prob for each character
         mask_bool = (mask.contiguous().view(-1, 1) == 1).squeeze(1)  # shape: (B,), True where we keep
+        
         valid_logits = logits[mask_bool]  # shape: (B', C)
         pred = valid_logits.mean(dim=0) # shape: (vocab_size,)
         # kl loss 
@@ -62,10 +60,9 @@ class Tokenizer(nn.Module):
             q = q + epsilon
             kl_div = torch.sum(p * (torch.log(p) - torch.log(q)))
             return kl_div
-        diversity_loss = kl_divergence_loss(pred, prior) 
-        print(f"diversity_loss: {diversity_loss.item()}")
-        
-        
+        prior = torch.from_numpy(prior).to(logits.device) # (vocab_size,)
+        diversity_loss = kl_divergence_loss(pred, prior) # KL divergence between the predicted distribution and the prior distribution 
+      
         
         # Normalize z 
         z = F.normalize(z, p=2, dim=-1) # (batch, time, channels)

@@ -72,7 +72,7 @@ train:
   
   num_steps: 100000
   freeze_steps: 10000
-  discriminator_freq: 5
+  discriminator_freq: 2
   gradient_accumulation_steps: 1
 
   mixed_precision: True
@@ -85,7 +85,7 @@ loss:
   smooth_loss_weight: 0.1
   commit_loss_weight: 0.1
   gen_loss_weight: 0.1
-  diversity_loss_weight: 0.1
+  diversity_loss_weight: 1.0
 
   disc_loss_weight: 1.0
   gp_weight: 2.0
