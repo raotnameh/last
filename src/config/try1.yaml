@@ -42,7 +42,7 @@ upsample:
 
 discriminator:
   hidden_dim: 368
-  num_layers: 2
+  num_layers: 4
 
 
 decoder:
