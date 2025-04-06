@@ -133,7 +133,7 @@ def initialize_datasets(config: Dict) -> Tuple[DataLoader, DataLoader, Dict]:
     logging.info(f"Number of batches in speech dataset: {len(speech_loader)}")
     logging.info(f"Number of batches in text dataset: {len(text_loader)}")
     
-    return speech_loader, text_dataset, text_loader, text_dataset.vocab
+    return speech_loader, text_dataset, text_loader, text_dataset.vocab, text_dataset.prior
 
 
 # step :- Prepare the codebook
@@ -160,6 +160,7 @@ def setup_models(config: Dict, vocab: nn.Module) -> Dict:
         kernel_size=config['upsample']['kernel_size'],
         stride=config['upsample']['stride'],
         groups=config['upsample']['groups'],
+        vocab_size=models['codebook'].embedding.weight.shape[0]-1, # -1 for padding    
         )
  
     models['decoder'] = Decoder(config['decoder'])
@@ -278,7 +279,7 @@ def configure_optimizers(models: Dict, config: Dict) -> Dict:
     return optimizers, schedulers
 
 
-def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLoader, text_dataset, text_loader: DataLoader, loss_module: Loss, config: Dict, device: torch.device, start_step: int):
+def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLoader, text_dataset, text_loader: DataLoader, loss_module: Loss, config: Dict, device: torch.device, prior, start_step: int):
     
     # Initialize TensorBoard writer
     writer = SummaryWriter(log_dir=config['logging'].get('log_dir', './logs'))
@@ -329,22 +330,27 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             output['gt'] = gt 
             
             # ===== Downsample =====
-            down_out = models['downsample'](enc_out['encoder_out']) # [B, T // 2, C] 
+            down_out, logits = models['downsample'](enc_out['encoder_out']) # [B, T // 2, C], [B, T // 2, vocab_size]
             dmask = mask[:, ::config["upsample"]['stride']] # [B, T // config["upsample"]['stride'], 1]
             down_out = down_out[:,:dmask.shape[1],:] * dmask # [B, T // 2, C]
+            logits  = logits[:,:dmask.shape[1],:] * dmask # [B, T // 2, vocab_size] 
+            output['logits'] = logits
             output['down_out'] = down_out
             output['dmask'] = dmask
             
             # ===== Tokenizer =====
-            smoothness_loss, commitment_loss, z_q, z_q_disc, z_q_disc_mask, selected_encodings_list = models['tokenizer'](
+            diversity_loss, smoothness_loss, commitment_loss, z_q, z_q_disc, z_q_disc_mask, selected_encodings_list = models['tokenizer'](
                 down_out, 
                 models['codebook'], 
-                dmask
+                dmask,
+                logits, 
+                prior,
             )
             z_q_disc_mask = ~z_q_disc_mask.bool() # [B, T // 2, 1]
            
             output['smoothness_loss'] = smoothness_loss
             output['commitment_loss'] = commitment_loss
+            output['diversity_loss'] = diversity_loss
             output['z_q'] = z_q # already masked
             output['z_q_disc'] = z_q_disc # already masked
             
@@ -375,6 +381,7 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             total_lossg = total_lossg + gen_loss_components['commit_loss'] 
             total_lossg = total_lossg + gen_loss_components['smooth_loss']
             total_lossg = total_lossg + gen_loss_components['gen_loss']
+            total_lossg = total_lossg + gen_loss_components['diversity_loss']
             
             if step % config['logging']['step'] == 0:
                 
@@ -388,6 +395,7 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
                 f"commit_loss: {gen_loss_components['commit_loss']:.4f}, "
                 f"smooth_loss: {gen_loss_components['smooth_loss']:.4f}, "
                 f"gen_loss: {gen_loss_components['gen_loss']:.4f}, "
+                f"diversity_loss: {gen_loss_components['diversity_loss']:.4f}, "
                 f"total_loss: {total_lossg:.4f}"
                         )                
                 writer.add_scalar('generator_loss/rec_loss', gen_loss_components['rec_loss'], step)
@@ -395,6 +403,7 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
                 writer.add_scalar('generator_loss/smooth_loss', gen_loss_components['smooth_loss'], step)
                 writer.add_scalar('generator_loss/gen_loss', gen_loss_components['gen_loss'], step)
                 writer.add_scalar('generator_loss/total_loss_gen', total_lossg, step)
+                writer.add_scalar('generator_loss/diversity_loss', gen_loss_components['diversity_loss'], step)
 
                 # logging lr 
                 writer.add_scalar('learning_rate/encoder', schedulers['enc'].get_last_lr()[0], step)
@@ -577,7 +586,7 @@ def main():
     np.random.seed(config['train']['seed'])
     
     # Initialize datasets and models
-    speech_loader, text_dataset, text_loader, vocab = initialize_datasets(config)
+    speech_loader, text_dataset, text_loader, vocab, prior = initialize_datasets(config)
     models = setup_models(config, vocab)
     # Training setup
     models['encoder'].train()
@@ -625,6 +634,7 @@ def main():
             loss_module=loss_module,
             config=config,
             device=device,
+            prior=prior,
             start_step=start_step  # Add this
         )
     except KeyboardInterrupt:

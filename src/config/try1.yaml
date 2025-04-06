@@ -85,6 +85,7 @@ loss:
   smooth_loss_weight: 0.1
   commit_loss_weight: 0.1
   gen_loss_weight: 0.1
+  diversity_loss_weight: 0.1
 
   disc_loss_weight: 1.0
   gp_weight: 2.0

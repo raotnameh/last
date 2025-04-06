@@ -39,12 +39,34 @@ class Tokenizer(nn.Module):
         
         plt.close()
      
-    def forward(self, z, codebook, mask):
+    def forward(self, z, codebook, mask, logits, prior):
         """
         z (torch.Tensor): b,t,c
         codebook (nn.Module): A module with a weight attribute of shape (vocab_size, embed_dim).
         mask (torch.Tensor): Mask of shape (batch, time, 1) with 1s for valid positions and 0s for padding.
         """
+        
+        # Diversity loss
+        logits = logits.contiguous().view(-1, logits.shape[1]) # (batch*time, vocab_size)
+        logits = F.softmax(logits, dim=-1) # apply softmax to logits
+        # only keep the valid positions 
+        logits = logits * mask # (batch*time, vocab_size)
+
+        # prob for each character
+        mask_bool = (mask.contiguous().view(-1, 1) == 1).squeeze(1)  # shape: (B,), True where we keep
+        valid_logits = logits[mask_bool]  # shape: (B', C)
+        pred = valid_logits.mean(dim=0) # shape: (vocab_size,)
+        # kl loss 
+        def kl_divergence_loss(p, q, epsilon=1e-8):
+            p = p + epsilon
+            q = q + epsilon
+            kl_div = torch.sum(p * (torch.log(p) - torch.log(q)))
+            return kl_div
+        diversity_loss = kl_divergence_loss(pred, prior) 
+        print(f"diversity_loss: {diversity_loss.item()}")
+        
+        
+        
         # Normalize z 
         z = F.normalize(z, p=2, dim=-1) # (batch, time, channels)
         
@@ -90,7 +112,7 @@ class Tokenizer(nn.Module):
         n_z_q, n_mask, selected_encodings_list = self.remove_consecutive_repeated_indices( encodings, mask.squeeze(-1), z_q) # randomly pick one index from each group of consecutive repeating elements # shape (B,T) and also returns the mask 
     
         
-        return smoothness_loss, commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list # commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list
+        return diversity_loss, smoothness_loss, commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list # commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list
 
         
     def remove_consecutive_repeated_indices(self, min_encoding_indices, mask, z_q):

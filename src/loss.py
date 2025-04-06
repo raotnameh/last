@@ -123,21 +123,16 @@ class Loss:
         rec_loss = rec_loss1 + rec_loss2
         rec_loss *= self.config["recon_loss_weight"]
         
-        # commitment loss
-        commit_loss = output["commitment_loss"] * self.config["commit_loss_weight"]
-        
-        # smoothness loss :- down_out shifted by 1
-        smooth_loss = output["smoothness_loss"] * self.config["smooth_loss_weight"]
-        
+
         # generator loss
         gen_loss = F.binary_cross_entropy_with_logits(output["disc_fake"], torch.zeros_like(output["disc_fake"]))
-        gen_loss *= self.config["gen_loss_weight"]
         
         loss_components = {
-            "rec_loss": rec_loss,
-            "commit_loss": commit_loss,
-            "smooth_loss": smooth_loss,
-            "gen_loss": gen_loss,
+            "rec_loss": rec_loss * self.config["recon_loss_weight"],
+            "commit_loss": output["commitment_loss"] * self.config["commit_loss_weight"],
+            "smooth_loss": output["smoothness_loss"] * self.config["smooth_loss_weight"],
+            "gen_loss": gen_loss * self.config["gen_loss_weight"],
+            "diversity_loss": output["diversity_loss"] * self.config["diversity_loss_weight"],
         }     
         
         return  loss_components

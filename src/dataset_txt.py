@@ -46,6 +46,9 @@ class Dataset_txt(Dataset):
         c = [char_counts[v] for v in self.vocab if v != "p"]  # Exclude the padding token
         c = np.array(c, dtype=np.float32)
         c /= c.sum()  # Normalize the counts to get probabilities
+        
+        self.prior = c # save the counts as prior for kl loss.
+        
         # Plotting the histogram
         plt.figure(figsize=(10, 6))
         plt.bar(self.vocab[1:], c, color='blue', alpha=0.7)
