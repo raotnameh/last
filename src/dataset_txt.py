@@ -83,7 +83,8 @@ class Dataset_txt(Dataset):
         logging.info(f"Modified text sample")
         logging.info(f"{random.choice(modified_texts)}")
         logging.info(f"{random.choice(modified_texts)}")
-        texts = modified_texts
+        
+        return  modified_texts
 
     def build_vocab(self, texts):
         """

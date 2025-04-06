@@ -23,6 +23,7 @@ class Conv1dBlock(nn.Module):
         
 
     def forward(self, x, padding_mask=None):
+        
         # x is expected to be of shape (batch, time, channels)
         if padding_mask is not None:
             x = x.masked_fill(padding_mask, 0)
@@ -35,8 +36,7 @@ class Conv1dBlock(nn.Module):
         x = self.conv(x)
         x = x.transpose(1, 2)
         
-        return x
-
+        return x  
 
 class SinusoidalPositionalEncoding(nn.Module):
     def __init__(self, d_model, max_len=1024):
@@ -77,6 +77,7 @@ class CausalTransformer(nn.Module):
             )
             for _ in range(num_layers)
         ])
+        
 
     def forward(self, x, padding_mask=None):
         """
@@ -99,32 +100,21 @@ class CausalTransformer(nn.Module):
                 src_key_padding_mask=padding_mask
             )
 
-        return x
+        return x 
 
 
 class Discriminator(nn.Module):
-    def __init__(self, in_channels=256, hidden_dim=256, kernel_size=11, groups=1):
+    def __init__(self, in_channels=256, hidden_dim=256, num_layers=4):
         super().__init__()
 
         torch.backends.cuda.enable_flash_sdp(False)
         torch.backends.cuda.enable_mem_efficient_sdp(False)
         torch.backends.cuda.enable_math_sdp(True)
         
-        self.disc_layers = nn.ModuleList([
-            Conv1dBlock(in_channels, hidden_dim, kernel_size=1, groups=groups),
-            nn.GELU(),
-            nn.Dropout(0.1),
-            Conv1dBlock(hidden_dim, hidden_dim, kernel_size),
-            nn.GELU(),
-            nn.Dropout(0.1),
-            Conv1dBlock(hidden_dim, hidden_dim, kernel_size),
-            nn.GELU(),
-            nn.Dropout(0.1),
+        self.pre = Conv1dBlock(in_channels, hidden_dim, kernel_size=1)
         
-        ])
-        # self.proj = Conv1dBlock(hidden_dim, 1, kernel_size)
-        
-        self.decoder = CausalTransformer(d_model=hidden_dim, nhead=8, num_layers=4)
+        self.norm = nn.LayerNorm(hidden_dim)  # Normalize over channel dim
+        self.decoder = CausalTransformer(d_model=hidden_dim, nhead=8, num_layers=num_layers, dim_feedforward=hidden_dim*4, dropout=0.1)
         self.proj = nn.Linear(hidden_dim, 1)
         
     def forward(self, x, padding_mask=None):
@@ -133,26 +123,26 @@ class Discriminator(nn.Module):
         padding_mask: (batch, time, 1) where True indicates a padded timestep.
         """
         
-        for layer in self.disc_layers:
-            if isinstance(layer, Conv1dBlock):
-                x = layer(x, padding_mask)  # Pass padding_mask only to Conv1dBlock
-            else:
-                x = layer(x)  # GELU & Dropout don't need padding_mask
+        x = self.pre(x, padding_mask) 
         
-        # x = x.masked_fill(padding_mask, 0)
-        # # Compute mean pooling over valid timesteps
-        # valid_counts = (~padding_mask).sum(dim=1).clamp(min=1).float()
-        # x_mean = x.sum(dim=1) / valid_counts  # (batch, channels)
-        # x_mean = x_mean.unsqueeze(1) # (batch, 1, channels)
-        
-        # x_mean = self.proj(x_mean) # (batch, 1, 1)
-        # return x_mean.squeeze(1).squeeze(1)  # (batch,)
-        
-        
+        x = self.norm(x)
         x = self.decoder(x, padding_mask.squeeze(-1))  # (batch, time, hidden_dim), (batch, time)
-        x = x[:,0,:]  # (batch, hidden_dim)
-        x = self.proj(x)  # (batch, hidden_dim) -> (batch, 1)
-        x = x.squeeze(-1)
+        
+        # Extract the valid last timestep for each sequence in the batch
+        B, T, C = x.size()
+        padding_mask = padding_mask.squeeze(-1)
+        time_indices = torch.arange(T).view(1, T, 1).expand(B, T, C).to(x.device)  # (1, T, 1)
+        expanded_mask = padding_mask.unsqueeze(-1).expand(B, T, C)
+        masked_indices = time_indices.masked_fill(expanded_mask, -1)
+        last_valid_t = masked_indices.max(dim=1).values
+        gather_index = last_valid_t.unsqueeze(1)  # (B, 1, C)
+        x = torch.gather(x, dim=1, index=gather_index)  # (B, 1, C)
+        x = x.squeeze(1)  # (B, C)
+        
+        # Apply the final projection
+        x = self.proj(x)
+        x = x.squeeze(-1)  # (B,)
+        
         return x
         
     

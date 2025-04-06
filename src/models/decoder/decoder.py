@@ -54,18 +54,22 @@ class Decoder(nn.Module):
         super().__init__()
         
         # Global conditioning.
-        self.speaker = Conv1dBlock( config["speaker"]["speaker_emb_dim"], config["transformer"]["decoder_hidden"])
+        self.use_s = config['speaker']['use_s']
+        if self.use_s:
+            self.speaker = Conv1dBlock( config["speaker"]["speaker_emb_dim"], config["transformer"]["decoder_hidden"])
         
         self.decoder = models.Decoder(config)
         self.proj = Conv1dBlock( config["transformer"]["decoder_hidden"], config["transformer"]["dac_hidden"])
         
-        self.PostNet = layers.PostNet(n_mel_channels=config["transformer"]["dac_hidden"])
+        self.use_postnet = config['speaker']['use_postnet']
+        if self.use_postnet: 
+            self.PostNet = layers.PostNet(n_mel_channels=config["transformer"]["dac_hidden"])
 
     
-    def forward(self, x, mask, s, use_s=None): # b,t,c # mask should be b,t and 1 for masked position and 0 for non-masked position # s is speaker embedding b,t',c
+    def forward(self, x, mask, s): # b,t,c # mask should be b,t and 1 for masked position and 0 for non-masked position # s is speaker embedding b,t',c
         
         # speaker embedding
-        if use_s:
+        if self.use_s:
             s = self.speaker(s) # b,t,c
             s = torch.mean(s, dim=1, keepdim=True) # b,1,c
             # concatenate speaker embedding with input at t dim
@@ -75,12 +79,14 @@ class Decoder(nn.Module):
         dec_output, mask = self.decoder(x, mask)
         dec_output = self.proj(dec_output)
         
-        if use_s:
+        if self.use_s:
             dec_output = dec_output[:,1:,:] # remove the first token
             mask = mask[:,1:] # remove the first token
-    
-        dec_output2 = self.PostNet(dec_output) + dec_output
-        dec_output2 = dec_output2
+
+        if self.use_postnet: 
+            dec_output2 = self.PostNet(dec_output) + dec_output
+        else: 
+            dec_output2 = dec_output
         
         return dec_output, dec_output2, ~mask.unsqueeze(-1) # b,t,c # b,t,c # b,t,1
     

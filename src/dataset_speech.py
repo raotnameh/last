@@ -88,6 +88,7 @@ class Dataset_speech(Dataset):
     # collate function to pad the waveforms to the same length wrt the maximum duration
     def collate_fn(self, batches):
         max_dur = max(batch[1] for batch in batches)
+        dur = [batch[1] for batch in batches]
         gt_list = [batch[3] for batch in batches]
         gt = pad_sequence(gt_list, batch_first=True, padding_value=0)
         waveforms = []
@@ -104,7 +105,7 @@ class Dataset_speech(Dataset):
             waveforms.append(padded_waveform)
             padding_masks.append(padding_mask) # 1 for masked position and 0 for non-masked position
         paths = [batch[2] for batch in batches]
-        return torch.stack(waveforms), torch.stack(padding_masks), paths, gt # (batch_size, max_dur), (batch_size, max_dur), list of paths, (batch_size, max_dur, 1024)
+        return torch.stack(waveforms), torch.stack(padding_masks), paths, gt, dur # (batch_size, max_dur), (batch_size, max_dur), list of paths, (batch_size, max_dur, 1024)
 
 
 if __name__ == "__main__":

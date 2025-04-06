@@ -159,7 +159,7 @@ def setup_models(config: Dict, vocab: nn.Module) -> Dict:
     models['discriminator'] = Discriminator(
         in_channels=models['codebook'].embedding.weight.shape[1], 
         hidden_dim=config['discriminator']['hidden_dim'], 
-        kernel_size=config['discriminator']['kernel_size'])
+        num_layers=config['discriminator']['num_layers'])
     
     
     logging.info(f"Size of codebook: {models['codebook'].embedding.weight.shape[0]} x {models['codebook'].embedding.weight.shape[1]}")
@@ -296,10 +296,10 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
         
         # ===== Data Preparation =====
         try:
-            waveforms, padding_masks, paths, gt = next(speech_iter)
+            waveforms, padding_masks, paths, gt, dur = next(speech_iter)
         except StopIteration:
             speech_iter = iter(speech_loader)
-            waveforms, padding_masks, paths, gt = next(speech_iter)
+            waveforms, padding_masks, paths, gt, dur = next(speech_iter)
         waveforms = waveforms.to(device) # [B, T]
         padding_masks = padding_masks.to(device) # [B, T] true for masked, false for not masked means [False, False, ..., True, True]
         gt = gt.to(device) # [B, T, 1024]
@@ -349,7 +349,6 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
                 x=up_out,
                 mask=enc_out['padding_mask'],
                 s=enc_out['cnn_out'],
-                use_s=config['decoder']['speaker']['use_s']
             )
             dec_out = dec_out[:,:dec_mask.shape[1],:] * dec_mask
             dec_out2 = dec_out2[:,:dec_mask.shape[1],:] * dec_mask
@@ -371,7 +370,7 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             
             if step % config['logging']['step'] == 0:
                 
-                logging.info(f"Generator encoded text path: --{paths[0]}--")
+                logging.info(f"Generator encoded text path: --{paths[0]}-- of length {dur[0]} seconds--")
                 logging.info( f"Generator decoded text with special tokens: --{text_dataset.decode(selected_encodings_list[0],keep_special_tokens=True)}--" )
                 logging.info( f"Generator decoded text without special tokens: --{text_dataset.decode(selected_encodings_list[0])}--" )
                     
