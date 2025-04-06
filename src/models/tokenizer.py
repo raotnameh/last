@@ -30,7 +30,7 @@ class Tokenizer(nn.Module):
         plt.ylabel('Probability')
         plt.title('Codebook Usage Distribution')
         plt.grid(axis='y')
-        plt.savefig(os.path.join('plots', f'codebook_usage_distribution.png'), bbox_inches='tight')
+        plt.savefig('codebook_usage_distribution.png', bbox_inches='tight')
         # for every 1000 steps save the plot 
         if self.step % 100 == 0:
             plt.savefig(os.path.join('plots', f'codebook_usage_distribution_{self.step}.png'), bbox_inches='tight')

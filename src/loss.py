@@ -31,7 +31,7 @@ class GANLoss(nn.Module):
         super().__init__()
         self.gp_weight = gp_weight
 
-    def forward(self, fake, real, fake_x, real_x, fake_smooth=0.1, real_smooth=0.1):
+    def forward(self, fake, real, fake_x, real_x, fake_smooth=0., real_smooth=0.):
         # using zero class for real and one class for fake
         """Computes adversarial loss and gradient penalty."""
         

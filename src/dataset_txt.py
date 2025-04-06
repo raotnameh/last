@@ -53,7 +53,7 @@ class Dataset_txt(Dataset):
         plt.ylabel('Probability')
         plt.title('Codebook Usage Distribution')
         plt.grid(axis='y')
-        plt.savefig('plots/REAL_codebook_usage_distribution.png', bbox_inches='tight')
+        plt.savefig('REAL_codebook_usage_distribution.png', bbox_inches='tight')
         
         
     def add_question_marks(self, texts=[]):
