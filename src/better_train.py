@@ -31,7 +31,6 @@ from models.codebook import Codebook
 from models.decoder.decoder import Decoder, Upsample
 from models.discriminator import Discriminator
 from models.encoder import Encoder, Downsample
-from models.gtruth import Gtruth
 from models.tokenizer import Tokenizer
 from loss import Loss
 
@@ -143,7 +142,6 @@ def setup_models(config: Dict, vocab: nn.Module) -> Dict:
     """Initialize and configure model components."""
     models = {
         'codebook': Codebook(vocab, config['codebook']['model_name']),
-        'gtruth': Gtruth(), # Always non trainable
         'encoder': Encoder(config['encoder']['ckpt_path']),
     }
     
@@ -299,7 +297,22 @@ def load_checkpoint(checkpoint_path, models, optimizers, device):
         'num_steps': checkpoint['num_steps'],
         'config': checkpoint['config']
     }
+
+
+def load_or_compute_gt_from_path(waveform, model, path, CACHE_DIR):
+    # Sanitize path to make it a valid filename
+    filename = os.path.basename(path).replace("/", "_").replace("\\", "_")
+    cache_path =  os.path.join(CACHE_DIR, f"{filename}.pt")
+
     
+    if os.path.exists(cache_path):
+        gt = torch.load(cache_path, map_location=waveform.device)
+    else:
+        with torch.no_grad():
+            gt = model.encode(waveform.unsqueeze(0).unsqueeze(1))  # [1, T_enc, 1024]
+            torch.save(gt.squeeze(0), cache_path)
+    return gt.squeeze(0)
+
 
 def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLoader, text_dataset, text_loader: DataLoader, loss_module: Loss, config: Dict, device: torch.device, start_step: int):
     
@@ -327,12 +340,15 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
         
         # ===== Data Preparation =====
         try:
-            waveforms, padding_masks, paths = next(speech_iter)
+            waveforms, padding_masks, paths, gt = next(speech_iter)
         except StopIteration:
+            print("Speech dataset exhausted, resetting iterator.")
+            
             speech_iter = iter(speech_loader)
-            waveforms, padding_masks, paths = next(speech_iter)
+            waveforms, padding_masks, paths, gt = next(speech_iter)
         waveforms = waveforms.to(device) # [B, T]
         padding_masks = padding_masks.to(device) # [B, T] true for masked, false for not masked means [False, False, ..., True, True]
+        gt = gt.to(device) # [B, T, 1024]
         
     
         # ===== Generator Forward Pass =====
@@ -346,12 +362,10 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
             output['mask'] = mask
             
             # ===== Ground Truth =====
-            with torch.no_grad():
-                gt = models['gtruth'].encode(waveforms.unsqueeze(1)) # [B, T//320, 1024] 
-                gt = gt[:,:mask.shape[1],:] * mask # [B, T, 1024]
-                output['gt'] = gt 
+            gt = gt[:,:mask.shape[1],:] * mask # [B, T, 1024]
+            output['gt'] = gt 
             
-            # ===== Generator Forward Pass Cont. =====
+            # ===== Downsample =====
             down_out = models['downsample'](enc_out['encoder_out']) # [B, T // 2, C] 
             dmask = mask[:, ::config["upsample"]['stride']] # [B, T // config["upsample"]['stride'], 1]
             down_out = down_out[:,:dmask.shape[1],:] * dmask # [B, T // 2, C]

@@ -37,19 +37,10 @@ class Conv1dBlock(nn.Module):
 class Discriminator(nn.Module):
     def __init__(self, in_channels=256, hidden_dim=256, kernel_size=11, groups=1):
         super().__init__()
-        
-        self.mask_token_idx = 1
-        self.mask_prob = 0.25
-        self.masked_embedding = nn.Parameter(torch.randn(1, 1, 256)) if self.mask_token_idx else None
 
         
-        self.pre = nn.ModuleList([
-            Conv1dBlock(in_channels, hidden_dim, kernel_size=1, groups=groups),
-            nn.GELU(),
-            nn.Dropout(0.1),
-        ])
         self.disc_layers = nn.ModuleList([
-            Conv1dBlock(hidden_dim, hidden_dim, kernel_size),
+            Conv1dBlock(in_channels, hidden_dim, kernel_size=1, groups=groups),
             nn.GELU(),
             nn.Dropout(0.1),
             Conv1dBlock(hidden_dim, hidden_dim, kernel_size),
@@ -65,26 +56,6 @@ class Discriminator(nn.Module):
         padding_mask: (batch, time, 1) where True indicates a padded timestep.
         """
         
-        for layer in self.pre:
-            if isinstance(layer, Conv1dBlock):
-                x = layer(x, padding_mask)  # Pass padding_mask only to Conv1dBlock
-            else:
-                x = layer(x)  # GELU & Dropout don't need padding_mask
-                
-        if self.mask_token_idx:
-            batch_size, seq_len, channels = x.shape
-            
-            # Step 1: Create mask with `mask_prob` probability
-            rand = torch.rand(batch_size, seq_len, device=x.device)
-            mask = rand < self.mask_prob
-
-            # Step 2: Exclude positions that are padded
-            mask = mask & ~padding_mask.squeeze(-1)
-            
-            # Step 3: Apply masking: replace with masked_embedding
-            x = torch.where(mask.unsqueeze(-1), self.masked_embedding.expand(batch_size, seq_len, channels), x)
-
-
         for layer in self.disc_layers:
             if isinstance(layer, Conv1dBlock):
                 x = layer(x, padding_mask)  # Pass padding_mask only to Conv1dBlock

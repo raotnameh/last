@@ -65,9 +65,9 @@ train:
   seed: 42124
 
   lr_enc: 0.00005
-  lr_down: 0.00005
+  lr_down: 0.0005
   lr_dec: 0.0005
-  lr_disc: 0.0001
+  lr_disc: 0.0005
   grad_clip: 1.0
   
   num_steps: 40000
@@ -81,7 +81,7 @@ train:
 
 loss:
   recon_loss_weight: 1.0
-  smooth_loss_weight: 0.1
+  smooth_loss_weight: 0.0
   commit_loss_weight: 0.1
   gen_loss_weight: 0.1
 
@@ -89,4 +89,4 @@ loss:
   gp_weight: 2.0
 
 lr_scheduler:
-  phase_ratio: [0.2, 0.5, 0.3]
+  phase_ratio: [0.1, 0.0, 0.9]

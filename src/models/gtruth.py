@@ -11,12 +11,12 @@ class Gtruth(nn.Module):
         for param in self.model.parameters():
             param.requires_grad = False
         self.model.eval()
-    
+    @torch.no_grad()
     def encode(self, waveform, sample_rate=16000):
         # waveform [batch, 1, time]
         x = self.model.preprocess(waveform, sample_rate=sample_rate)
         return self.model.encoder(x).transpose(1,2) # [b,t,c]
-    
+    @torch.no_grad()
     def decode(self, z):
         # z, _, _, _, _ = self.model.quantizer(z)
         return self.model.decoder(z).squeeze(1) # [b,t]
