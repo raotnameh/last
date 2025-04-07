@@ -39,7 +39,7 @@ class Tokenizer(nn.Module):
         
         plt.close()
     
-    def kl_divergence_loss(self, logits, prior, mask, epsilon=1e-8):
+    def diversity_loss(self, logits, prior, mask, epsilon=1e-8):
         # Diversity loss
         logits = logits.contiguous().view(-1, logits.shape[-1]) # (batch*time, vocab_size)
         logits = F.softmax(logits, dim=-1) # apply softmax to logits
@@ -50,31 +50,23 @@ class Tokenizer(nn.Module):
         pred = valid_logits.mean(dim=0) # shape: (vocab_size,)
         # kl loss 
         
-        pred = pred + epsilon
-        prior = prior + epsilon
+        pred = torch.clamp(pred, epsilon)
+        prior = torch.clamp(prior, epsilon)
         
-        def dice_loss(inputs, targets):
-            # Flatten the tensors to simplify the computation
-            inputs = inputs.view(-1)
-            targets = targets.view(-1)
-            smooth = 1e-6  # Smoothing term to avoid division by zero
-            intersection = (inputs * targets).sum()
-            dice = (2.0 * intersection + smooth) / (inputs.sum() + targets.sum() + smooth)
-            return 1 - dice
-        return dice_loss(pred, prior)
+        def js_divergence(p,q, eps):
+            # p is pred, q is target
+            m = 0.5 * (p + q)
+            # Calculate KL divergence between distributions
+            kl_pm = torch.sum(p * torch.log(p / torch.clamp(m, min=eps)))
+            kl_qm = torch.sum(q * torch.log(q / torch.clamp(m, min=eps)))
+            
+            # JS divergence is the average of the two KL divergences
+            js = 0.5 * (kl_pm + kl_qm)
+            return js
+        
+        return js_divergence(pred, prior, epsilon)
         
 
-        def js_divergence(p, q, epsilon=1e-8):
-            # Jensen-Shannon Divergence (JS Divergence)
-            m = 0.5 * (p + q)
-            return 0.5 * (
-                torch.sum(p * (torch.log(p) - torch.log(m)), dim=-1) +
-                torch.sum(q * (torch.log(q) - torch.log(m)), dim=-1)
-            )
-        
-        return js_divergence(pred, prior)
-        return torch.sum(pred * (torch.log(pred) - torch.log(prior)))
-     
     def forward(self, z, codebook, mask, logits, prior):
         """
         z (torch.Tensor): b,t,c
@@ -83,7 +75,7 @@ class Tokenizer(nn.Module):
         """
         
         # KL divergence between the predicted distribution and the prior distribution 
-        diversity_loss = self.kl_divergence_loss(logits, torch.from_numpy(prior).to(logits.device), mask) 
+        diversity_loss = self.diversity_loss(logits, torch.from_numpy(prior).to(logits.device), mask) 
       
         
         # Normalize z 

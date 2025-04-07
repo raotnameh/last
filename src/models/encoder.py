@@ -16,7 +16,7 @@ arg_overrides = {
     "mask_channel_other": 0,
     "mask_channel_prob": 0.5,
 
-    "encoder_layerdrop": 0.0,
+    "encoder_layerdrop": 0.1,
     "dropout": 0.0,
     "activation_dropout": 0.1,
     "attention_dropout": 0.0,
