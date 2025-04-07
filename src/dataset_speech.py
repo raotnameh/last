@@ -57,6 +57,7 @@ class Dataset_speech(Dataset):
                 gt = model.encode(waveform.unsqueeze(0).unsqueeze(1))  # [1, T_enc, 1024]
                 pad_sequence([gt.squeeze(0)], batch_first=True)
                 torch.save(gt.squeeze(0), cache_path)
+                print(gt)
             return cache_path
 
         for path in tqdm(self.paths):

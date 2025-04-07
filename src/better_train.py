@@ -82,15 +82,6 @@ def configure_logging(dir='logs/') -> None:
 # step :- Prepare the dataset.
 def initialize_datasets(config: Dict) -> Tuple[DataLoader, DataLoader, Dict]:
     """Initialize and configure speech/text datasets with samplers."""
-    # class ShuffledBatchSampler(BatchSampler):
-    #     """Custom batch sampler that shuffles batch order while maintaining sequence order within batches."""
-    #     def __init__(self, sampler, batch_size, drop_last):
-    #         super().__init__(sampler, batch_size, drop_last)  
-
-    #     def __iter__(self):
-    #         batches = list(super().__iter__())  
-    #         random.shuffle(batches)  # Shuffle batch order
-    #         return iter(batches)
 
     # step 1 :- Prepare the speech dataset.
     speech_dataset = Dataset_speech(
@@ -107,17 +98,6 @@ def initialize_datasets(config: Dict) -> Tuple[DataLoader, DataLoader, Dict]:
         num_workers=4
     )
     
-    # speech_loader = DataLoader(
-    #     speech_dataset,
-    #     batch_sampler=ShuffledBatchSampler(
-    #         sampler=SequentialSampler(speech_dataset),
-    #         batch_size=config['dataset_speech']['batch_size'],
-    #         drop_last=False,
-    #     ),
-    #     collate_fn=speech_dataset.collate_fn,
-    #     pin_memory=True,
-    #     num_workers=6
-    # )
 
     # step 2 :- Prepare the text dataset.
     text_dataset = Dataset_txt(data=config['dataset_txt']['path'])

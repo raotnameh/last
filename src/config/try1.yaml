@@ -1,6 +1,6 @@
 checkpoint: 
   dir: "checkpoints"
-  step: 10000
+  step: 1000
 
 logging: 
   dir: "logs"
@@ -14,7 +14,7 @@ dataset_speech:
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeechmanifest_train.tsv"
   min_duration: 32000
   max_duration: 320000
-  batch_size: &batch_size_value 64
+  batch_size: &batch_size_value 32
 
 dataset_txt:
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/transcription.txt"
@@ -62,12 +62,12 @@ decoder:
   max_seq_len: 2048
 
 train:
-  seed: 42124
+  seed: 42121
 
   lr_enc: 0.00005
   lr_down: 0.00005
   lr_dec: 0.0005
-  lr_disc: 0.0003
+  lr_disc: 0.0001
   grad_clip: 10.0
   
   num_steps: 100000
@@ -75,7 +75,7 @@ train:
   discriminator_freq: 2
   gradient_accumulation_steps: 1
 
-  mixed_precision: True
+  mixed_precision: False
   resume_checkpoint: False
   resume_path: "checkpoints/step_10000.pth"
 
