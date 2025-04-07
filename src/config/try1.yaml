@@ -14,7 +14,7 @@ dataset_speech:
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeechmanifest_train.tsv"
   min_duration: 32000
   max_duration: 320000
-  batch_size: &batch_size_value 16
+  batch_size: &batch_size_value 64
 
 dataset_txt:
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/transcription.txt"
@@ -71,7 +71,7 @@ train:
   grad_clip: 10.0
   
   num_steps: 100000
-  freeze_steps: 10000
+  freeze_steps: 1000
   discriminator_freq: 2
   gradient_accumulation_steps: 1
 

@@ -34,8 +34,7 @@ class GANLoss(nn.Module):
     def forward(self, fake, real, fake_x, real_x, fake_smooth=0.0, real_smooth=0.0):
         # using zero class for real and one class for fake
         """Computes adversarial loss and gradient penalty."""
-        
-        # with 5 percent probability, switch fake and real data
+
   
         loss_fake = F.binary_cross_entropy_with_logits(
             fake, torch.ones_like(fake) - fake_smooth, reduction="sum"

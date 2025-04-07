@@ -197,12 +197,12 @@ def configure_training_mode(models: Dict, config: Dict) -> None:
     """Set model training modes and parameter requirements."""
  
     # Partially freeze encoder
-    # for name, param in models['encoder'].named_parameters():
-    #     for n in config['encoder']['frozen_layers']:
-    #         if str(f"model.encoder.layers.{n}") in name :
-    #             param.requires_grad = True
-    #         else:
-    #             param.requires_grad = False
+    for name, param in models['encoder'].named_parameters():
+        for n in config['encoder']['frozen_layers']:
+            if str(f"model.encoder.layers.{n}") in name :
+                param.requires_grad = True
+            else:
+                param.requires_grad = False
     
     # Log trainable parameters
     total_params = 0
@@ -467,7 +467,7 @@ def train(models: Dict, optimizers: Dict, schedulers:Dict, speech_loader: DataLo
                 
             max_grad_norm = config['train']['grad_clip']
             if step >= freeze_steps:
-                torch.nn.utils.clip_grad_norm_(models['encoder'].parameters(), max_grad_norm)
+                torch.nn.utils.clip_grad_norm_(models['encoder'].parameters(), max_grad_norm*0.1)
             torch.nn.utils.clip_grad_norm_(
                 list(models['downsample'].parameters()) + 
                 list(models['upsample'].parameters()) + 
