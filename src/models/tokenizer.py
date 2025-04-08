@@ -75,7 +75,7 @@ class Tokenizer(nn.Module):
         """
         
         # KL divergence between the predicted distribution and the prior distribution 
-        diversity_loss = self.diversity_loss(logits, torch.from_numpy(prior).to(logits.device), mask) 
+        diversity_loss = 0.0 # self.diversity_loss(logits, torch.from_numpy(prior).to(logits.device), mask) 
       
         
         # Normalize z 
