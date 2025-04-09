@@ -11,12 +11,13 @@ from torch.nn.utils.rnn import pad_sequence
 from models.gtruth import Gtruth
 from tqdm import tqdm
 
+
 class Dataset_speech(Dataset):
     def __init__(self, input_manifest, split = "train", min_duration=0, max_duration=float("inf"), CACHE_DIR="gtruth_cache"):
         super().__init__()
         
         paths = []
-        min_dur, max_dur, tot_dur = min_duration, 0, 0
+        min_dur, max_dur, tot_dur = float('inf'), 0, 0
         with open(input_manifest, "r") as infile:
             root_dir = infile.readline().strip()  # First line is the root directory
             
@@ -32,32 +33,33 @@ class Dataset_speech(Dataset):
                     max_dur = max(max_dur, duration)
                     tot_dur += duration
                     
-        logging.info(f"Speech dataset duration range in seconds: {min_dur/16000:.2f} - {max_dur/16000:.2f} | Total duration in hours: {tot_dur/16000/3600:.2f}")
         # Sort by duration
         paths.sort(key=lambda x: x[1])
         self.paths = paths
         # self.paths = paths[:2]  # For testing
         # print(f"Testing Mode: Using only {len(self.paths)} samples")
         
+        logging.info(f"Speech dataset duration range in seconds: {min_dur/16000:.2f} - {max_dur/16000:.2f} | Total duration in hours: {tot_dur/16000/3600:.2f}")
         
         # Do the caching of the gtruth features    
         logging.info("Caching gtruth features...")
         os.makedirs(CACHE_DIR, exist_ok=True)
         self.model = Gtruth()
         self.model.to("cuda")
+        self.model.eval()
         
-        @torch.no_grad()
+        
         def load_or_compute_gt_from_path( waveform, model, path):
+            
             filename = os.path.basename(path).replace("/", "_").replace("\\", "_")
             cache_path = os.path.join(CACHE_DIR, f"{filename}.pt")
             
             if os.path.exists(cache_path):
                 pass
             else:
-                gt = model.encode(waveform.unsqueeze(0).unsqueeze(1))  # [1, T_enc, 1024]
-                pad_sequence([gt.squeeze(0)], batch_first=True)
-                torch.save(gt.squeeze(0), cache_path)
-                print(gt)
+                with torch.no_grad():
+                    gt = model.encode(waveform.unsqueeze(0).unsqueeze(1))  # [1, T_enc, 1024]
+                    torch.save(gt.squeeze(0), cache_path)
             return cache_path
 
         for path in tqdm(self.paths):
