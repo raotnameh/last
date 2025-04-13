@@ -37,7 +37,7 @@ class Conv1dBlock(nn.Module):
             dilation=dilation, 
             padding=((kernel_size - 1) * dilation) // 2,
         )
-        self.norm = nn.BatchNorm1d(out_channels)
+        self.norm = nn.LayerNorm(out_channels)
         
 
     def forward(self, x, padding_mask=None):
@@ -47,8 +47,8 @@ class Conv1dBlock(nn.Module):
             
         x = x.transpose(1, 2)
         x = self.conv(x)
-        x = self.norm(x)
         x = x.transpose(1, 2)
+        x = self.norm(x)
         
         return x
      
@@ -64,7 +64,7 @@ class Decoder(nn.Module):
         self.decoder = models.Decoder(config)
         self.proj = Conv1dBlock( config["transformer"]["decoder_hidden"], config["transformer"]["dac_hidden"])
         
-        self.use_postnet = config['speaker']['use_postnet']
+        self.use_postnet = config['use_postnet']
         if self.use_postnet: 
             self.PostNet = layers.PostNet(n_mel_channels=config["transformer"]["dac_hidden"])
 

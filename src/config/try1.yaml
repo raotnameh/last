@@ -1,20 +1,19 @@
 checkpoint: 
   dir: "checkpoints"
-  step: 10000
+  step: 5000
 
 logging: 
   dir: "logs"
-  step: 20
+  step: 1
 
 device: "cuda"
-
 
 dataset_speech:
   # path: "/raid/home/rajivratn/hemant_rajivratn/librispeech/data/manifest/train-clean-100.tsv"
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeechmanifest_train.tsv"
   min_duration: 32000
   max_duration: 320000
-  batch_size: &batch_size_value 64
+  batch_size: &batch_size_value 16
 
 dataset_txt:
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/transcription.txt"
@@ -48,8 +47,9 @@ discriminator:
 decoder:
   speaker:
     use_s : False
-    use_postnet: False
     speaker_emb_dim: 512
+  
+  use_postnet: True
     
   transformer:
     decoder_layer: 4
@@ -63,32 +63,31 @@ decoder:
 
 train:
   seed: 42121
+  train_discriminator: True
+  discriminator_freq: 2
 
   lr_enc: 0.00005
-  lr_down: 0.0005
+  lr_down: 0.00005
   lr_dec: 0.0005
   lr_disc: 0.0001
-  grad_clip: 10.0
+  grad_clip: 1.0
   
   num_steps: 100000
-  freeze_steps: 10000000
-  discriminator_freq: 200000000
+  freeze_steps: 50000
   gradient_accumulation_steps: 1
 
   mixed_precision: True
   resume_checkpoint: False
   resume_path: "checkpoints/step_10000.pth"
 
-
 loss:
   recon_loss_weight: 1.0
-  smooth_loss_weight: 0.1
-  commit_loss_weight: 1.0
+  smooth_loss_weight: 0.0
+  commit_loss_weight: 0.1
   gen_loss_weight: 1.0
-  diversity_loss_weight: 1.0
   
   disc_loss_weight: 1.0
-  gp_weight: 2.0
+  gp_weight: 1.0
 
 lr_scheduler:
-  phase_ratio: [0.01, 0.2, 0.79]
+  phase_ratio: [0.01, 0.0, 0.9]

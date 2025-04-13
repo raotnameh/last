@@ -108,7 +108,7 @@ class Loss:
         return loss
         
 
-    def step_gen(self, output, step=1, total_steps=1):
+    def step_gen(self, output):
         
         # reconstrunction loss :- decoder 
         valid_count = output["dec_mask"].sum() * output["dec_out"].shape[-1]        
@@ -121,14 +121,16 @@ class Loss:
         
 
         # generator loss
-        gen_loss = F.binary_cross_entropy_with_logits(output["disc_fake"], torch.zeros_like(output["disc_fake"]))
+        if output["disc_fake"] is not None:
+            gen_loss = F.binary_cross_entropy_with_logits(output["disc_fake"], torch.zeros_like(output["disc_fake"]))
+        else:
+            gen_loss = 0.0
         
         loss_components = {
             "rec_loss": rec_loss * self.config["recon_loss_weight"],
             "commit_loss": output["commitment_loss"] * self.config["commit_loss_weight"],
             "smooth_loss": output["smoothness_loss"] * self.config["smooth_loss_weight"],
             "gen_loss": gen_loss * self.config["gen_loss_weight"],
-            "diversity_loss": output["diversity_loss"] * self.config["diversity_loss_weight"],
         }     
         
         return  loss_components

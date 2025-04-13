@@ -5,6 +5,8 @@ from transformers import AutoTokenizer, AutoModel
 from sklearn.decomposition import PCA
 import numpy as np 
 import torch.nn.functional as F
+
+import logging  
         
 class Codebook(nn.Module):
         
@@ -29,16 +31,29 @@ class Codebook(nn.Module):
             else:
                 embedding.weight.data[i] *= 0.0 # padding token embedding is zero
                 
-        self.embedding = embedding
-        # p2 Normalize the embedding matrix
-        self.embedding.weight.data = F.normalize(self.embedding.weight.data, p=2, dim=1)
         
+        # Normalize the embedding matrix
+        embedding.weight.data = F.normalize(embedding.weight.data, p=2, dim=1)
+        
+        self.embedding = embedding
+        # print the mean, std, min, max of the embedding matrix beautifully for each character
+        logging.info("Embedding matrix statistics:")
+        logging.info("char\tmean\tstd\tmin\tmax")
+        for i, char in enumerate(vocab):
+            mean = embedding.weight.data[i].mean().item()
+            std = embedding.weight.data[i].std().item()
+            min_val = embedding.weight.data[i].min().item()
+            max_val = embedding.weight.data[i].max().item()
+            logging.info(f"{char}\t{mean:.4f}\t{std:.4f}\t{min_val:.4f}\t{max_val:.4f}")
+        
+
         # Remove the model and tokenizer
         del model
         del tokenizer
 
     def forward(self, x): # x: (b,t) tensor
-        return self.embedding(x) # (b,t,c)
+        with torch.no_grad():
+            return self.embedding(x) # (b,t,c)
 
 
 if __name__ == "__main__":

@@ -111,9 +111,11 @@ class Discriminator(nn.Module):
         torch.backends.cuda.enable_mem_efficient_sdp(False)
         torch.backends.cuda.enable_math_sdp(True)
         
+        self.norm1 = nn.LayerNorm(in_channels)  # Normalize over channel dim
         self.pre = Conv1dBlock(in_channels, hidden_dim, kernel_size=1)
+        self.norm2 = nn.LayerNorm(hidden_dim)  # Normalize over channel dim
         
-        self.norm = nn.LayerNorm(hidden_dim)  # Normalize over channel dim
+        
         self.decoder = CausalTransformer(d_model=hidden_dim, nhead=8, num_layers=num_layers, dim_feedforward=hidden_dim*4, dropout=0.1)
         self.proj = nn.Linear(hidden_dim, 1)
         
@@ -123,28 +125,23 @@ class Discriminator(nn.Module):
         padding_mask: (batch, time, 1) where True indicates a padded timestep.
         """
         
+        x = self.norm1(x)
         x = self.pre(x, padding_mask) 
-        
-        x = self.norm(x)
-        
+        x = self.norm2(x)
+
         x = self.decoder(x, padding_mask.squeeze(-1))  # (batch, time, hidden_dim), (batch, time)
         
-        # Extract the valid last timestep for each sequence in the batch
-        B, T, C = x.size()
-        padding_mask = padding_mask.squeeze(-1)
-        time_indices = torch.arange(T).view(1, T, 1).expand(B, T, C).to(x.device)  # (1, T, 1)
-        expanded_mask = padding_mask.unsqueeze(-1).expand(B, T, C)
-        masked_indices = time_indices.masked_fill(expanded_mask, -1)
-        last_valid_t = masked_indices.max(dim=1).values
-        gather_index = last_valid_t.unsqueeze(1)  # (B, 1, C)
-        x = torch.gather(x, dim=1, index=gather_index)  # (B, 1, C)
-        x = x.squeeze(1)  # (B, C)
+        x = x.masked_fill(padding_mask, 0)
+        # Compute mean pooling over valid timesteps
+        valid_counts = (~padding_mask).sum(dim=1).clamp(min=1).float() # (batch, channels)
+        x_mean = x.sum(dim=1) / valid_counts  # (batch, channels)
+        x_mean = x_mean.unsqueeze(1) # (batch, 1, channels)
         
         # Apply the final projection
-        x = self.proj(x)
-        x = x.squeeze(-1)  # (B,)
-        
-        return x
+        x_mean = self.proj(x_mean) # (B, 1, 1)
+        x_mean = x_mean.squeeze(1).squeeze(1)  # (B)
+    
+        return x_mean
         
     
 

@@ -23,14 +23,12 @@ class Dataset_txt(Dataset):
                 out = f.readlines()
             texts = [x.strip() for x in out if len(x) > 10 and len(x) < 500] # filtering out short texts that 2 second.
         
-        self.texts = texts
-        self.texts = self.add_question_marks(self.texts)
-        self.texts = sorted(self.texts, key=len)
-        
         # creating the vocab.
         self.vocab = self.build_vocab(texts)
+        self.save_histogram(self.add_question_marks(texts))
         
-        self.save_histogram()
+        self.texts = texts
+        self.texts = sorted(self.texts, key=len)
         
         self.char_to_idx = {char: idx for idx, char in enumerate(self.vocab)} # char to index mapping
         self.idx_to_char = {idx: char for idx, char in enumerate(self.vocab)} # index to char mapping
@@ -39,11 +37,12 @@ class Dataset_txt(Dataset):
         logging.info(f"Vocab: {self.vocab}")
         logging.info(f"-p- is for padding and -?- is for silence")
         
-    def save_histogram(self):
+    def save_histogram(self, texts):
         logging.info(f"Saving histogram of the REAL text data.")
-        char_counts = Counter("".join(self.texts))  # Example output: [('a', 2), ('d', 1)]
+        char_counts = Counter("".join(texts))  # Example output: [('a', 2), ('d', 1)]
         char_counts = dict(char_counts)
-        c = [char_counts[v] for v in self.vocab if v != "p"]  # Exclude the padding token
+        print(f"char_counts: {char_counts}")
+        c = [char_counts[v] for v in self.vocab if v not in ["p"]]  # Exclude padding and silence tokens
         c = np.array(c, dtype=np.float32)
         c /= c.sum()  # Normalize the counts to get probabilities
         
@@ -112,8 +111,27 @@ class Dataset_txt(Dataset):
 
     def __getitem__(self, idx):
         text = self.texts[idx]
-        input_ids = self.encode(text)
-        return input_ids  # Input sequence
+        result = ["?"]
+        prev_char = ""
+
+        for char in text:
+            if char == prev_char:
+                result.append("?")
+            result.append(char)
+
+            # Slightly more efficient: only check random if not already '?'
+            if result[-1] != "?" and random.random() < 0.25:
+                result.append("?")
+
+            prev_char = char
+
+        # Ensure it ends with a question mark
+        if result[-1] != "?":
+            result.append("?")
+
+        modified_text = "".join(result)
+        input_ids = self.encode(modified_text)
+        return input_ids
         
     def collate_fn(self, batch):
         inp = [item for item in batch]

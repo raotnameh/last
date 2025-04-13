@@ -60,21 +60,20 @@ class Downsample(torch.nn.Module):
     def __init__(self, input_dim=768, output_dim=256, kernel_size=9, stride=2, groups=1, vocab_size=256):
         super().__init__()
         
-        self.norm = torch.nn.LayerNorm(input_dim)
+        self.norm1 = torch.nn.LayerNorm(input_dim)
         
         padding = kernel_size // 2
-        self.conv = torch.nn.Conv1d(input_dim, output_dim, kernel_size=kernel_size, stride=stride, padding=padding, groups = groups )
+        self.conv = torch.nn.Conv1d(input_dim, output_dim, kernel_size=kernel_size, stride=stride, padding=padding, groups = groups, bias=False )
         
-        self.linear = torch.nn.Linear(output_dim, vocab_size)
+ 
+    def forward(self, x, mask): # B x T x C
         
-    def forward(self, x): # B x T x C 
-
-        x = self.norm(x)
-                
-        x = x.transpose(1, 2)
+        x = x * mask
+        x = self.norm1(x)
+        
+        x = x.transpose(1, 2)        
         x = self.conv(x)
         x = x.transpose(1, 2)
-        
-        logits = self.linear(x)
+ 
                 
-        return x, logits # B x T x C , B x T x vocab_size
+        return x # B x T x C 
