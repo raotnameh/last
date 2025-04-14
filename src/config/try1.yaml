@@ -4,7 +4,7 @@ checkpoint:
 
 logging: 
   dir: "logs"
-  step: 1
+  step: 10
 
 device: "cuda"
 
@@ -27,7 +27,7 @@ encoder:
   # ckpt_path: "../weights/hubert_base_ls960.pt"
   ckpt_path: "../weights/convert_iter3.pt"
   encoder_embed_dim: 768
-  frozen_layers: ["11", "10"]
+  frozen_layers: ["11"]
 
 downsample:
   kernel_size: &kernel_size_value 51
@@ -63,31 +63,34 @@ decoder:
 
 train:
   seed: 42121
-  train_discriminator: True
-  discriminator_freq: 2
+  train_vqvae: True
+  train_disc: True
+  train_full: True
 
   lr_enc: 0.00005
-  lr_down: 0.00005
-  lr_dec: 0.0005
+  lr_down: 0.0001
+  lr_dec: 0.0001
   lr_disc: 0.0001
-  grad_clip: 1.0
+  grad_clip: 10.0
   
-  num_steps: 100000
-  freeze_steps: 50000
+  num_steps: 20000
+  freeze_steps: 5000
   gradient_accumulation_steps: 1
+  discriminator_freq: 2
 
-  mixed_precision: True
+  mixed_precision: False
   resume_checkpoint: False
   resume_path: "checkpoints/step_10000.pth"
+
 
 loss:
   recon_loss_weight: 1.0
   smooth_loss_weight: 0.0
-  commit_loss_weight: 0.1
+  commit_loss_weight: 0.01
   gen_loss_weight: 1.0
   
   disc_loss_weight: 1.0
   gp_weight: 1.0
 
 lr_scheduler:
-  phase_ratio: [0.01, 0.0, 0.9]
+  phase_ratio: [0.1, 0.0, 0.9]

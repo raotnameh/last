@@ -21,7 +21,7 @@ arg_overrides = {
     "activation_dropout": 0.1,
     "attention_dropout": 0.0,
 
-    "feature_grad_mult": 0.0,
+    "feature_grad_mult": 0.0, # always keeps the feature grad mult to 0.0
 }
 
 
@@ -46,6 +46,7 @@ class Encoder(torch.nn.Module):
             "mask": True and self.training,
             "ret_conv": False,
         }
+        print("w2v_args", w2v_args)
                       
         features, x, padding_mask = self.model.extract_features(**w2v_args)
 
