@@ -31,9 +31,8 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
         # ===== Generator Forward Pass =====
         # ===== Encoder =====
         if step >= freeze_steps:
-            models['encoder'].train()
-        else: 
-            enc_out = models['encoder'](waveforms, padding_masks)  # [B, T, C] # step 1
+            models['encoder'].train() 
+        enc_out = models['encoder'](waveforms, padding_masks)  # [B, T, C] # step 1
         output["cnn_out"] = enc_out['cnn_out'] # [B, T // 320, C] 
         output['encoder_out'] = enc_out['encoder_out'] # [B, T // 320, C] 
         
@@ -47,11 +46,10 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
             assert enc_out['encoder_out'].shape[1]-10 <= gt.shape[1] <= enc_out['encoder_out'].shape[1]+10, f"GT shape: {gt.shape}, Encoder out shape: {enc_out['encoder_out'].shape}"
             gt = gt[:,:mask.shape[1],:] * mask # [B, T, 1024]
             output['gt'] = gt 
-        
+            
         # ===== Downsample =====
         down_out = models['downsample'](enc_out['encoder_out'], mask) # [B, T // 2, C], [B, T // 2, vocab_size]
         dmask = mask[:, ::config["upsample"]['stride']] # [B, T // config["upsample"]['stride'], 1]
-        down_out = down_out[:,:dmask.shape[1],:] * dmask # [B, T // 2, C]
         output['down_out'] = down_out
         output['dmask'] = dmask
         
@@ -70,27 +68,23 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
         
         # ===== UpSample =====
         up_out = models['upsample'](z_q)
-        up_out = up_out[:,:mask.shape[1],:] * mask # [B, T, C]       
+        up_out = up_out[:,:mask.shape[1],:] * mask # [B, T, C]
         output['up_out'] = up_out
         
-        dec_out, dec_out2, dec_mask = models['decoder'](
+        dec_out = models['decoder'](
             x=up_out,
             mask=enc_out['padding_mask'],
             s=enc_out['cnn_out'],
         )
-        dec_out = dec_out[:,:dec_mask.shape[1],:] * dec_mask
-        dec_out2 = dec_out2[:,:dec_mask.shape[1],:] * dec_mask
         output['dec_out'] = dec_out
-        output['dec_out2'] = dec_out2
-        output['dec_mask'] = dec_mask
         
             
         output['disc_fake'] = None
         # Loss calculation
         gen_loss_components = loss_module.step_gen(output)        
-        total_lossg = gen_loss_components['rec_loss'] 
-        total_lossg = total_lossg + gen_loss_components['commit_loss'] 
-        total_lossg = total_lossg + gen_loss_components['smooth_loss']
+        total_lossg = gen_loss_components['rec_loss']
+        # total_lossg = total_lossg + gen_loss_components['commit_loss'] 
+        # total_lossg = total_lossg + gen_loss_components['smooth_loss']
         
         if step % config['logging']['step'] == 0:
             

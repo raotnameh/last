@@ -49,8 +49,6 @@ class Tokenizer(nn.Module):
         mask (torch.Tensor): Mask of shape (batch, time, 1) with 1s for valid positions and 0s for padding.
         """
         
-        z = F.normalize(z, dim=-1) # (batch, time, channels) # normalize the z tensor along the last dimension (channels)
-        
         if self.step % 100 == 0:
             print( f"---{z[0,0,:].mean().item(), z[0,0,:].std().item(), z[0,0,:].max().item(), z[0,0,:].min().item()}--" )
         
@@ -76,7 +74,7 @@ class Tokenizer(nn.Module):
         # commitment loss
         ################ no need to detach z_q if e is not trainable
         commitment_loss = F.mse_loss(z, z_q.detach(), reduction='none') * mask # (batch, time, channels) # MSE loss between z and z_q ignoring padding positions
-        valid_count = mask.sum()  # * z.shape[-1] # Total number of valid (non-masked) elements
+        valid_count = mask.sum()  * z.shape[-1] # Total number of valid (non-masked) elements
         commitment_loss = commitment_loss.sum() / valid_count 
         
         # preserve gradients
@@ -85,7 +83,7 @@ class Tokenizer(nn.Module):
         
         # Smoothness loss
         smoothness_loss = F.mse_loss(z_q[:, :-1, :], z_q[:, 1:, :], reduction='none') * mask[:, 1:, :] # (batch, time-1, channels) 
-        smoothness_loss = smoothness_loss.sum() / mask.sum() # average over valid positions
+        smoothness_loss = smoothness_loss.sum() / valid_count
         
         
         ##### Discriminator codebooks without repeated indices #####
@@ -93,6 +91,7 @@ class Tokenizer(nn.Module):
         n_z_q, n_mask, selected_encodings_list = self.remove_consecutive_repeated_indices( encodings, mask.squeeze(-1), z_q.clone()) # randomly pick one index from each group of consecutive repeating elements # shape (B,T) and also returns the mask 
     
         
+        # return smoothness_loss, commitment_loss, z, n_z_q, n_mask, selected_encodings_list #
         return smoothness_loss, commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list # commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list
 
         

@@ -3,7 +3,7 @@ import torch.nn as nn
 import Models as models
 import Layers as layers
 import torch.nn.functional as F
-
+from torch.nn.utils import weight_norm
 
 class Upsample(nn.Module):
     def __init__(self, input_dim, output_dim=256, kernel_size=9, stride=2, groups=1):
@@ -28,7 +28,7 @@ class Conv1dBlock(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=1, dilation=1, stride=1):
         super().__init__()
         
-        
+        self.norm1 = nn.LayerNorm(in_channels)
         self.conv = nn.Conv1d(
             in_channels, 
             out_channels, 
@@ -37,10 +37,12 @@ class Conv1dBlock(nn.Module):
             dilation=dilation, 
             padding=((kernel_size - 1) * dilation) // 2,
         )
-        self.norm = nn.LayerNorm(out_channels)
+        self.norm2 = nn.LayerNorm(out_channels)
         
 
     def forward(self, x, padding_mask=None):
+        
+        x = self.norm1(x)
         # x is expected to be of shape (batch, time, channels)
         if padding_mask is not None:
             x = x.masked_fill(padding_mask.unsqueeze(-1), 0)
@@ -48,7 +50,7 @@ class Conv1dBlock(nn.Module):
         x = x.transpose(1, 2)
         x = self.conv(x)
         x = x.transpose(1, 2)
-        x = self.norm(x)
+        x = self.norm2(x)
         
         return x
      
@@ -62,12 +64,13 @@ class Decoder(nn.Module):
             self.speaker = Conv1dBlock( config["speaker"]["speaker_emb_dim"], config["transformer"]["decoder_hidden"])
         
         self.decoder = models.Decoder(config)
-        self.proj = Conv1dBlock( config["transformer"]["decoder_hidden"], config["transformer"]["dac_hidden"])
+        self.proj = weight_norm(
+            nn.Linear(
+                config["transformer"]["decoder_hidden"], config["transformer"]["dac_hidden"],
+                # bias=False,
+                )
+            )
         
-        self.use_postnet = config['use_postnet']
-        if self.use_postnet: 
-            self.PostNet = layers.PostNet(n_mel_channels=config["transformer"]["dac_hidden"])
-
     
     def forward(self, x, mask, s): # b,t,c # mask should be b,t and 1 for masked position and 0 for non-masked position # s is speaker embedding b,t',c
         
@@ -76,22 +79,12 @@ class Decoder(nn.Module):
             s = self.speaker(s) # b,t,c
             s = torch.mean(s, dim=1, keepdim=True) # b,1,c
             # concatenate speaker embedding with input at t dim
-            x = torch.cat((s,x), dim=1) # b,t+1,c
-            mask = torch.cat((torch.zeros((mask.shape[0], 1), device=mask.device).bool(), mask), dim=1)  # (b, t+1)
-
+            x = x + s.expand(-1, x.size(1), -1) # b,t,c 
+                       
         dec_output, mask = self.decoder(x, mask)
         dec_output = self.proj(dec_output)
         
-        if self.use_s:
-            dec_output = dec_output[:,1:,:] # remove the first token
-            mask = mask[:,1:] # remove the first token
-
-        if self.use_postnet: 
-            dec_output2 = self.PostNet(dec_output) + dec_output
-        else: 
-            dec_output2 = dec_output
-        
-        return dec_output, dec_output2, ~mask.unsqueeze(-1) # b,t,c # b,t,c # b,t,1
+        return dec_output # b,t,c 
     
 if __name__ == '__main__':
     config = {

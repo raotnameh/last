@@ -4,7 +4,7 @@ checkpoint:
 
 logging: 
   dir: "logs"
-  step: 10
+  step: 20
 
 device: "cuda"
 
@@ -32,7 +32,7 @@ encoder:
 downsample:
   kernel_size: &kernel_size_value 51
   stride: &stride_value 2
-  groups: &groups_value 64
+  groups: &groups_value 256
 
 upsample:
   kernel_size: *kernel_size_value
@@ -48,8 +48,7 @@ decoder:
   speaker:
     use_s : False
     speaker_emb_dim: 512
-  
-  use_postnet: True
+
     
   transformer:
     decoder_layer: 4
@@ -64,17 +63,17 @@ decoder:
 train:
   seed: 42121
   train_vqvae: True
-  train_disc: True
-  train_full: True
+  train_disc: False
+  train_full: False
 
   lr_enc: 0.00005
-  lr_down: 0.0001
-  lr_dec: 0.0001
+  lr_down: 0.0005
+  lr_dec: 0.001
   lr_disc: 0.0001
-  grad_clip: 10.0
+  grad_clip: 1.0
   
-  num_steps: 20000
-  freeze_steps: 5000
+  num_steps: 10000
+  freeze_steps: 10000
   gradient_accumulation_steps: 1
   discriminator_freq: 2
 
@@ -82,11 +81,10 @@ train:
   resume_checkpoint: False
   resume_path: "checkpoints/step_10000.pth"
 
-
 loss:
   recon_loss_weight: 1.0
   smooth_loss_weight: 0.0
-  commit_loss_weight: 0.01
+  commit_loss_weight: 1.0
   gen_loss_weight: 1.0
   
   disc_loss_weight: 1.0

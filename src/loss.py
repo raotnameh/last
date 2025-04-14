@@ -95,7 +95,7 @@ class Loss:
 
         self.config = config["loss"]
         
-        self.mse_loss = nn.MSELoss(reduction='mean') # smoothness loss
+        self.mse_loss = nn.MSELoss(reduction='none') # smoothness loss
         self.mae_loss = nn.L1Loss(reduction='none') # reconstruction loss
         
         
@@ -111,14 +111,9 @@ class Loss:
     def step_gen(self, output):
         
         # reconstrunction loss :- decoder 
-        valid_count = output["dec_mask"].sum() * output["dec_out"].shape[-1]        
-        rec_loss1 = self.mae_loss(output["dec_out"], output["gt"], ) * output["dec_mask"]
-        rec_loss1 = rec_loss1.sum() / valid_count
-        rec_loss2 = self.mae_loss(output["dec_out2"], output["gt"]) * output["dec_mask"]
-        rec_loss2 = rec_loss2.sum() / valid_count
-        rec_loss = rec_loss1 + rec_loss2
-        rec_loss *= self.config["recon_loss_weight"]
-        
+        valid_count = output["mask"].sum() * output["dec_out"].shape[-1]        
+        rec_loss = self.mse_loss(output["dec_out"], output["gt"], ) * output["mask"]
+        rec_loss = rec_loss.sum() / valid_count
 
         # generator loss
         if output["disc_fake"] is not None:

@@ -1,7 +1,8 @@
 import torch
 import fairseq
 from fairseq import checkpoint_utils
-
+from torch.nn.utils import weight_norm
+import torch.nn.functional as F
 
 arg_overrides = {
     "apply_mask": True,
@@ -43,10 +44,10 @@ class Encoder(torch.nn.Module):
         w2v_args = {
             "source": source, # source: (B, T)
             "padding_mask": padding_mask, # padding_mask: (B, T), 
-            "mask": True and self.training,
+            # "mask": True and self.training,
+            "mask": False,
             "ret_conv": False,
         }
-        print("w2v_args", w2v_args)
                       
         features, x, padding_mask = self.model.extract_features(**w2v_args)
 
@@ -64,8 +65,8 @@ class Downsample(torch.nn.Module):
         self.norm1 = torch.nn.LayerNorm(input_dim)
         
         padding = kernel_size // 2
-        self.conv = torch.nn.Conv1d(input_dim, output_dim, kernel_size=kernel_size, stride=stride, padding=padding, groups = groups, bias=False )
-        
+        self.conv = weight_norm( torch.nn.Conv1d(input_dim, output_dim, kernel_size=kernel_size, stride=stride, padding=padding, groups = groups, bias=False) )
+        # self.conv = torch.nn.Conv1d(input_dim, output_dim, kernel_size=kernel_size, stride=stride, padding=padding, groups = groups, bias=False)
  
     def forward(self, x, mask): # B x T x C
         
@@ -75,6 +76,8 @@ class Downsample(torch.nn.Module):
         x = x.transpose(1, 2)        
         x = self.conv(x)
         x = x.transpose(1, 2)
- 
+        
+        # x = F.normalize(x, p=2,dim=2)
+        
                 
         return x # B x T x C 

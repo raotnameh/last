@@ -238,7 +238,7 @@ def configure_optimizers(models, config):
     }
     
     
-    def tri_stage_scheduler(optimizer, total_steps, phase_ratio=[0.03, 0.9, 0.07]):
+    def tri_stage_scheduler(optimizer, total_steps, phase_ratio=[0.03, 0.9, 0.07], low=1e-2):
         """
         Tri-stage LR scheduler that applies:
         - Warmup phase: LR increases linearly from 0 to base LR.
@@ -259,9 +259,9 @@ def configure_optimizers(models, config):
                 # Constant phase: LR stays at base value (multiplier 1)
                 return 1.0
             else:
-                # Linear decay: from 1 down to 0 over decay_steps
+                # Linear decay: from 1 down to low over decay_steps
                 decay_step = current_step - (warmup_steps + constant_steps)
-                return max(0.0, 1.0 - float(decay_step) / float(max(1, decay_steps)))
+                return max( low, (1.0 - float(decay_step) / float(max(1, decay_steps))) )
         return LambdaLR(optimizer, lr_lambda)
 
     
@@ -381,7 +381,7 @@ def main():
     
     # Main training loop
     # Initialize TensorBoard writer
-    writer = SummaryWriter(log_dir=config['logging'].get('log_dir', './logs'))
+    writer = SummaryWriter(log_dir=config['logging']['dir'])
     
     if config['train']['train_vqvae']:
         train_vqvae(
