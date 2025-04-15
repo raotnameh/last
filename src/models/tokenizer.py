@@ -9,7 +9,7 @@ import seaborn as sns
 
 
 class Tokenizer(nn.Module):
-    def __init__(self, vocab):
+    def __init__(self, vocab, rot=True):
         super(Tokenizer, self).__init__()
         '''
         Tokenizer module that tokenizes the speech encoder output by finding the closest codebook
@@ -17,7 +17,8 @@ class Tokenizer(nn.Module):
 
         self.vocab = vocab[1:] # remove the padding token
         self.step = 0
-        
+        self.rot = rot
+    
     def codebook_usage(self, min_encodings, mask):
         
         # prob for each character
@@ -40,7 +41,12 @@ class Tokenizer(nn.Module):
         
         plt.close()
    
-        
+    @staticmethod
+    def get_very_efficient_rotation(u, q, e):
+        w = ((u + q) / torch.norm(u + q, dim=1, keepdim=True)).detach()
+        e = e - 2 * torch.bmm(torch.bmm(e, w.unsqueeze(-1)), w.unsqueeze(1)) \
+            + 2 * torch.bmm(torch.bmm(e, u.unsqueeze(-1).detach()), q.unsqueeze(1).detach())
+        return e
         
     def forward(self, z, codebook, mask):
         """
@@ -48,6 +54,7 @@ class Tokenizer(nn.Module):
         codebook (nn.Module): A module with a weight attribute of shape (vocab_size, embed_dim).
         mask (torch.Tensor): Mask of shape (batch, time, 1) with 1s for valid positions and 0s for padding.
         """
+        x = z
         
         if self.step % 100 == 0:
             print( f"---{z[0,0,:].mean().item(), z[0,0,:].std().item(), z[0,0,:].max().item(), z[0,0,:].min().item()}--" )
@@ -58,9 +65,14 @@ class Tokenizer(nn.Module):
         
         z_flattened = z.contiguous().view(-1, e.shape[1]) # (batch * time, channels==embed_dim)
         
-        # distances from z to codebooks e_j ∥z−e∥**2 =∥z∥**2 +∥e∥**2 −2(z⋅e)
-        d = (torch.sum(z_flattened**2, dim=1, keepdim=True) + torch.sum(e**2, dim=1) - 2 * torch.matmul(z_flattened, e.t())) # (batch*time, vocab_size)
-  
+        # # distances from z to codebooks e_j ∥z−e∥**2 =∥z∥**2 +∥e∥**2 −2(z⋅e)
+        # d = (torch.sum(z_flattened**2, dim=1, keepdim=True) + torch.sum(e**2, dim=1) - 2 * torch.matmul(z_flattened, e.t())) # (batch*time, vocab_size)
+        
+        # cosine_similarity = z · e  (ranges in [-1, 1])
+        cos_sim = torch.matmul(z_flattened, e.t())  # (batch*time, vocab_size)
+        # Convert the similarity to a distance: lower distance means better match.# Here, distance = 1 - cosine_similarity.
+        d = 1.0 - cos_sim  # (batch*time, vocab_size)
+        
         # find closest encodings
         min_encoding_indices = torch.argmin(d, dim=1).unsqueeze(1) # (batch*time, 1) This has 0 to vocab_size-1 except for padding token which was 0.
         min_encodings = torch.zeros(min_encoding_indices.shape[0], e.shape[0], device=z.device) # (batch*time, vocab_size) 
@@ -74,17 +86,39 @@ class Tokenizer(nn.Module):
         # commitment loss
         ################ no need to detach z_q if e is not trainable
         commitment_loss = F.mse_loss(z, z_q.detach(), reduction='none') * mask # (batch, time, channels) # MSE loss between z and z_q ignoring padding positions
-        valid_count = mask.sum()  * z.shape[-1] # Total number of valid (non-masked) elements
+        valid_count = mask.sum() * z.shape[-1] # Total number of valid (non-masked) elements
         commitment_loss = commitment_loss.sum() / valid_count 
         
-        # preserve gradients
-        z_q = z + (z_q - z).detach() # ( batch, time, channels ) # z_q is the quantized version of z, but we want to preserve the gradients of z, so we add the difference between z_q and z to z. This is called the straight-through estimator.
+        # If using the rotation trick for audio data.
+        if self.rot:
+            b, t, c = x.shape # z_q same shape
+
+            # Flatten (b, t, c) -> (b * t, c)
+            x = x.contiguous().view(-1, c)
+            z_q = z_q.contiguous().view(-1, c)
+
+            # Normalize and apply rotation
+            norm_x = x / (torch.norm(x, dim=1, keepdim=True) + 1e-6)
+            norm_q = z_q / (torch.norm(z_q, dim=1, keepdim=True) + 1e-6)
+
+            pre_norm_q = self.get_very_efficient_rotation(norm_x, norm_q, x.unsqueeze(1)).squeeze()
+
+            # Reapply scale
+            z_q = pre_norm_q * (
+                torch.norm(z_q, dim=1, keepdim=True) / (torch.norm(x, dim=1, keepdim=True) + 1e-6)
+            ).detach()
+
+            # Reshape back to (b, t, c)
+            z_q = z_q.view(b, t, c)
+        else: 
+            # preserve gradients
+            z_q = z + (z_q - z).detach() # ( batch, time, channels ) # z_q is the quantized version of z, but we want to preserve the gradients of z, so we add the difference between z_q and z to z. This is called the straight-through estimator.
         z_q = z_q * mask # ( batch, time, channels ) # mask out padding positions of index 0. REASON: our data is sequential compared to the original VQVAE paper where the data is not sequential (images) which did not need padding.
         
+
         # Smoothness loss
-        smoothness_loss = F.mse_loss(z_q[:, :-1, :], z_q[:, 1:, :], reduction='none') * mask[:, 1:, :] # (batch, time-1, channels) 
+        smoothness_loss = F.mse_loss(z[:, :-1, :], z[:, 1:, :], reduction='none') * mask[:, 1:, :] # (batch, time-1, channels) 
         smoothness_loss = smoothness_loss.sum() / valid_count
-        
         
         ##### Discriminator codebooks without repeated indices #####
         encodings = min_encoding_indices.view(z.shape[0], z.shape[1]) # ( batch, time ) # (B, T)

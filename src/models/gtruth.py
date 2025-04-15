@@ -19,7 +19,7 @@ class Gtruth(nn.Module):
     @torch.no_grad()
     def decode(self, z):
         # z, _, _, _, _ = self.model.quantizer(z)
-        return self.model.decoder(z).squeeze(1) # [b,t]
+        return self.model.decoder(z.transpose(1,2)).squeeze(1) # [b,t]
 
 if __name__ == '__main__':
     gtruth = Gtruth()

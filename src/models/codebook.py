@@ -33,7 +33,7 @@ class Codebook(nn.Module):
                 
         
         # Normalize the embedding matrix
-        # embedding.weight.data = F.normalize(embedding.weight.data, p=2, dim=1)
+        embedding.weight.data = F.normalize(embedding.weight.data, p=2, dim=1)
         
         
         self.embedding = embedding

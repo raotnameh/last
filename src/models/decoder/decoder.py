@@ -67,7 +67,6 @@ class Decoder(nn.Module):
         self.proj = weight_norm(
             nn.Linear(
                 config["transformer"]["decoder_hidden"], config["transformer"]["dac_hidden"],
-                # bias=False,
                 )
             )
         

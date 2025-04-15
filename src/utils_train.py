@@ -1,5 +1,7 @@
 import torch
 import logging
+import torchaudio
+
 
 def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, text_loader, loss_module, config, device, writer, start_step):
     
@@ -84,14 +86,21 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
         gen_loss_components = loss_module.step_gen(output)        
         total_lossg = gen_loss_components['rec_loss']
         # total_lossg = total_lossg + gen_loss_components['commit_loss'] 
-        # total_lossg = total_lossg + gen_loss_components['smooth_loss']
-        
+        total_lossg = total_lossg + gen_loss_components['smooth_loss']
+            
+            
         if step % config['logging']['step'] == 0:
             
             logging.info(f"Generator encoded text path: --{paths[0]}-- of length {dur[0]} seconds--")
             logging.info( f"Generator decoded text with special tokens: --{text_dataset.decode(selected_encodings_list[0],keep_special_tokens=True)}--" )
             logging.info( f"Generator decoded text without special tokens: --{text_dataset.decode(selected_encodings_list[0])}--" )
-                
+        
+            with torch.no_grad():
+                pred = models['gtruth'].decode(output['dec_out'][0].unsqueeze(0)).clone().detach().cpu()
+                torchaudio.save(f"temp/{step}_{text_dataset.decode(selected_encodings_list[0])}_.wav", pred, sample_rate=16000)
+            
+            
+            
             logging.info(
             f"VQ-VAE-LOSS---step/total: {step}/{num_steps} "
             f"rec_loss: {gen_loss_components['rec_loss']:.4f}, "
