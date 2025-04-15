@@ -88,7 +88,7 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
         # total_lossg = total_lossg + gen_loss_components['commit_loss'] 
         total_lossg = total_lossg + gen_loss_components['smooth_loss']
             
-            
+        
         if step % config['logging']['step'] == 0:
             
             logging.info(f"Generator encoded text path: --{paths[0]}-- of length {dur[0]} seconds--")
@@ -96,10 +96,13 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
             logging.info( f"Generator decoded text without special tokens: --{text_dataset.decode(selected_encodings_list[0])}--" )
         
             with torch.no_grad():
-                pred = models['gtruth'].decode(output['dec_out'][0].unsqueeze(0)).clone().detach().cpu()
-                torchaudio.save(f"temp/{step}_{text_dataset.decode(selected_encodings_list[0])}_.wav", pred, sample_rate=16000)
-            
-            
+                pr = models['gtruth'].decode(output['dec_out'][0].unsqueeze(0)) # [1, T]
+                gt = waveforms[0].unsqueeze(0) # [1, T]
+                gap = torch.zeros_like(gt)[:,:16000] # [1, 16000]
+                total = torch.cat([pr, gap, gt], dim=1) # [1, 2T+16000]
+                torchaudio.save(f"temp/{step}.wav", total.clone().detach().cpu(), sample_rate=16000)
+                with open(f"temp/{step}.txt", "w") as f:
+                    f.write(f"Decoded text: {text_dataset.decode(selected_encodings_list[0])}\n")
             
             logging.info(
             f"VQ-VAE-LOSS---step/total: {step}/{num_steps} "
