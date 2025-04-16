@@ -111,7 +111,7 @@ class Discriminator(nn.Module):
         torch.backends.cuda.enable_mem_efficient_sdp(False)
         torch.backends.cuda.enable_math_sdp(True)
         
-        self.norm1 = nn.LayerNorm(in_channels)  # Normalize over channel dim
+        # self.norm1 = nn.LayerNorm(in_channels)  # Normalize over channel dim
         self.pre = Conv1dBlock(in_channels, hidden_dim, kernel_size=1)
         self.norm2 = nn.LayerNorm(hidden_dim)  # Normalize over channel dim
         
@@ -125,7 +125,7 @@ class Discriminator(nn.Module):
         padding_mask: (batch, time, 1) where True indicates a padded timestep.
         """
         
-        x = self.norm1(x)
+        # x = self.norm1(x)
         x = self.pre(x, padding_mask) 
         x = self.norm2(x)
 

@@ -103,7 +103,6 @@ class Loss:
     
     def step_disc(self, output):
         # fake, real, fake_x, real_x, fake_smooth=0.0, real_smooth=0.0):
-    
         loss = self.gan_loss(output["disc_fake"], output["disc_real"], output["disc_fake_x"], output["disc_real_x"])        
         return loss
         
@@ -112,7 +111,7 @@ class Loss:
         
         # reconstrunction loss :- decoder 
         valid_count = output["mask"].sum() * output["dec_out"].shape[-1]        
-        rec_loss = self.mse_loss(output["dec_out"], output["gt"], ) * output["mask"]
+        rec_loss = self.mae_loss(output["dec_out"], output["gt"], ) * output["mask"]
         rec_loss = rec_loss.sum() / valid_count
 
         # generator loss

@@ -28,7 +28,7 @@ class Conv1dBlock(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=1, dilation=1, stride=1):
         super().__init__()
         
-        self.norm1 = nn.LayerNorm(in_channels)
+        # self.norm1 = nn.LayerNorm(in_channels)
         self.conv = nn.Conv1d(
             in_channels, 
             out_channels, 
@@ -42,7 +42,7 @@ class Conv1dBlock(nn.Module):
 
     def forward(self, x, padding_mask=None):
         
-        x = self.norm1(x)
+        # x = self.norm1(x)
         # x is expected to be of shape (batch, time, channels)
         if padding_mask is not None:
             x = x.masked_fill(padding_mask.unsqueeze(-1), 0)

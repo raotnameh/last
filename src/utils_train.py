@@ -1,7 +1,8 @@
 import torch
 import logging
 import torchaudio
-
+import matplotlib.pyplot as plt
+import torchaudio.transforms as T
 
 def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, text_loader, loss_module, config, device, writer, start_step):
     
@@ -13,7 +14,7 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
     
     # Initialize iterators
     speech_iter = iter(speech_loader)
-
+    
     for optimizer in optimizers.values():
         optimizer.zero_grad()
 
@@ -28,7 +29,6 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
             waveforms, padding_masks, paths, dur = next(speech_iter)
         waveforms = waveforms.to(device) # [B, T]
         padding_masks = padding_masks.to(device) # [B, T] true for masked, false for not masked means [False, False, ..., True, True]
-        
     
         # ===== Generator Forward Pass =====
         # ===== Encoder =====
@@ -56,7 +56,7 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
         output['dmask'] = dmask
         
         # ===== Tokenizer =====
-        smoothness_loss, commitment_loss, z_q, z_q_disc, z_q_disc_mask, selected_encodings_list = models['tokenizer'](
+        smoothness_loss, commitment_loss, z_q, z_q_disc, z_q_disc_mask, selected_encodings_list, selected_encodings_repeated = models['tokenizer'](
             down_out, 
             models['codebook'], 
             dmask,
@@ -86,23 +86,75 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
         gen_loss_components = loss_module.step_gen(output)        
         total_lossg = gen_loss_components['rec_loss']
         # total_lossg = total_lossg + gen_loss_components['commit_loss'] 
-        total_lossg = total_lossg + gen_loss_components['smooth_loss']
+        # total_lossg = total_lossg + gen_loss_components['smooth_loss']
             
         
         if step % config['logging']['step'] == 0:
-            
             logging.info(f"Generator encoded text path: --{paths[0]}-- of length {dur[0]} seconds--")
             logging.info( f"Generator decoded text with special tokens: --{text_dataset.decode(selected_encodings_list[0],keep_special_tokens=True)}--" )
             logging.info( f"Generator decoded text without special tokens: --{text_dataset.decode(selected_encodings_list[0])}--" )
+            logging.info( f"Generator decoded REPEATED text with special tokens: --{text_dataset.decode(selected_encodings_repeated[0],keep_special_tokens=True)}--" )
+            
         
             with torch.no_grad():
                 pr = models['gtruth'].decode(output['dec_out'][0].unsqueeze(0)) # [1, T]
+                pr = pr / torch.max(torch.abs(pr))
                 gt = waveforms[0].unsqueeze(0) # [1, T]
+                gt = gt / torch.max(torch.abs(gt)) 
                 gap = torch.zeros_like(gt)[:,:16000] # [1, 16000]
                 total = torch.cat([pr, gap, gt], dim=1) # [1, 2T+16000]
                 torchaudio.save(f"temp/{step}.wav", total.clone().detach().cpu(), sample_rate=16000)
+               
                 with open(f"temp/{step}.txt", "w") as f:
-                    f.write(f"Decoded text: {text_dataset.decode(selected_encodings_list[0])}\n")
+                    spec_tokens_repeated = text_dataset.decode(selected_encodings_repeated[0],keep_special_tokens=True)
+                    spec_tokens = text_dataset.decode(selected_encodings_list[0],keep_special_tokens=True)
+                    tokens = text_dataset.decode(selected_encodings_list[0])
+                    a = f"Decoded text: {tokens}\n"
+                    a += f"Decoded text with special tokens: {spec_tokens}\n"
+                    a += f"Decoded text with special tokens (repeated): {spec_tokens_repeated}\n"
+
+                    t = 0.02 # for each special token, add a time of 20ms upto 2 decimal places
+                    for ii in range(len(spec_tokens_repeated)):
+                        a += f"{round(t, 2)} "
+                        t += 0.02
+                    a += "\n"
+                    a += f"Total time: {t} seconds and path: {paths[0]}\n"
+                        
+                    f.write(a)
+                    
+                # save a mel spectorgram with non repeated tokens as labels
+                # === Generate Spectrogram (20ms resolution) ===
+                sr = 16000
+                frame_length = int(0.04 * sr)  # 20 ms -> 320 samples
+                hop_length = frame_length      # no overlap
+
+                mel_spectrogram = T.MelSpectrogram(
+                    sample_rate=sr,
+                    n_fft=frame_length,
+                    hop_length=hop_length,
+                    n_mels=80
+                )(gt.detach().cpu())[0] # 2d > 1d
+                
+                l = [t for t in spec_tokens_repeated]
+                mel_spectrogram = mel_spectrogram[:,:len(l)]
+                
+                print(mel_spectrogram.shape, len(spec_tokens_repeated   ))
+                plt.figure(figsize=(20, 6))
+                plt.imshow(mel_spectrogram.log2().numpy(), aspect="auto", origin="lower", cmap="magma")
+
+                # Add token labels to x-axis
+                plt.xticks(
+                    ticks=range(len(l)),
+                    labels=l,
+                    rotation=45
+                )
+
+                plt.xlabel("Special Tokens (20ms per token)")
+                plt.ylabel("Mel Frequency Channels")
+                plt.title("Mel Spectrogram with Special Tokens on X-axis")
+                plt.tight_layout()
+                plt.savefig(f"temp/{step}_mel_spectrogram.png", dpi=100)
+                
             
             logging.info(
             f"VQ-VAE-LOSS---step/total: {step}/{num_steps} "
@@ -146,7 +198,6 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
             optimizers['down'].step()
             optimizers['dec'].step()
         
-        
             # scheduler step
             for scheduler in schedulers.values():
                 scheduler.step()    
@@ -155,8 +206,6 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
             for optimizer in optimizers.values():
                 optimizer.zero_grad()
         
-            
-            
         # Checkpoint
         if step % config['checkpoint']['step'] == 0:
             checkpoint_path = f"{config['checkpoint']['dir']}/step_{step:06d}.pt"

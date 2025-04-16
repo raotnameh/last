@@ -34,7 +34,7 @@ class Tokenizer(nn.Module):
         plt.grid(axis='y')
         plt.savefig('codebook_usage_distribution.png', bbox_inches='tight')
         # for every 1000 steps save the plot 
-        if self.step % 100 == 0:
+        if self.step % 1000 == 0:
             plt.savefig(os.path.join('plots', f'codebook_usage_distribution_{self.step}.png'), bbox_inches='tight')
             plt.close()
         self.step += 1
@@ -55,10 +55,7 @@ class Tokenizer(nn.Module):
         mask (torch.Tensor): Mask of shape (batch, time, 1) with 1s for valid positions and 0s for padding.
         """
         x = z
-        
-        if self.step % 100 == 0:
-            print( f"---{z[0,0,:].mean().item(), z[0,0,:].std().item(), z[0,0,:].max().item(), z[0,0,:].min().item()}--" )
-        
+    
         # Using fixed codebook embeddings
         e = codebook.embedding.weight.clone().detach() # (vocab_size+1, embed_dim) 
         e = e[1:,:] # remove the padding embedding from the codebook # (vocab_size, embed_dim)        
@@ -86,63 +83,70 @@ class Tokenizer(nn.Module):
         # commitment loss
         ################ no need to detach z_q if e is not trainable
         commitment_loss = F.mse_loss(z, z_q.detach(), reduction='none') * mask # (batch, time, channels) # MSE loss between z and z_q ignoring padding positions
-        valid_count = mask.sum() * z.shape[-1] # Total number of valid (non-masked) elements
+        valid_count = mask.sum() # * z.shape[-1] # Total number of valid (non-masked) elements
         commitment_loss = commitment_loss.sum() / valid_count 
+        
+        # preserve gradients
+        z_q = z + (z_q - z).detach() # btc
+        z_q = z_q * mask # btc # our data is sequential compared to the original VQVAE paper where the data is not sequential (images) which did not need padding.
         
         # If using the rotation trick for audio data.
         if self.rot:
             b, t, c = x.shape # z_q same shape
 
             # Flatten (b, t, c) -> (b * t, c)
-            x = x.contiguous().view(-1, c)
+            x = z_flattened
             z_q = z_q.contiguous().view(-1, c)
 
             # Normalize and apply rotation
             norm_x = x / (torch.norm(x, dim=1, keepdim=True) + 1e-6)
-            norm_q = z_q / (torch.norm(z_q, dim=1, keepdim=True) + 1e-6)
+            norm_q = z_q # fixed codebooks not need to normalize
+            # norm_q = z_q / (torch.norm(z_q, dim=1, keepdim=True) + 1e-6) 
 
             pre_norm_q = self.get_very_efficient_rotation(norm_x, norm_q, x.unsqueeze(1)).squeeze()
 
             # Reapply scale
-            z_q = pre_norm_q * (
-                torch.norm(z_q, dim=1, keepdim=True) / (torch.norm(x, dim=1, keepdim=True) + 1e-6)
+            z_q = pre_norm_q * ( z_q / (torch.norm(x, dim=1, keepdim=True) + 1e-6)
             ).detach()
 
             # Reshape back to (b, t, c)
             z_q = z_q.view(b, t, c)
-        else: 
-            # preserve gradients
-            z_q = z + (z_q - z).detach() # ( batch, time, channels ) # z_q is the quantized version of z, but we want to preserve the gradients of z, so we add the difference between z_q and z to z. This is called the straight-through estimator.
-        z_q = z_q * mask # ( batch, time, channels ) # mask out padding positions of index 0. REASON: our data is sequential compared to the original VQVAE paper where the data is not sequential (images) which did not need padding.
         
+        z_q = z_q * mask 
 
         # Smoothness loss
-        smoothness_loss = F.mse_loss(z[:, :-1, :], z[:, 1:, :], reduction='none') * mask[:, 1:, :] # (batch, time-1, channels) 
-        smoothness_loss = smoothness_loss.sum() / valid_count
+        smoothness_loss = F.mse_loss(z[:, :-1, :], z[:, 1:, :], reduction='none') * mask[:, 1:, :] # (batch, time-1, channels)
+        smoothness_loss = smoothness_loss.sum() / valid_count # average over valid positions
         
         ##### Discriminator codebooks without repeated indices #####
         encodings = min_encoding_indices.view(z.shape[0], z.shape[1]) # ( batch, time ) # (B, T)
-        n_z_q, n_mask, selected_encodings_list = self.remove_consecutive_repeated_indices( encodings, mask.squeeze(-1), z_q.clone()) # randomly pick one index from each group of consecutive repeating elements # shape (B,T) and also returns the mask 
-    
+        n_z_q, n_mask, selected_encodings_list, selected_encodings_repeated_list = self.remove_consecutive_repeated_indices( encodings, mask.squeeze(-1), z_q.clone()) # randomly pick one index from each group of consecutive repeating elements # shape (B,T) and also returns the mask 
         
-        # return smoothness_loss, commitment_loss, z, n_z_q, n_mask, selected_encodings_list #
-        return smoothness_loss, commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list # commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list
+        
+        return smoothness_loss, commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list, selected_encodings_repeated_list # commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list<
 
-        
-    def remove_consecutive_repeated_indices(self, min_encoding_indices, mask, z_q):
+    @staticmethod
+    def remove_consecutive_repeated_indices(min_encoding_indices, mask, z_q):
         B, T = min_encoding_indices.shape
         selected_indices_list = []
         selected_encodings_list = []
         max_len = 0
+        
+        selected_encodings_repeated_list = []
+        
 
         for b in range(B):
             indices = min_encoding_indices[b]
             selected_indices = []
             selected_encodings = []
+            selected_encodings_repeated = []
             start = 0
             for i in range(1, T):
                 if mask[b, i] == 0:
                     break
+                
+                selected_encodings_repeated.append(indices[i].item()+1) # +1 to avoid padding token
+                                
                 if indices[i] != indices[i - 1]:
                     ii = random.randint(start, i - 1)
                     selected_indices.append(ii)
@@ -151,10 +155,14 @@ class Tokenizer(nn.Module):
             ii = random.randint(start, T - 1)
             selected_indices.append(ii)
             selected_encodings.append(indices[ii].item()+1) # +1 to avoid padding token
+            selected_encodings_repeated.append(indices[ii].item()+1) # +1 to avoid padding token
 
             selected_encodings_list.append(selected_encodings)
+            selected_encodings_repeated_list.append(selected_encodings_repeated)
             selected_indices_list.append(torch.tensor(selected_indices))
             max_len = max(max_len, len(selected_indices))
+            
+            
 
         # Pad and create mask in a vectorized way
         padded_indices = torch.zeros((B, max_len), dtype=min_encoding_indices.dtype, device=min_encoding_indices.device)
@@ -171,4 +179,4 @@ class Tokenizer(nn.Module):
         n_z_q = z_q.gather(dim=1, index=padded_indices)
         n_z_q *= masks
 
-        return n_z_q, masks, selected_encodings_list # shape (B, max_len, channels), mask shape (B, max_len, 1), list of selected encodings
+        return n_z_q, masks, selected_encodings_list, selected_encodings_repeated_list    # shape (B, max_len, channels), mask shape (B, max_len, 1), list of selected encodings

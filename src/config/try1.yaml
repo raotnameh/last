@@ -66,12 +66,12 @@ train:
   train_full: False
 
   lr_enc: 0.00005
-  lr_down: 0.0005
-  lr_dec: 0.0005
+  lr_down: 0.00005
+  lr_dec: 0.001
   lr_disc: 0.0005
-  grad_clip: 10.0
+  grad_clip: 1.0
   
-  num_steps: 200000
+  num_steps: 50000
   freeze_steps: 20000000
   gradient_accumulation_steps: 1
   discriminator_freq: 2
@@ -82,7 +82,7 @@ train:
 
 loss:
   recon_loss_weight: 1.0
-  smooth_loss_weight: 100.0
+  smooth_loss_weight: 1.0
   commit_loss_weight: 1.0
   gen_loss_weight: 1.0
   
