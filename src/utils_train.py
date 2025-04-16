@@ -61,6 +61,8 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
             models['codebook'], 
             dmask,
         )
+        
+        
         z_q_disc_mask = ~z_q_disc_mask.bool() # [B, T // 2, 1]
         
         output['smoothness_loss'] = smoothness_loss
@@ -95,7 +97,6 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
             logging.info( f"Generator decoded text without special tokens: --{text_dataset.decode(selected_encodings_list[0])}--" )
             logging.info( f"Generator decoded REPEATED text with special tokens: --{text_dataset.decode(selected_encodings_repeated[0],keep_special_tokens=True)}--" )
             
-        
             with torch.no_grad():
                 pr = models['gtruth'].decode(output['dec_out'][0].unsqueeze(0)) # [1, T]
                 pr = pr / torch.max(torch.abs(pr))
@@ -153,7 +154,7 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
                 plt.ylabel("Mel Frequency Channels")
                 plt.title("Mel Spectrogram with Special Tokens on X-axis")
                 plt.tight_layout()
-                plt.savefig(f"temp/{step}_mel_spectrogram.png", dpi=100)
+                plt.savefig(f"temp/{step}_mel_spectrogram.png", dpi=600)
                 
             
             logging.info(

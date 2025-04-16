@@ -58,10 +58,9 @@ class Tokenizer(nn.Module):
     
         # Using fixed codebook embeddings
         e = codebook.embedding.weight.clone().detach() # (vocab_size+1, embed_dim) 
-        e = e[1:,:] # remove the padding embedding from the codebook # (vocab_size, embed_dim)        
-        
+        e = e[1:,:] # remove the padding embedding from the codebook # (vocab_size, embed_dim)       
+ 
         z_flattened = z.contiguous().view(-1, e.shape[1]) # (batch * time, channels==embed_dim)
-        
         # # distances from z to codebooks e_j ∥z−e∥**2 =∥z∥**2 +∥e∥**2 −2(z⋅e)
         # d = (torch.sum(z_flattened**2, dim=1, keepdim=True) + torch.sum(e**2, dim=1) - 2 * torch.matmul(z_flattened, e.t())) # (batch*time, vocab_size)
         
@@ -69,7 +68,7 @@ class Tokenizer(nn.Module):
         cos_sim = torch.matmul(z_flattened, e.t())  # (batch*time, vocab_size)
         # Convert the similarity to a distance: lower distance means better match.# Here, distance = 1 - cosine_similarity.
         d = 1.0 - cos_sim  # (batch*time, vocab_size)
-        
+
         # find closest encodings
         min_encoding_indices = torch.argmin(d, dim=1).unsqueeze(1) # (batch*time, 1) This has 0 to vocab_size-1 except for padding token which was 0.
         min_encodings = torch.zeros(min_encoding_indices.shape[0], e.shape[0], device=z.device) # (batch*time, vocab_size) 
@@ -98,12 +97,7 @@ class Tokenizer(nn.Module):
             x = z_flattened
             z_q = z_q.contiguous().view(-1, c)
 
-            # Normalize and apply rotation
-            norm_x = x / (torch.norm(x, dim=1, keepdim=True) + 1e-6)
-            norm_q = z_q # fixed codebooks not need to normalize
-            # norm_q = z_q / (torch.norm(z_q, dim=1, keepdim=True) + 1e-6) 
-
-            pre_norm_q = self.get_very_efficient_rotation(norm_x, norm_q, x.unsqueeze(1)).squeeze()
+            pre_norm_q = self.get_very_efficient_rotation(x / (torch.norm(x, dim=1, keepdim=True) + 1e-6), z_q, x.unsqueeze(1)).squeeze()
 
             # Reapply scale
             z_q = pre_norm_q * ( z_q / (torch.norm(x, dim=1, keepdim=True) + 1e-6)
@@ -121,8 +115,7 @@ class Tokenizer(nn.Module):
         ##### Discriminator codebooks without repeated indices #####
         encodings = min_encoding_indices.view(z.shape[0], z.shape[1]) # ( batch, time ) # (B, T)
         n_z_q, n_mask, selected_encodings_list, selected_encodings_repeated_list = self.remove_consecutive_repeated_indices( encodings, mask.squeeze(-1), z_q.clone()) # randomly pick one index from each group of consecutive repeating elements # shape (B,T) and also returns the mask 
-        
-        
+
         return smoothness_loss, commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list, selected_encodings_repeated_list # commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list<
 
     @staticmethod

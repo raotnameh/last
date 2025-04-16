@@ -285,8 +285,8 @@ def load_checkpoint(checkpoint_path, models, optimizers, schedulers, device):
     
     # Load model states
     for name, model in models.items():
-        if name in checkpoint['models']:
-            model.load_state_dict(checkpoint['models'][name])
+        if name in checkpoint['models']: 
+            model.load_state_dict(checkpoint['models'][name])  # fallback for single GPU or non-wrapped
         else:
             logging.warning(f"No weights found for {name} in checkpoint")
 
@@ -353,11 +353,12 @@ def main():
     models['discriminator'].train()
     configure_training_mode(models, config)
     
-    # Move models to device
+    # Determine the device (GPU or CPU)
     device = torch.device(config.get("device"))
-    for model in models.values():
-        model.to(device)
-        
+    for name in models:
+        models[name].to(device)
+
+
     # Initialize optimizers and loss
     optimizers, schedulers = configure_optimizers(models, config)
     loss_module = Loss(config)

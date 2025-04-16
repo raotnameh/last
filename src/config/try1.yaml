@@ -67,7 +67,7 @@ train:
 
   lr_enc: 0.00005
   lr_down: 0.00005
-  lr_dec: 0.001
+  lr_dec: 0.0005
   lr_disc: 0.0005
   grad_clip: 1.0
   
