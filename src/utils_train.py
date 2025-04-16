@@ -113,10 +113,10 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
                     a += f"Decoded text with special tokens: {spec_tokens}\n"
                     a += f"Decoded text with special tokens (repeated): {spec_tokens_repeated}\n"
 
-                    t = 0.02 # for each special token, add a time of 20ms upto 2 decimal places
+                    t = 0.04 # for each special token, add a time of 20ms upto 2 decimal places
                     for ii in range(len(spec_tokens_repeated)):
                         a += f"{round(t, 2)} "
-                        t += 0.02
+                        t += 0.04
                     a += "\n"
                     a += f"Total time: {t} seconds and path: {paths[0]}\n"
                         
