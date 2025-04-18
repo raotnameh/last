@@ -6,7 +6,7 @@ import torchaudio.transforms as T
 import os
 
 
-from models.asr import WhisperWERCalculator
+from models.asr import WhisperWERCalculator, compute_pesq, compute_stoi
 from tqdm.auto import tqdm
 
 def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, text_loader, loss_module, config, device, writer, start_step, save_dir):
@@ -230,6 +230,10 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
             }, checkpoint_path)
             logging.info(f"Saved checkpoint to {checkpoint_path}")
             
+            # Evaluation function
+            eval(models, val_speech_loader, loss_module, config, device, writer=writer, step=step)
+            logging.info("Evaluation done")
+            
 
 def eval(models, speech_loader, loss_module, config, device, writer=None, step=0):
     
@@ -305,30 +309,45 @@ def eval(models, speech_loader, loss_module, config, device, writer=None, step=0
             
             pr = [ models['gtruth'].decode(x.unsqueeze(0))[:,:dur[e]] for e,x in enumerate(output['dec_out']) ] # [ [1,T], [1,T], ...]
             pr = [x / torch.max(torch.abs(x)) for x in pr]
-            # pr = [x[:,:gt[e].shape[1]] for e,x in enumerate(pr)] # remove empty tensors
-            
-            # for i in range(len(pr)):
-            #     assert pr[i].shape[1] == gt[i].shape[1], f"Length of pr and gt should be same. pr: {pr[i].shape}, gt: {gt[i].shape}"
             
             all_gt.extend(gt)
             all_pr.extend(pr)
             all_txt.extend(txt)
             
         # Get the ASR loos for pr and gt
-        wer_pred, wer_real = WERCalculator.compute_wer(all_pr, all_gt, all_txt)
+        cer_pred, cer_real, wer_pred, wer_real, pred_hyps, real_hyps = WERCalculator.compute_wer(all_pr, all_gt, all_txt)
+        
+        # Get PESQ
+        pesq = compute_pesq(all_gt, all_pr)
+        
+        # Get STOI
+        stoi = compute_stoi(all_gt, all_pr)
+        
+        total_rec_loss /= len(speech_loader)
+        total_commit_loss /= len(speech_loader)
+        total_smooth_loss /= len(speech_loader)
         
         logging.info(
+            f"Predicted CER: {cer_pred:.4f}, "
+            f"Real CER: {cer_real:.4f}, "
             f"Predicted WER: {wer_pred:.4f}, "
-            f"Real WER: {wer_real:.4f}"
+            f"Real WER: {wer_real:.4f}, "
+            f"PESQ: {sum(pesq)/len(pesq):.4f}, "
+            f"STOI: {sum(stoi)/len(stoi):.4f}, "
             f"rec_loss: {total_rec_loss:.4f}, "
             f"commit_loss: {total_commit_loss:.4f}, "
             f"smooth_loss: {total_smooth_loss:.4f}"
         )
         
         if writer is not None:
+            writer.add_scalar('val_generator_loss/cer_pred', cer_pred, step)
+            writer.add_scalar('val_generator_loss/cer_real', cer_real, step)
             writer.add_scalar('val_generator_loss/wer_pred', wer_pred, step)
             writer.add_scalar('val_generator_loss/wer_real', wer_real, step)
-                
+            
+            writer.add_scalar('val_generator_loss/pesq', sum(pesq)/len(pesq), step)
+            writer.add_scalar('val_generator_loss/stoi', sum(stoi)/len(stoi), step)
+            
             writer.add_scalar('val_generator_loss/rec_loss', total_rec_loss, step)
             writer.add_scalar('val_generator_loss/commit_loss', total_commit_loss, step)
             writer.add_scalar('val_generator_loss/smooth_loss', total_smooth_loss, step)
