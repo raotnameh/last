@@ -13,7 +13,7 @@ while True:
     if not os.path.exists(filename):
         break  # Stop when the file doesn't exist
     image_files.append(filename)
-    step += 100
+    step += 1000
 
 
 # Output path for the GIF

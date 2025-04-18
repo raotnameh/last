@@ -78,7 +78,7 @@ def configure_logging(dir='logs/'):
     )
     
 # step :- Prepare the dataset.
-def initialize_datasets(config):
+def initialize_datasets(config, split='train'):
     """Initialize and configure speech/text datasets with samplers."""
     class ShuffledBatchSampler(BatchSampler):
         """Custom batch sampler that shuffles batch order while maintaining sequence order within batches."""
@@ -92,7 +92,7 @@ def initialize_datasets(config):
         
     # step 1 :- Prepare the speech dataset.
     speech_dataset = Dataset_speech(
-        input_manifest=config['dataset_speech']['path'],
+        input_manifest=config['dataset_speech'][f'{split}_path'],
         min_duration=config['dataset_speech']['min_duration'],
         max_duration=config['dataset_speech']['max_duration'],
     )
@@ -103,32 +103,32 @@ def initialize_datasets(config):
             batch_size=config['dataset_speech']['batch_size'],
             drop_last=False,
         ),
-        # batch_size=config['dataset_txt']['batch_size'],
-        # shuffle=True,  
         collate_fn=speech_dataset.collate_fn,
         num_workers=4
     )
     
+    logging.info(f"Number of batches in {split} speech dataset: {len(speech_loader)}")
+    if split == 'train':
+                
+        # step 2 :- Prepare the text dataset.
+        text_dataset = Dataset_txt(data=config['dataset_txt']['path'])
+        text_loader = DataLoader(
+            text_dataset,
+            batch_sampler=ShuffledBatchSampler(
+                sampler=SequentialSampler(text_dataset),
+                batch_size=config['dataset_speech']['batch_size'],
+                drop_last=False,
+            ),
+            collate_fn=text_dataset.collate_fn,
+            num_workers=4
+        )
 
-    # step 2 :- Prepare the text dataset.
-    text_dataset = Dataset_txt(data=config['dataset_txt']['path'])
-    text_loader = DataLoader(
-        text_dataset,
-        batch_sampler=ShuffledBatchSampler(
-            sampler=SequentialSampler(speech_dataset),
-            batch_size=config['dataset_speech']['batch_size'],
-            drop_last=False,
-        ),
-        # batch_size=config['dataset_txt']['batch_size'],
-        # shuffle=True, 
-        collate_fn=text_dataset.collate_fn,
-        num_workers=4
-    )
+        logging.info(f"Number of batches in text dataset: {len(text_loader)}")
 
-    logging.info(f"Number of batches in speech dataset: {len(speech_loader)}")
-    logging.info(f"Number of batches in text dataset: {len(text_loader)}")
-    
-    return speech_loader, text_dataset, text_loader, text_dataset.vocab, text_dataset.prior
+        return speech_loader, text_dataset, text_loader, text_dataset.vocab, text_dataset.prior
+
+    else:
+        return speech_loader, None, None, None, None
 
 # step :- Prepare the codebook
 def setup_models(config, vocab):
@@ -148,7 +148,7 @@ def setup_models(config, vocab):
         vocab_size=models['codebook'].embedding.weight.shape[0]-1, # -1 for padding    
         )
     
-    models['tokenizer'] = Tokenizer(vocab=models['codebook'].vocab)
+    models['tokenizer'] = Tokenizer(config,vocab=models['codebook'].vocab)
     
     models['upsample'] = Upsample(
         input_dim=models['codebook'].embedding.weight.shape[1],
@@ -312,6 +312,12 @@ def load_checkpoint(checkpoint_path, models, optimizers, schedulers, device):
 def main():
     args = parse_args()
     config = load_config(args.config) 
+    
+    # Set random seeds
+    random.seed(config['train']['seed'])
+    torch.manual_seed(config['train']['seed'])
+    np.random.seed(config['train']['seed'])
+    
     configure_logging(config['logging']['dir'])
     # Override config if command-line args are provided
     if args.resume_checkpoint:
@@ -333,38 +339,49 @@ def main():
     config['checkpoint']['step'] *= config['train']['gradient_accumulation_steps']
         
     logging.info(f"Config after command-line overrides: {config}")
-
-    
-    
-    # Set random seeds
-    random.seed(config['train']['seed'])
-    torch.manual_seed(config['train']['seed'])
-    np.random.seed(config['train']['seed'])
     
     # Initialize datasets and models
-    speech_loader, text_dataset, text_loader, vocab, prior = initialize_datasets(config)
+    train_speech_loader, text_dataset, text_loader, vocab, prior = initialize_datasets(config, split='train')
+    val_speech_loader, _, _, _, _ = initialize_datasets(config, split='val')
+    test_speech_loader, _, _, _, _ = initialize_datasets(config, split='test')
+    
+    speech_loader = [train_speech_loader, val_speech_loader, test_speech_loader]
+    
+    # Initialize models    
     models = setup_models(config, vocab)
     
+    
     # Training setup
-    models['encoder'].eval()
-    models['downsample'].train()
-    models['upsample'].train()
-    models['decoder'].train()
-    models['discriminator'].train()
     configure_training_mode(models, config)
+    
+    if config['eval']['eval']:
+        # Set models to evaluation mode
+        for m in models.values():
+                m.eval()
+    else: 
+        models['encoder'].eval()
+        models['downsample'].train()
+        models['upsample'].train()
+        models['decoder'].train()
+        models['discriminator'].train()
+        
     
     # Determine the device (GPU or CPU)
     device = torch.device(config.get("device"))
     for name in models:
         models[name].to(device)
 
-
     # Initialize optimizers and loss
     optimizers, schedulers = configure_optimizers(models, config)
     loss_module = Loss(config)
     
-    # Create checkpoint directory
-    os.makedirs(config['checkpoint']['dir'], exist_ok=True)
+    # root dir for saving 
+    save_dir = config['logging']['dir']
+    
+    # Main training loop
+    # Initialize TensorBoard writer
+    writer = SummaryWriter(log_dir=config['logging']['dir'])
+    
     
     # Resume training if checkpoint specified
     start_step = 1
@@ -378,11 +395,18 @@ def main():
         )
         start_step = checkpoint_info['step'] + 1
         logging.info(f"Resuming training from step {start_step}")
-
     
-    # Main training loop
-    # Initialize TensorBoard writer
-    writer = SummaryWriter(log_dir=config['logging']['dir'])
+    
+    if config['eval']['eval']:
+        eval(
+            models=models,
+            speech_loader=speech_loader[1],
+            loss_module=loss_module,
+            config=config,
+            device=device,
+        )
+        exit(0)
+        
     
     if config['train']['train_vqvae']:
         train_vqvae(
@@ -396,7 +420,8 @@ def main():
             config=config,
             device=device,
             writer=writer,
-            start_step=start_step  # Add this
+            start_step=start_step,  # Add this
+            save_dir=save_dir,
         )
     elif config['train']['train_disc']:
         train(
@@ -414,6 +439,8 @@ def main():
         )
 
     writer.close()
+
+
 
 if __name__ == "__main__":
     main()

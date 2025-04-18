@@ -28,7 +28,7 @@ class Conv1dBlock(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=1, dilation=1, stride=1):
         super().__init__()
         
-        # self.norm1 = nn.LayerNorm(in_channels)
+        self.norm1 = nn.LayerNorm(in_channels)
         self.conv = nn.Conv1d(
             in_channels, 
             out_channels, 
@@ -42,7 +42,7 @@ class Conv1dBlock(nn.Module):
 
     def forward(self, x, padding_mask=None):
         
-        # x = self.norm1(x)
+        x = self.norm1(x)
         # x is expected to be of shape (batch, time, channels)
         if padding_mask is not None:
             x = x.masked_fill(padding_mask.unsqueeze(-1), 0)
@@ -69,7 +69,6 @@ class Decoder(nn.Module):
                 config["transformer"]["decoder_hidden"], config["transformer"]["dac_hidden"],
                 )
             )
-        
     
     def forward(self, x, mask, s): # b,t,c # mask should be b,t and 1 for masked position and 0 for non-masked position # s is speaker embedding b,t',c
         
@@ -77,7 +76,7 @@ class Decoder(nn.Module):
         if self.use_s:
             s = self.speaker(s) # b,t,c
             s = torch.mean(s, dim=1, keepdim=True) # b,1,c
-            # concatenate speaker embedding with input at t dim
+            # Add speaker embedding with input at t dim
             x = x + s.expand(-1, x.size(1), -1) # b,t,c 
                        
         dec_output, mask = self.decoder(x, mask)

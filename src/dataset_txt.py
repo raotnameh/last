@@ -12,17 +12,11 @@ class Dataset_txt(Dataset):
     def __init__(self, data="/raid/home/rajivratn/hemant_rajivratn/last/data/transcription.txt"):
         super(Dataset_txt, self).__init__()
 
-        try: 
-            # reading dataset. 
-            with open(data, "r") as f:
-                out = f.readlines()
-            texts = [x.split("\t")[1].strip() for x in out]
-            texts = [x for x in texts if len(x) > 10 and len(x) < 500] # filtering out short texts that 2 second.
-        except:
-            with open(data, "r") as f:
-                out = f.readlines()
-            texts = [x.strip() for x in out if len(x) > 10 and len(x) < 500] # filtering out short texts that 2 second.
         
+        with open(data, "r") as f:
+            out = f.readlines()
+        texts = [x.strip() for x in out if len(x) > 10 and len(x) < 500] # filtering out short texts that 2 second.
+    
         # creating the vocab.
         self.vocab = self.build_vocab(texts)
         self.save_histogram(self.add_question_marks(texts))

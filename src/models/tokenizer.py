@@ -9,7 +9,7 @@ import seaborn as sns
 
 
 class Tokenizer(nn.Module):
-    def __init__(self, vocab, rot=True):
+    def __init__(self, config, vocab, rot=True):
         super(Tokenizer, self).__init__()
         '''
         Tokenizer module that tokenizes the speech encoder output by finding the closest codebook
@@ -18,6 +18,8 @@ class Tokenizer(nn.Module):
         self.vocab = vocab[1:] # remove the padding token
         self.step = 0
         self.rot = rot
+        self.save_dir = config['logging']['dir']
+        os.makedirs(f"{self.save_dir}/plots/", exist_ok=True)
     
     def codebook_usage(self, min_encodings, mask):
         
@@ -35,7 +37,7 @@ class Tokenizer(nn.Module):
         plt.savefig('codebook_usage_distribution.png', bbox_inches='tight')
         # for every 1000 steps save the plot 
         if self.step % 1000 == 0:
-            plt.savefig(os.path.join('plots', f'codebook_usage_distribution_{self.step}.png'), bbox_inches='tight')
+            plt.savefig(os.path.join(f'{self.save_dir}/plots', f'codebook_usage_distribution_{self.step}.png'), bbox_inches='tight')
             plt.close()
         self.step += 1
         

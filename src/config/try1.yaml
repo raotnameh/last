@@ -3,20 +3,27 @@ checkpoint:
   step: 5000
 
 logging: 
-  dir: "logs"
+  dir: "del"
   step: 100
 
 device: "cuda"
 
 dataset_speech:
-  # path: "/raid/home/rajivratn/hemant_rajivratn/librispeech/data/manifest/train-clean-100.tsv"
-  path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeechmanifest_train.tsv"
+  # train_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/train.tsv"
+  # val_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/val.tsv"
+  # test_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/test.tsv"
+
+  train_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/manifest/train.tsv"
+  val_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/manifest/val.tsv"
+  test_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/manifest/test.tsv"
+
   min_duration: 32000
   max_duration: 320000
   batch_size: &batch_size_value 16
 
+
 dataset_txt:
-  path: "/raid/home/rajivratn/hemant_rajivratn/last/data/transcription.txt"
+  path: "/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train.wrd"
   # path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech-lm-norm.txt"
   batch_size: *batch_size_value
 
@@ -66,13 +73,13 @@ train:
   train_full: False
 
   lr_enc: 0.00005
-  lr_down: 0.00005
+  lr_down: 0.0005
   lr_dec: 0.0005
   lr_disc: 0.0005
   grad_clip: 1.0
   
   num_steps: 50000
-  freeze_steps: 20000000
+  freeze_steps: 100000
   gradient_accumulation_steps: 1
   discriminator_freq: 2
 
@@ -91,3 +98,6 @@ loss:
 
 lr_scheduler:
   phase_ratio: [0.05, 0.05, 0.9]
+
+eval:
+  eval: True

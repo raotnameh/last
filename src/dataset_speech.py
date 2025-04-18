@@ -13,21 +13,19 @@ from tqdm import tqdm
 
 
 class Dataset_speech(Dataset):
-    def __init__(self, input_manifest, split = "train", min_duration=0, max_duration=float("inf"), CACHE_DIR="gtruth_cache"):
+    def __init__(self, input_manifest, min_duration=0, max_duration=float("inf")):
         super().__init__()
         
         paths = []
         min_dur, max_dur, tot_dur = float('inf'), 0, 0
         with open(input_manifest, "r") as infile:
-            root_dir = infile.readline().strip()  # First line is the root directory
             
             for line in infile:
-                file_name, duration = line.strip().split("\t")
+                path, duration, txt = line.strip().split("\t")
                 duration = int(duration)
                 
                 if min_duration <= duration <= max_duration:
-                    path = os.path.join(root_dir, file_name)
-                    paths.append([path, duration])  # None for gtruth features
+                    paths.append([path, duration, txt])  
                     
                     min_dur = min(min_dur, duration)
                     max_dur = max(max_dur, duration)
@@ -45,18 +43,17 @@ class Dataset_speech(Dataset):
         return len(self.paths)
     
     def __getitem__(self, idx):
-        path, duration = self.paths[idx]
+        path, duration, txt = self.paths[idx]
         
         waveform, sample_rate = sf.read(path)
         assert sample_rate == 16000, "Sampling rate must be 16000"
         waveform = torch.from_numpy(waveform).float()
         
-        return waveform, duration, path # (seq_len), (duration)
+        return waveform, duration, path, txt # (seq_len), (duration)
     
     # collate function to pad the waveforms to the same length wrt the maximum duration
     def collate_fn(self, batches):
         max_dur = max(batch[1] for batch in batches)
-        dur = [batch[1] / 16000.0 for batch in batches]
         
         waveforms = []
         padding_masks = []
@@ -71,8 +68,12 @@ class Dataset_speech(Dataset):
             
             waveforms.append(padded_waveform)
             padding_masks.append(padding_mask) # 1 for masked position and 0 for non-masked position
+        
+        dur = [batch[1] / 16000.0 for batch in batches] # convert to seconds
         paths = [batch[2] for batch in batches]
-        return torch.stack(waveforms), torch.stack(padding_masks), paths, dur # (batch_size, max_dur), (batch_size, max_dur), list of paths, (batch_size, max_dur, 1024)
+        txts = [batch[3] for batch in batches]
+        
+        return torch.stack(waveforms), torch.stack(padding_masks), dur,  paths, txts # (batch_size, max_dur), (batch_size, max_dur), list of paths, (batch_size, max_dur, 1024)
 
 
 if __name__ == "__main__":
