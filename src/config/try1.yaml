@@ -102,3 +102,21 @@ lr_scheduler:
 eval:
   # eval: True
   eval: False
+
+# Predicted CER: 0.7672, Real CER: 0.0404, Predicted WER: 1.0942, Real WER: 0.1425, STOI: 0.4142, rec_loss: 1.8403, commit_loss: 2.7035, smooth_loss: 0.1027
+# Predicted CER: 0.7346, Real CER: 0.0404, Predicted WER: 1.0532, Real WER: 0.1425, STOI: 0.4322, rec_loss: 1.8208, commit_loss: 2.7122, smooth_loss: 0.1358
+# Predicted CER: 0.6774, Real CER: 0.0404, Predicted WER: 0.9948, Real WER: 0.1425, STOI: 0.4248, rec_loss: 1.8354, commit_loss: 2.7194, smooth_loss: 0.1382
+# Predicted CER: 0.7243, Real CER: 0.0404, Predicted WER: 1.0285, Real WER: 0.1425, STOI: 0.4258, rec_loss: 1.8412, commit_loss: 2.7175, smooth_loss: 0.1409
+# Predicted CER: 0.7299, Real CER: 0.0404, Predicted WER: 1.0701, Real WER: 0.1425, STOI: 0.4146, rec_loss: 1.8549, commit_loss: 2.7244, smooth_loss: 0.1329
+# Predicted CER: 0.6801, Real CER: 0.0404, Predicted WER: 1.0085, Real WER: 0.1425, STOI: 0.4111, rec_loss: 1.8614, commit_loss: 2.7322, smooth_loss: 0.1246
+# Predicted CER: 0.7022, Real CER: 0.0404, Predicted WER: 0.9893, Real WER: 0.1425, STOI: 0.4016, rec_loss: 1.8743, commit_loss: 2.7269, smooth_loss: 0.1217
+# Predicted CER: 0.7309, Real CER: 0.0404, Predicted WER: 1.0609, Real WER: 0.1425, STOI: 0.3966, rec_loss: 1.8824, commit_loss: 2.7439, smooth_loss: 0.1081
+# Predicted CER: 0.7699, Real CER: 0.0404, Predicted WER: 1.0719, Real WER: 0.1425, STOI: 0.3919, rec_loss: 1.8913, commit_loss: 2.7524, smooth_loss: 0.1005
+# Predicted CER: 0.8177, Real CER: 0.0404, Predicted WER: 1.0806, Real WER: 0.1425, STOI: 0.3895, rec_loss: 1.9004, commit_loss: 2.7585, smooth_loss: 0.0941
+
+# Predicted CER: 0.6441, Real CER: 0.0404, Predicted WER: 0.9700, Real WER: 0.1425, STOI: 0.4771, rec_loss: 1.7719, commit_loss: 2.4581, smooth_loss: 0.7720
+# Predicted CER: 0.6179, Real CER: 0.0404, Predicted WER: 0.8817, Real WER: 0.1425, STOI: 0.4865, rec_loss: 1.7587, commit_loss: 2.4642, smooth_loss: 0.8170
+# Predicted CER: 0.5668, Real CER: 0.0404, Predicted WER: 0.8487, Real WER: 0.1425, STOI: 0.4879, rec_loss: 1.7549, commit_loss: 2.4671, smooth_loss: 0.8852
+# Predicted CER: 0.5139, Real CER: 0.0404, Predicted WER: 0.7975, Real WER: 0.1425, STOI: 0.4948, rec_loss: 1.7474, commit_loss: 2.4672, smooth_loss: 0.8967
+# Predicted CER: 0.4902, Real CER: 0.0404, Predicted WER: 0.7948, Real WER: 0.1425, STOI: 0.4930, rec_loss: 1.7451, commit_loss: 2.4708, smooth_loss: 0.8761
+# Predicted CER: 0.4671, Real CER: 0.0404, Predicted WER: 0.7518, Real WER: 0.1425, STOI: 0.5023, rec_loss: 1.7394, commit_loss: 2.4681, smooth_loss: 0.8886
