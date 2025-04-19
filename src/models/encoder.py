@@ -44,8 +44,7 @@ class Encoder(torch.nn.Module):
         w2v_args = {
             "source": source, # source: (B, T)
             "padding_mask": padding_mask, # padding_mask: (B, T), 
-            # "mask": True and self.training,
-            "mask": False,
+            "mask": True and self.training,
             "ret_conv": False,
         }
                       

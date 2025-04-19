@@ -357,11 +357,13 @@ def main():
     configure_training_mode(models, config)
     
     if config['eval']['eval']:
-        # Set models to evaluation mode
-        for m in models.values():
-                m.eval()
+        models['encoder'].model.eval()
+        models['downsample'].eval()
+        models['upsample'].eval()
+        models['decoder'].eval()
+        models['discriminator'].eval()
     else: 
-        models['encoder'].eval()
+        models['encoder'].model.eval()
         models['downsample'].train()
         models['upsample'].train()
         models['decoder'].train()

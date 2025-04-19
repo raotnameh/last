@@ -44,7 +44,7 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
         # ===== Generator Forward Pass =====
         # ===== Encoder =====
         if step >= freeze_steps:
-            models['encoder'].train() 
+            models['encoder'].model.train() 
         enc_out = models['encoder'](waveforms, padding_masks)  # [B, T, C] # step 1
         output["cnn_out"] = enc_out['cnn_out'] # [B, T // 320, C] 
         output['encoder_out'] = enc_out['encoder_out'] # [B, T // 320, C] 
@@ -98,7 +98,7 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
         gen_loss_components = loss_module.step_gen(output)        
         total_lossg = gen_loss_components['rec_loss']
         # total_lossg = total_lossg + gen_loss_components['commit_loss'] 
-        total_lossg = total_lossg + gen_loss_components['smooth_loss']
+        # total_lossg = total_lossg + gen_loss_components['smooth_loss']
             
         
         if step % config['logging']['step'] == 0:
