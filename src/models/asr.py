@@ -85,7 +85,7 @@ class WhisperWERCalculator:
 def compute_pesq(reference_waveforms, synthesized_waveforms):
     pesq_scores = []
 
-    for ref_waveform, synth_waveform in zip(reference_waveforms, synthesized_waveforms):
+    for ref_waveform, synth_waveform in tqdm(zip(reference_waveforms, synthesized_waveforms)):
         # Ensure the waveforms are numpy arrays and convert them to 1D
         ref_waveform = ref_waveform.squeeze().cpu().numpy()
         synth_waveform = synth_waveform.squeeze().cpu().numpy()
@@ -96,16 +96,16 @@ def compute_pesq(reference_waveforms, synthesized_waveforms):
         synth_waveform = synth_waveform[:min_len]
 
         # Compute PESQ score
-        pesq_score = pesq(ref_waveform, synth_waveform)  # fs=16000 for 16kHz
+        pesq_score = pesq(16000, ref_waveform, synth_waveform)  # fs=16000 for 16kHz
         pesq_scores.append(pesq_score)
 
-    return pesq_scores
+    return sum(pesq_scores) / len(pesq_scores) if pesq_scores else 0
 
 
 def compute_stoi(reference_waveforms, synthesized_waveforms, sample_rate=16000):
     stoi_scores = []
 
-    for ref_waveform, synth_waveform in zip(reference_waveforms, synthesized_waveforms):
+    for ref_waveform, synth_waveform in tqdm(zip(reference_waveforms, synthesized_waveforms)):
         # Ensure the waveforms are numpy arrays and convert them to 1D
         ref_waveform = ref_waveform.squeeze().cpu().numpy()
         synth_waveform = synth_waveform.squeeze().cpu().numpy()
@@ -119,4 +119,4 @@ def compute_stoi(reference_waveforms, synthesized_waveforms, sample_rate=16000):
         stoi_score = stoi(ref_waveform, synth_waveform, sample_rate)
         stoi_scores.append(stoi_score)
 
-    return stoi_scores
+    return sum(stoi_scores) / len(stoi_scores) if stoi_scores else 0

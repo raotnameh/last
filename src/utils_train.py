@@ -231,8 +231,8 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
             logging.info(f"Saved checkpoint to {checkpoint_path}")
             
             # Evaluation function
-            eval(models, val_speech_loader, loss_module, config, device, writer=writer, step=step)
-            logging.info("Evaluation done")
+            # eval(models, val_speech_loader, loss_module, config, device, writer=writer, step=step)
+            # logging.info("Evaluation done")
             
 
 def eval(models, speech_loader, loss_module, config, device, writer=None, step=0):
@@ -332,8 +332,8 @@ def eval(models, speech_loader, loss_module, config, device, writer=None, step=0
             f"Real CER: {cer_real:.4f}, "
             f"Predicted WER: {wer_pred:.4f}, "
             f"Real WER: {wer_real:.4f}, "
-            f"PESQ: {sum(pesq)/len(pesq):.4f}, "
-            f"STOI: {sum(stoi)/len(stoi):.4f}, "
+            f"PESQ: {pesq:.4f}, "
+            f"STOI: {stoi:.4f}, "
             f"rec_loss: {total_rec_loss:.4f}, "
             f"commit_loss: {total_commit_loss:.4f}, "
             f"smooth_loss: {total_smooth_loss:.4f}"
@@ -345,8 +345,8 @@ def eval(models, speech_loader, loss_module, config, device, writer=None, step=0
             writer.add_scalar('val_generator_loss/wer_pred', wer_pred, step)
             writer.add_scalar('val_generator_loss/wer_real', wer_real, step)
             
-            writer.add_scalar('val_generator_loss/pesq', sum(pesq)/len(pesq), step)
-            writer.add_scalar('val_generator_loss/stoi', sum(stoi)/len(stoi), step)
+            writer.add_scalar('val_generator_loss/pesq', pesq, step)
+            writer.add_scalar('val_generator_loss/stoi', stoi, step)
             
             writer.add_scalar('val_generator_loss/rec_loss', total_rec_loss, step)
             writer.add_scalar('val_generator_loss/commit_loss', total_commit_loss, step)
