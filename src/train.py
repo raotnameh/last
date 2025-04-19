@@ -46,6 +46,7 @@ def parse_args():
     parser.add_argument("-d", "--device", type=str, choices=["cpu", "cuda"], default=None, help="Device to run on (overrides config).")
     parser.add_argument("-l", "--log_dir", type=str, default=None, help="Directory for logs (overrides config).")
     parser.add_argument("-fp16", "--fp16", action="store_true", help="Use mixed precision training.")
+    parser.add_argument("-e", "--eval", action="store_true", help="Evaluate the model instead of training.")
     
     return parser.parse_args()
 
@@ -128,7 +129,7 @@ def initialize_datasets(config, split='train'):
         return speech_loader, text_dataset, text_loader, text_dataset.vocab, text_dataset.prior
 
     else:
-        return speech_loader, None, None, None, None
+        return speech_loader
 
 # step :- Prepare the codebook
 def setup_models(config, vocab):
@@ -328,6 +329,8 @@ def main():
         config['logging']['dir'] = args.log_dir
     if args.fp16:
         config['train']['mixed_precision'] = True
+    if args.eval:
+        config['eval']['eval'] = True
     
     config['train']['num_steps'] *= config['train']['gradient_accumulation_steps']
     config['train']['freeze_steps'] *= config['train']['gradient_accumulation_steps']
@@ -344,8 +347,8 @@ def main():
     
     # Initialize datasets and models
     train_speech_loader, text_dataset, text_loader, vocab, prior = initialize_datasets(config, split='train')
-    val_speech_loader, _, _, _, _ = initialize_datasets(config, split='val')
-    test_speech_loader, _, _, _, _ = initialize_datasets(config, split='test')
+    val_speech_loader = initialize_datasets(config, split='val')
+    test_speech_loader = initialize_datasets(config, split='test')
     
     speech_loader = [train_speech_loader, val_speech_loader, test_speech_loader]
     
@@ -368,7 +371,6 @@ def main():
         models['upsample'].train()
         models['decoder'].train()
         models['discriminator'].train()
-        
     
     # Determine the device (GPU or CPU)
     device = torch.device(config.get("device"))

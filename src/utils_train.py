@@ -18,6 +18,7 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
     
     num_steps = config['train']['num_steps']
     freeze_steps = config['train']['freeze_steps']
+    stoi = 0.0
 
     # Initialize iterators
     train_speech_loader = speech_loader[0]
@@ -219,21 +220,24 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
         
         # Checkpoint
         if step % config['checkpoint']['step'] == 0:
-            checkpoint_path = f"{save_dir}/{config['checkpoint']['dir']}/step_{step:06d}.pt"
-            torch.save({
-                'step': step,
-                'num_steps': num_steps,
-                'models': {k: v.state_dict() for k, v in models.items()},
-                'optimizers': {k: v.state_dict() for k, v in optimizers.items()},
-                'schedulers': {k: v.state_dict() for k, v in schedulers.items()},
-                'config': config
-            }, checkpoint_path)
-            logging.info(f"Saved checkpoint to {checkpoint_path}")
-            
             # Evaluation function
-            # eval(models, val_speech_loader, loss_module, config, device, writer=writer, step=step)
-            # logging.info("Evaluation done")
+            current_stoi = eval(models, val_speech_loader, loss_module, config, device, writer=writer, step=step)
+            logging.info("Evaluation done")
             
+            if current_stoi > stoi:
+                checkpoint_path = f"{save_dir}/{config['checkpoint']['dir']}/step_{step:06d}.pt"
+                torch.save({
+                    'step': step,
+                    'num_steps': num_steps,
+                    'models': {k: v.state_dict() for k, v in models.items()},
+                    'optimizers': {k: v.state_dict() for k, v in optimizers.items()},
+                    'schedulers': {k: v.state_dict() for k, v in schedulers.items()},
+                    'config': config
+                }, checkpoint_path)
+                logging.info(f"Saved checkpoint to {checkpoint_path}")
+            
+            stoi = max( current_stoi, stoi )
+        
 
 def eval(models, speech_loader, loss_module, config, device, writer=None, step=0):
     
@@ -318,7 +322,7 @@ def eval(models, speech_loader, loss_module, config, device, writer=None, step=0
         cer_pred, cer_real, wer_pred, wer_real, pred_hyps, real_hyps = WERCalculator.compute_wer(all_pr, all_gt, all_txt)
         
         # Get PESQ
-        pesq = compute_pesq(all_gt, all_pr)
+        # pesq = compute_pesq(all_gt, all_pr)
         
         # Get STOI
         stoi = compute_stoi(all_gt, all_pr)
@@ -332,7 +336,7 @@ def eval(models, speech_loader, loss_module, config, device, writer=None, step=0
             f"Real CER: {cer_real:.4f}, "
             f"Predicted WER: {wer_pred:.4f}, "
             f"Real WER: {wer_real:.4f}, "
-            f"PESQ: {pesq:.4f}, "
+            # f"PESQ: {pesq:.4f}, "
             f"STOI: {stoi:.4f}, "
             f"rec_loss: {total_rec_loss:.4f}, "
             f"commit_loss: {total_commit_loss:.4f}, "
@@ -345,7 +349,7 @@ def eval(models, speech_loader, loss_module, config, device, writer=None, step=0
             writer.add_scalar('val_generator_loss/wer_pred', wer_pred, step)
             writer.add_scalar('val_generator_loss/wer_real', wer_real, step)
             
-            writer.add_scalar('val_generator_loss/pesq', pesq, step)
+            # writer.add_scalar('val_generator_loss/pesq', pesq, step)
             writer.add_scalar('val_generator_loss/stoi', stoi, step)
             
             writer.add_scalar('val_generator_loss/rec_loss', total_rec_loss, step)
@@ -353,7 +357,7 @@ def eval(models, speech_loader, loss_module, config, device, writer=None, step=0
             writer.add_scalar('val_generator_loss/smooth_loss', total_smooth_loss, step)
 
 
-
+        return stoi
 
 
 

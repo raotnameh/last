@@ -100,5 +100,5 @@ lr_scheduler:
   phase_ratio: [0.05, 0.05, 0.9]
 
 eval:
-  eval: True
-  # eval: False
+  # eval: True
+  eval: False
