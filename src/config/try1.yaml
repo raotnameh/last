@@ -3,7 +3,7 @@ checkpoint:
   step: 5000
 
 logging: 
-  dir: "del"
+  dir: "/raid/home/rajivratn/hemant_rajivratn/last/del"
   step: 100
 
 device: "cuda"

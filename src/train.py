@@ -318,7 +318,6 @@ def main():
     torch.manual_seed(config['train']['seed'])
     np.random.seed(config['train']['seed'])
     
-    configure_logging(config['logging']['dir'])
     # Override config if command-line args are provided
     if args.resume_checkpoint:
         config['train']['resume_checkpoint'] = True
@@ -329,16 +328,19 @@ def main():
         config['logging']['dir'] = args.log_dir
     if args.fp16:
         config['train']['mixed_precision'] = True
-        
-        
-    logging.info(f"Loaded config from {args.config}")
-    logging.info(f"Command-line args: {args}")   
     
     config['train']['num_steps'] *= config['train']['gradient_accumulation_steps']
     config['train']['freeze_steps'] *= config['train']['gradient_accumulation_steps']
     config['checkpoint']['step'] *= config['train']['gradient_accumulation_steps']
+         
         
+    logging.info(f"Loaded config from {args.config}")
+    logging.info(f"Command-line args: {args}")   
     logging.info(f"Config after command-line overrides: {config}")
+    
+    # Configure logging
+    configure_logging(config['logging']['dir'])
+    
     
     # Initialize datasets and models
     train_speech_loader, text_dataset, text_loader, vocab, prior = initialize_datasets(config, split='train')
