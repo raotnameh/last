@@ -430,7 +430,7 @@ def main():
             save_dir=save_dir,
         )
     elif config['train']['train_disc']:
-        train(
+        train_disc(
             models=models,
             optimizers=optimizers,
             schedulers=schedulers,
@@ -441,7 +441,8 @@ def main():
             config=config,
             device=device,
             writer=writer,
-            start_step=start_step  # Add this
+            start_step=start_step,  # Add this
+            save_dir=save_dir,
         )
 
     writer.close()

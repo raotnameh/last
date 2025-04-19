@@ -150,7 +150,6 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
                 l = [t for t in spec_tokens_repeated]
                 mel_spectrogram = mel_spectrogram[:,:len(l)]
                 
-                print(mel_spectrogram.shape, len(spec_tokens_repeated   ))
                 plt.figure(figsize=(20, 6))
                 plt.imshow(mel_spectrogram.log2().numpy(), aspect="auto", origin="lower", cmap="magma")
 
@@ -409,6 +408,7 @@ def train_disc(models, optimizers, schedulers, speech_loader, text_dataset, text
     test_speech_loader = speech_loader[2]
     
     train_speech_iter = iter(train_speech_loader)
+    text_iter = iter(text_loader)
     
     for optimizer in optimizers.values():
         optimizer.zero_grad()
@@ -480,52 +480,11 @@ def train_disc(models, optimizers, schedulers, speech_loader, text_dataset, text
         # ===== Discriminator Generator Update =====
         disc_fake = models['discriminator'](z_q_disc, z_q_disc_mask)
         output['disc_fake'] = disc_fake
-        
-        # ===== Discriminator Forward Pass =====
-        if step % config['train']['discriminator_freq'] == 0:
-            doutput = {}
-            
-            disc_fake = models['discriminator'](z_q_disc.detach(), z_q_disc_mask)
-            doutput['disc_fake'] = disc_fake
-            doutput["disc_fake_x"] = z_q_disc
-        
-            try:
-                text, tmask = next(text_iter)
-            except StopIteration:
-                text_iter = iter(text_loader)
-                text, tmask = next(text_iter)
-            text = text.to(device)
-            tmask = tmask.to(device)
-            
-            
-            text_emb = models['codebook'](text)
-            disc_real = models['discriminator'](text_emb, tmask.unsqueeze(-1))
-            doutput['disc_real'] = disc_real
-            doutput['disc_real_x'] = text_emb
-
-            loss_module.gan_loss.discriminator = models['discriminator']
-            disc_loss_components = loss_module.step_disc(doutput)
-            total_lossd = disc_loss_components['total_loss']
-            
-            if step % config['logging']['step'] == 0:  
-                logging.info(
-                f"DISC-LOSS---step/total: {step}/{num_steps} "
-                f"real_loss: {disc_loss_components['loss_real']:.4f}, "
-                f"fake_loss: {disc_loss_components['loss_fake']:.4f}, "
-                f"gp_loss: {disc_loss_components['grad_pen']:.4f}, "
-                f"total_loss: {disc_loss_components['total_loss']:.4f}"
-                )                    
-                writer.add_scalar('Discriminator_loss/discriminator_total_loss', total_lossd, step)
-                writer.add_scalar('Discriminator_loss/discriminator_real_loss', disc_loss_components['loss_real'], step)
-                writer.add_scalar('Discriminator_loss/discriminator_fake_loss', disc_loss_components['loss_fake'], step)
-                writer.add_scalar('Discriminator_loss/discriminator_gp_loss', disc_loss_components['grad_pen'], step)
-
 
         # Loss calculation
         gen_loss_components = loss_module.step_gen(output)        
         total_lossg = gen_loss_components['rec_loss']
-        if output['disc_fake'] is not None:
-            total_lossg = total_lossg + gen_loss_components['gen_loss']
+        total_lossg = total_lossg + gen_loss_components['gen_loss']
         
         if step % config['logging']['step'] == 0:
             logging.info(f"Generator encoded text path: --{paths[0]}-- of length {dur[0]} seconds--")
@@ -575,7 +534,6 @@ def train_disc(models, optimizers, schedulers, speech_loader, text_dataset, text
                 l = [t for t in spec_tokens_repeated]
                 mel_spectrogram = mel_spectrogram[:,:len(l)]
                 
-                print(mel_spectrogram.shape, len(spec_tokens_repeated   ))
                 plt.figure(figsize=(20, 6))
                 plt.imshow(mel_spectrogram.log2().numpy(), aspect="auto", origin="lower", cmap="magma")
 
@@ -594,7 +552,7 @@ def train_disc(models, optimizers, schedulers, speech_loader, text_dataset, text
                 
             
             logging.info(
-            f"VQ-VAE-LOSS---step/total: {step}/{num_steps} "
+            f"GEN-LOSS---step/total: {step}/{num_steps} "
             f"rec_loss: {gen_loss_components['rec_loss']:.4f}, "
             f"commit_loss: {gen_loss_components['commit_loss']:.4f}, "
             f"smooth_loss: {gen_loss_components['smooth_loss']:.4f}, "
@@ -613,14 +571,53 @@ def train_disc(models, optimizers, schedulers, speech_loader, text_dataset, text
             writer.add_scalar('learning_rate/downsample', schedulers['down'].get_last_lr()[0], step)
             writer.add_scalar('learning_rate/decoder', schedulers['dec'].get_last_lr()[0], step)
             writer.add_scalar('learning_rate/discriminator', schedulers['disc'].get_last_lr()[0], step)
-            
-        # Backpropagation    
         
+        
+        # ===== Discriminator Forward Pass =====
         if step % config['train']['discriminator_freq'] == 0:
-            total_lossg += total_lossd
+            doutput = {}
             
-        total_lossg /= config['train']['gradient_accumulation_steps']
+            disc_fake = models['discriminator'](z_q_disc.detach(), z_q_disc_mask)
+            doutput['disc_fake'] = disc_fake
+            doutput["disc_fake_x"] = z_q_disc
         
+            try:
+                text, tmask = next(text_iter)
+            except StopIteration:
+                text_iter = iter(text_loader)
+                text, tmask = next(text_iter)
+            text = text.to(device)
+            tmask = tmask.to(device)
+            
+            
+            text_emb = models['codebook'](text)
+            disc_real = models['discriminator'](text_emb, tmask.unsqueeze(-1))
+            doutput['disc_real'] = disc_real
+            doutput['disc_real_x'] = text_emb
+
+            loss_module.gan_loss.discriminator = models['discriminator']
+            disc_loss_components = loss_module.step_disc(doutput)
+            total_lossd = disc_loss_components['total_loss']
+            
+            if step % config['logging']['step'] == 0:  
+                logging.info(
+                f"DISC-LOSS---step/total: {step}/{num_steps} "
+                f"real_loss: {disc_loss_components['loss_real']:.4f}, "
+                f"fake_loss: {disc_loss_components['loss_fake']:.4f}, "
+                f"gp_loss: {disc_loss_components['grad_pen']:.4f}, "
+                f"total_loss: {disc_loss_components['total_loss']:.4f}"
+                )                    
+                writer.add_scalar('Discriminator_loss/discriminator_total_loss', total_lossd, step)
+                writer.add_scalar('Discriminator_loss/discriminator_real_loss', disc_loss_components['loss_real'], step)
+                writer.add_scalar('Discriminator_loss/discriminator_fake_loss', disc_loss_components['loss_fake'], step)
+                writer.add_scalar('Discriminator_loss/discriminator_gp_loss', disc_loss_components['grad_pen'], step)
+
+            # update the total loss
+            total_lossg = total_lossg + total_lossd
+        
+            
+        # Backpropagation
+        total_lossg /= config['train']['gradient_accumulation_steps']
         total_lossg.backward()
 
         if step % config['train']['gradient_accumulation_steps'] == 0:
@@ -671,6 +668,44 @@ def train_disc(models, optimizers, schedulers, speech_loader, text_dataset, text
             
             stoi = max( current_stoi, stoi )
         
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

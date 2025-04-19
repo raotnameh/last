@@ -3,7 +3,7 @@ checkpoint:
   step: 5000
 
 logging: 
-  dir: "/raid/home/rajivratn/hemant_rajivratn/last/src/logs_5e-4_all"
+  dir: "/raid/home/rajivratn/hemant_rajivratn/last/src/logs_5e-4_disc"
   step: 100
 
 device: "cuda"
@@ -48,7 +48,7 @@ upsample:
 
 discriminator:
   hidden_dim: 256
-  num_layers: 2
+  num_layers: 1
 
 
 decoder:
@@ -68,8 +68,8 @@ decoder:
 
 train:
   seed: 42121
-  train_vqvae: True
-  train_disc: False
+  train_vqvae: False
+  train_disc: True
   train_full: False
 
   lr_enc: 0.00005
