@@ -426,9 +426,10 @@ def train_disc(models, optimizers, schedulers, speech_loader, text_dataset, text
     
         # ===== Generator Forward Pass =====
         # ===== Encoder =====
-        if step >= freeze_steps:
-            models['encoder'].model.train() 
-        enc_out = models['encoder'](waveforms, padding_masks)  # [B, T, C] # step 1
+        with torch.no_grad():
+            if step >= freeze_steps:
+                models['encoder'].model.train() 
+            enc_out = models['encoder'](waveforms, padding_masks)  # [B, T, C] # step 1
         output["cnn_out"] = enc_out['cnn_out'] # [B, T // 320, C] 
         output['encoder_out'] = enc_out['encoder_out'] # [B, T // 320, C] 
         

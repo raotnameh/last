@@ -30,11 +30,9 @@ class Codebook(nn.Module):
                 embedding.weight.data[i] = model.embed_tokens(torch.tensor(tok)).detach().clone()
             else:
                 embedding.weight.data[i] *= 0.0 # padding token embedding is zero
-                
         
         # Normalize the embedding matrix
-        embedding.weight.data = F.normalize(embedding.weight.data, p=2, dim=1)
-        
+        embedding.weight.data = F.normalize(embedding.weight.data, p=2, dim=-1)
         
         self.embedding = embedding
         # print the mean, std, min, max of the embedding matrix beautifully for each character
@@ -51,10 +49,10 @@ class Codebook(nn.Module):
         # Remove the model and tokenizer
         del model
         del tokenizer
-
+        
+    @torch.no_grad()
     def forward(self, x): # x: (b,t) tensor
-        with torch.no_grad():
-            return self.embedding(x) # (b,t,c)
+        return self.embedding(x) # (b,t,c)
 
 
 if __name__ == "__main__":

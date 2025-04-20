@@ -46,8 +46,8 @@ class Tokenizer(nn.Module):
     @staticmethod
     def get_very_efficient_rotation(u, q, e):
         w = ((u + q) / torch.norm(u + q, dim=1, keepdim=True)).detach()
-        e = e - 2 * torch.bmm(torch.bmm(e, w.unsqueeze(-1)), w.unsqueeze(1)) \
-            + 2 * torch.bmm(torch.bmm(e, u.unsqueeze(-1).detach()), q.unsqueeze(1).detach())
+        e = e - 2 * torch.bmm(torch.bmm(e, w.unsqueeze(-1)), w.unsqueeze(1)) + 2 * torch.bmm(
+        torch.bmm(e, u.unsqueeze(-1).detach()), q.unsqueeze(1).detach())
         return e
         
     def forward(self, z, codebook, mask):
@@ -55,69 +55,53 @@ class Tokenizer(nn.Module):
         z (torch.Tensor): b,t,c
         codebook (nn.Module): A module with a weight attribute of shape (vocab_size, embed_dim).
         mask (torch.Tensor): Mask of shape (batch, time, 1) with 1s for valid positions and 0s for padding.
-        """
-        x = z
-    
-        # Using fixed codebook embeddings
+        """  
+        
+        # 1. Prepare codebook embeddings (detach to avoid training update)
         e = codebook.embedding.weight.clone().detach() # (vocab_size+1, embed_dim) 
         e = e[1:,:] # remove the padding embedding from the codebook # (vocab_size, embed_dim)       
- 
-        z_flattened = z.contiguous().view(-1, e.shape[1]) # (batch * time, channels==embed_dim)
-        # # distances from z to codebooks e_j ∥z−e∥**2 =∥z∥**2 +∥e∥**2 −2(z⋅e)
-        # d = (torch.sum(z_flattened**2, dim=1, keepdim=True) + torch.sum(e**2, dim=1) - 2 * torch.matmul(z_flattened, e.t())) # (batch*time, vocab_size)
-        
-        # cosine_similarity = z · e  (ranges in [-1, 1])
-        cos_sim = torch.matmul(z_flattened, e.t())  # (batch*time, vocab_size)
-        # Convert the similarity to a distance: lower distance means better match.# Here, distance = 1 - cosine_similarity.
-        d = 1.0 - cos_sim  # (batch*time, vocab_size)
-
-        # find closest encodings
-        min_encoding_indices = torch.argmin(d, dim=1).unsqueeze(1) # (batch*time, 1) This has 0 to vocab_size-1 except for padding token which was 0.
+        # 2. Flatten z for distance computation: (b*t, c)
+        b, t, c = z.shape
+        z_flat = z.contiguous().view(-1, c) # (batch * time, channels==embed_dim)
+  
+        # 3. Cosine similarity (dot product) and distance
+        cos_sim = torch.matmul(z_flat, e.t())  # (batch*time, vocab_size)
+        d = 1.0 - cos_sim  # (batch*time, vocab_size)        
+        # 4. Nearest neighbor lookup
+        min_encoding_indices = torch.argmin(d, dim=1).unsqueeze(1) # (batch*time, 1)
         min_encodings = torch.zeros(min_encoding_indices.shape[0], e.shape[0], device=z.device) # (batch*time, vocab_size) 
         min_encodings.scatter_(1, min_encoding_indices, 1) # (batch*time, vocab_size)
         
         # codebook usage Distribution
         self.codebook_usage(min_encodings, mask.contiguous().view(-1, 1))
+
+        # 5. Quantized latents via direct indexing
+        z_q = torch.matmul(min_encodings, e).view(z.shape) # (batch, time, channels) 
         
-        z_q = torch.matmul(min_encodings, e).view(z.shape) # (batch, time, channels) # get tokenized latent vectors
-        
-        # commitment loss
-        ################ no need to detach z_q if e is not trainable
-        commitment_loss = F.mse_loss(z, z_q.detach(), reduction='none') * mask # (batch, time, channels) # MSE loss between z and z_q ignoring padding positions
-        valid_count = mask.sum() # * z.shape[-1] # Total number of valid (non-masked) elements
-        commitment_loss = commitment_loss.sum() / valid_count 
-        commitment_loss = commitment_loss.detach() # detach the loss to avoid backpropagation through the codebook
-        
-        # preserve gradients
-        z_q = z + (z_q - z).detach() # btc
-        d_z_q = z_q.clone() * mask
-        
-        # If using the rotation trick for audio data.
         if self.rot:
-            b, t, c = x.shape # z_q same shape
-
-            # Flatten (b, t, c) -> (b * t, c)
-            x = z_flattened
+            # 6. Apply rotation trick
+            x = z_flat
             z_q = z_q.contiguous().view(-1, c)
-
-            pre_norm_q = self.get_very_efficient_rotation(x / (torch.norm(x, dim=1, keepdim=True) + 1e-6), z_q, x.unsqueeze(1)).squeeze()
-
-            # Reapply scale
-            z_q = pre_norm_q * ( z_q / (torch.norm(x, dim=1, keepdim=True) + 1e-6) ).detach()
-
-            # Reshape back to (b, t, c)
-            z_q = z_q.view(b, t, c)
+            pre_norm_q = self.get_very_efficient_rotation(x, z_q, x.unsqueeze(1)).squeeze() # (b * t, c)
+            z_q = pre_norm_q.contiguous().view(b, t, c) # Reshape back to (b, t, c)
+        else:
+            # 7. Straight-through estimator and mask padding
+            z_q = z + (z_q - z).detach() # btc     
+            
+        z_q = z_q * mask
         
-        z_q = z_q * mask 
-
-        # Smoothness loss
+        # 8. commitment loss
+        commitment_loss = F.mse_loss(z, z_q.detach(), reduction='none') * mask # (batch, time, channels) # MSE loss between z and z_q ignoring padding positions
+        valid_count = mask.sum() * z.shape[-1] # Total number of valid (non-masked) elements
+        commitment_loss = commitment_loss.sum() / valid_count 
+        
+        # 9. Smoothness loss
         smoothness_loss = F.mse_loss(z[:, :-1, :], z[:, 1:, :], reduction='none') * mask[:, 1:, :] # (batch, time-1, channels)
         smoothness_loss = smoothness_loss.sum() / valid_count # average over valid positions
-        smoothness_loss = smoothness_loss.detach() # detach the loss to avoid backpropagation through the codebook
         
-        ##### Discriminator codebooks without repeated indices #####
+        # 10. Discriminator codebooks without repeated indices #####
         encodings = min_encoding_indices.view(z.shape[0], z.shape[1]) # ( batch, time ) # (B, T)
-        n_z_q, n_mask, selected_encodings_list, selected_encodings_repeated_list = self.remove_consecutive_repeated_indices( encodings, mask.squeeze(-1), d_z_q.clone()) # randomly pick one index from each group of consecutive repeating elements # shape (B,T) and also returns the mask 
+        n_z_q, n_mask, selected_encodings_list, selected_encodings_repeated_list = self.remove_consecutive_repeated_indices( encodings, mask.squeeze(-1), z_q.clone()) # randomly pick one index from each group of consecutive repeating elements # shape (B,T) and also returns the mask 
 
         return smoothness_loss, commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list, selected_encodings_repeated_list # commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list<
 

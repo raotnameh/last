@@ -18,14 +18,11 @@ class Conv1dBlock(nn.Module):
         )
         self.norm = nn.LayerNorm(out_channels)
         self.activation = nn.GELU()
-        self.dropout = nn.Dropout(0.1)
+        self.dropout = nn.Dropout(0.2)
 
     def forward(self, x, padding_mask=None):
         
-        if padding_mask is not None:
-            # Apply padding mask
-            x = x.masked_fill(padding_mask, 0)
-            
+        
         # x: (batch, time, channels)
         x = x.transpose(1, 2)
         # Apply causal (left) padding: (padding_left, padding_right)
@@ -36,16 +33,19 @@ class Conv1dBlock(nn.Module):
         x = self.norm(x)
         x = self.activation(x)
         x = self.dropout(x)
-
+        
+        x = x.masked_fill(padding_mask, 0)
         return x  
 
 class Discriminator(nn.Module):
     def __init__(self, in_channels=256, hidden_dim=256, num_layers=4):
         super().__init__()
         
-        self.pre = Conv1dBlock(in_channels, hidden_dim, kernel_size=1)
-        
+    
         self.layers = nn.ModuleList()
+        self.layers.append(
+            Conv1dBlock(in_channels, hidden_dim, kernel_size=1)
+        )
         for i in range(num_layers):
             self.layers.append(Conv1dBlock(hidden_dim, hidden_dim, kernel_size=11))
         
@@ -56,13 +56,11 @@ class Discriminator(nn.Module):
         x: (batch, time, channels)
         padding_mask: (batch, time, 1) where True indicates a padded timestep.
         """
+        x = x.masked_fill(padding_mask, 0)
         
-        x = self.pre(x, padding_mask)  # (batch, time, hidden_dim)
-    
         for layer in self.layers:
             x = x + layer(x, padding_mask)
         
-        x = x.masked_fill(padding_mask, 0)  # Apply padding mask
         # Compute mean pooling over valid timesteps
         valid_counts = (~padding_mask).sum(dim=1).float() # (batch, channels)
         x_mean = x.sum(dim=1) / valid_counts  # (batch, channels)
