@@ -58,24 +58,23 @@ class Encoder(torch.nn.Module):
         
 
 class Downsample(torch.nn.Module):
-    def __init__(self, input_dim=768, output_dim=256, kernel_size=9, stride=2, groups=1, vocab_size=256):
+    def __init__(self, input_dim=768, output_dim=256, kernel_size=9, stride=2, groups=1):
         super().__init__()
-        
-        self.norm1 = torch.nn.LayerNorm(input_dim)
+    
+        self.norm = torch.nn.LayerNorm(input_dim)
         
         padding = kernel_size // 2
-        self.conv = weight_norm( torch.nn.Conv1d(input_dim, output_dim, kernel_size=kernel_size, stride=stride, padding=padding, groups = groups, bias=False) )
+        self.conv = torch.nn.Conv1d(input_dim, output_dim, kernel_size=kernel_size, stride=stride, padding=padding, groups = groups)
  
     def forward(self, x, mask): # B x T x C
         
         x = x * mask
-        x = self.norm1(x)
+        x = self.norm(x)
         
-        x = x.transpose(1, 2)        
+        x = x.transpose(1, 2)
         x = self.conv(x)
         x = x.transpose(1, 2)
         
-        x = F.normalize(x, p=2,dim=2)
-        
+        x = F.normalize(x, p=2,dim=-1)
                 
         return x # B x T x C 

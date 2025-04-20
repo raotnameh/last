@@ -4,7 +4,7 @@ checkpoint:
 
 logging: 
   dir: "/raid/home/rajivratn/hemant_rajivratn/last/src/logs_5e-4_disc"
-  step: 100
+  step: 10
 
 device: "cuda"
 
@@ -19,7 +19,7 @@ dataset_speech:
 
   min_duration: 32000
   max_duration: 320000
-  batch_size: &batch_size_value 16
+  batch_size: &batch_size_value 8
 
 
 dataset_txt:
@@ -37,9 +37,9 @@ encoder:
   frozen_layers: ["11"]
 
 downsample:
-  kernel_size: &kernel_size_value 51
+  kernel_size: &kernel_size_value 11
   stride: &stride_value 2
-  groups: &groups_value 256
+  groups: &groups_value 16
 
 upsample:
   kernel_size: *kernel_size_value
@@ -49,7 +49,6 @@ upsample:
 discriminator:
   hidden_dim: 256
   num_layers: 1
-
 
 decoder:
   speaker:
@@ -72,11 +71,11 @@ train:
   train_disc: True
   train_full: False
 
-  lr_enc: 0.00005
+  lr_enc: 0.0001
   lr_down: 0.0005
   lr_dec: 0.0005
   lr_disc: 0.0005
-  grad_clip: 1.0
+  grad_clip: 10.0
   
   num_steps: 50000
   freeze_steps: 100000
@@ -101,6 +100,7 @@ lr_scheduler:
 
 eval:
   # eval: True
+
   eval: False
 
 # Predicted CER: 0.7672, Real CER: 0.0404, Predicted WER: 1.0942, Real WER: 0.1425, STOI: 0.4142, rec_loss: 1.8403, commit_loss: 2.7035, smooth_loss: 0.1027
@@ -120,3 +120,7 @@ eval:
 # Predicted CER: 0.5139, Real CER: 0.0404, Predicted WER: 0.7975, Real WER: 0.1425, STOI: 0.4948, rec_loss: 1.7474, commit_loss: 2.4672, smooth_loss: 0.8967
 # Predicted CER: 0.4902, Real CER: 0.0404, Predicted WER: 0.7948, Real WER: 0.1425, STOI: 0.4930, rec_loss: 1.7451, commit_loss: 2.4708, smooth_loss: 0.8761
 # Predicted CER: 0.4671, Real CER: 0.0404, Predicted WER: 0.7518, Real WER: 0.1425, STOI: 0.5023, rec_loss: 1.7394, commit_loss: 2.4681, smooth_loss: 0.8886
+# Predicted CER: 0.4890, Real CER: 0.0404, Predicted WER: 0.7688, Real WER: 0.1425, STOI: 0.4951, rec_loss: 1.7414, commit_loss: 2.4667, smooth_loss: 0.8900
+# Predicted CER: 0.4759, Real CER: 0.0404, Predicted WER: 0.7523, Real WER: 0.1425, STOI: 0.4971, rec_loss: 1.7376, commit_loss: 2.4661, smooth_loss: 0.8888
+# Predicted CER: 0.4445, Real CER: 0.0404, Predicted WER: 0.7286, Real WER: 0.1425, STOI: 0.5032, rec_loss: 1.7347, commit_loss: 2.4671, smooth_loss: 0.8811
+#  Predicted CER: 0.4570, Real CER: 0.0404, Predicted WER: 0.7453, Real WER: 0.1425, STOI: 0.4980, rec_loss: 1.7386, commit_loss: 2.4683, smooth_loss: 0.8758

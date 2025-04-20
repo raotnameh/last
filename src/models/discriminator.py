@@ -1,16 +1,12 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import math
-
-
 
 class Conv1dBlock(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, dilation=1, stride=1, groups=1):
         super().__init__()
         
         self.causal_padding = (kernel_size - 1) * dilation
-        self.layernorm = nn.LayerNorm(in_channels)  # Normalize over channel dim
         self.conv = nn.Conv1d(
             in_channels, 
             out_channels, 
@@ -20,103 +16,39 @@ class Conv1dBlock(nn.Module):
             padding=0,
             groups=groups,
         )
-        
+        self.norm = nn.LayerNorm(out_channels)
+        self.activation = nn.GELU()
+        self.dropout = nn.Dropout(0.1)
 
     def forward(self, x, padding_mask=None):
         
-        # x is expected to be of shape (batch, time, channels)
         if padding_mask is not None:
+            # Apply padding mask
             x = x.masked_fill(padding_mask, 0)
-        
-        x = self.layernorm(x)
-        
+            
+        # x: (batch, time, channels)
         x = x.transpose(1, 2)
         # Apply causal (left) padding: (padding_left, padding_right)
         x = F.pad(x, (self.causal_padding, 0))
         x = self.conv(x)
         x = x.transpose(1, 2)
         
+        x = self.norm(x)
+        x = self.activation(x)
+        x = self.dropout(x)
+
         return x  
-
-class SinusoidalPositionalEncoding(nn.Module):
-    def __init__(self, d_model, max_len=1024):
-        super().__init__()
-
-        # Create matrix of shape (max_len, d_model)
-        pe = torch.zeros(max_len, d_model)
-        position = torch.arange(0, max_len, dtype=torch.float32).unsqueeze(1)  # (max_len, 1)
-        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))  # (d_model//2)
-
-        pe[:, 0::2] = torch.sin(position * div_term)  # even indices
-        pe[:, 1::2] = torch.cos(position * div_term)  # odd indices
-
-        pe = pe.unsqueeze(0)  # (1, max_len, d_model)
-        self.register_buffer('pe', pe)  # register as buffer (not a parameter)
-
-    def forward(self, x):
-        """
-        Args:
-            x: Tensor of shape (batch, seq_len, d_model)
-        Returns:
-            Tensor of shape (batch, seq_len, d_model) with positional encoding added
-        """
-        return x + self.pe[:, :x.size(1)]
-    
-class CausalTransformer(nn.Module):
-    def __init__(self, d_model, nhead, num_layers=2, dim_feedforward=1024, dropout=0.1):
-        super().__init__()
-        
-        self.pos_enc = SinusoidalPositionalEncoding(d_model, max_len=2048)
-        self.layers = nn.ModuleList([
-            nn.TransformerEncoderLayer(
-                d_model=d_model,
-                nhead=nhead,
-                dim_feedforward=dim_feedforward,
-                dropout=dropout,
-                batch_first=True,
-            )
-            for _ in range(num_layers)
-        ])
-        
-
-    def forward(self, x, padding_mask=None):
-        """
-        x: (batch, seq_len, d_model)
-        padding_mask: (batch, seq_len) - True for padding tokens
-        """
-        bsz, seq_len, _ = x.size()
-        device = x.device
-
-        # Add sinusoidal positional encoding
-        x = self.pos_enc(x)
-
-        # Causal mask: prevent attending to future positions
-        causal_mask = torch.triu(torch.ones(seq_len, seq_len, device=device), diagonal=1).bool()
-
-        for layer in self.layers:
-            x = layer(
-                src=x,
-                src_mask=causal_mask,
-                src_key_padding_mask=padding_mask
-            )
-
-        return x 
-
 
 class Discriminator(nn.Module):
     def __init__(self, in_channels=256, hidden_dim=256, num_layers=4):
         super().__init__()
-
-        torch.backends.cuda.enable_flash_sdp(False)
-        torch.backends.cuda.enable_mem_efficient_sdp(False)
-        torch.backends.cuda.enable_math_sdp(True)
         
-        # self.norm1 = nn.LayerNorm(in_channels)  # Normalize over channel dim
         self.pre = Conv1dBlock(in_channels, hidden_dim, kernel_size=1)
-        self.norm2 = nn.LayerNorm(hidden_dim)  # Normalize over channel dim
         
+        self.layers = nn.ModuleList()
+        for i in range(num_layers):
+            self.layers.append(Conv1dBlock(hidden_dim, hidden_dim, kernel_size=11))
         
-        self.decoder = CausalTransformer(d_model=hidden_dim, nhead=8, num_layers=num_layers, dim_feedforward=hidden_dim*4, dropout=0.1)
         self.proj = nn.Linear(hidden_dim, 1)
         
     def forward(self, x, padding_mask=None):
@@ -125,21 +57,19 @@ class Discriminator(nn.Module):
         padding_mask: (batch, time, 1) where True indicates a padded timestep.
         """
         
-        # x = self.norm1(x)
-        x = self.pre(x, padding_mask) 
-        x = self.norm2(x)
-
-        x = self.decoder(x, padding_mask.squeeze(-1))  # (batch, time, hidden_dim), (batch, time)
+        x = self.pre(x, padding_mask)  # (batch, time, hidden_dim)
+    
+        for layer in self.layers:
+            x = x + layer(x, padding_mask)
         
-        x = x.masked_fill(padding_mask, 0)
+        x = x.masked_fill(padding_mask, 0)  # Apply padding mask
         # Compute mean pooling over valid timesteps
-        valid_counts = (~padding_mask).sum(dim=1).clamp(min=1).float() # (batch, channels)
+        valid_counts = (~padding_mask).sum(dim=1).float() # (batch, channels)
         x_mean = x.sum(dim=1) / valid_counts  # (batch, channels)
-        x_mean = x_mean.unsqueeze(1) # (batch, 1, channels)
-        
+
         # Apply the final projection
-        x_mean = self.proj(x_mean) # (B, 1, 1)
-        x_mean = x_mean.squeeze(1).squeeze(1)  # (B)
+        x_mean = self.proj(x_mean) # (B, 1)
+        x_mean = x_mean.squeeze(1)  # (B)
     
         return x_mean
         

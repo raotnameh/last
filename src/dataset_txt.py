@@ -15,7 +15,7 @@ class Dataset_txt(Dataset):
         
         with open(data, "r") as f:
             out = f.readlines()
-        texts = [x.strip() for x in out if len(x) > 10 and len(x) < 500] # filtering out short texts that 2 second.
+        texts = [x.strip() for x in out if len(x) > 10] # filtering out short texts that 2 second.
     
         # creating the vocab.
         self.vocab = self.build_vocab(texts)
@@ -139,7 +139,7 @@ class Dataset_txt(Dataset):
         inp = torch.tensor([pad_sequence(seq, max_length) for seq in inp], dtype=torch.long)
         mask = torch.tensor([[False] * len(seq) + [True] * (max_length - len(seq)) for seq in batch], dtype=torch.bool)
     
-        return inp, mask
+        return inp, mask.unsqueeze(-1)
         
         
 if __name__ == "__main__":

@@ -41,7 +41,7 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
             waveforms, padding_masks, dur, paths, txt = next(train_speech_iter)
         waveforms = waveforms.to(device) # [B, T]
         padding_masks = padding_masks.to(device) # [B, T] true for masked, false for not masked means [False, False, ..., True, True]
-    
+        
         # ===== Generator Forward Pass =====
         # ===== Encoder =====
         if step >= freeze_steps:
@@ -54,13 +54,14 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
         mask = mask.unsqueeze(-1).float() # [B, T // 320, 1]
         output['mask'] = mask
         
+        
         # ===== Ground Truth =====
         with torch.no_grad():
             gt = models['gtruth'].encode(waveforms.unsqueeze(1)) # [B, T//320, 1024] 
             assert enc_out['encoder_out'].shape[1]-10 <= gt.shape[1] <= enc_out['encoder_out'].shape[1]+10, f"GT shape: {gt.shape}, Encoder out shape: {enc_out['encoder_out'].shape}"
             gt = gt[:,:mask.shape[1],:] * mask # [B, T, 1024]
             output['gt'] = gt 
-            
+        
         # ===== Downsample =====
         down_out = models['downsample'](enc_out['encoder_out'], mask) # [B, T // 2, C], [B, T // 2, vocab_size]
         dmask = mask[:, ::config["upsample"]['stride']] # [B, T // config["upsample"]['stride'], 1]
@@ -73,7 +74,6 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
             models['codebook'], 
             dmask,
         )
-        
         
         z_q_disc_mask = ~z_q_disc_mask.bool() # [B, T // 2, 1]
         
@@ -100,7 +100,6 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
         total_lossg = gen_loss_components['rec_loss']
         # total_lossg = total_lossg + gen_loss_components['commit_loss'] 
         # total_lossg = total_lossg + gen_loss_components['smooth_loss']
-            
         
         if step % config['logging']['step'] == 0:
             logging.info(f"Generator encoded text path: --{paths[0]}-- of length {dur[0]} seconds--")
@@ -480,11 +479,13 @@ def train_disc(models, optimizers, schedulers, speech_loader, text_dataset, text
         # ===== Discriminator Generator Update =====
         disc_fake = models['discriminator'](z_q_disc, z_q_disc_mask)
         output['disc_fake'] = disc_fake
-
+        
         # Loss calculation
         gen_loss_components = loss_module.step_gen(output)        
         total_lossg = gen_loss_components['rec_loss']
         total_lossg = total_lossg + gen_loss_components['gen_loss']
+        # if step % config['train']['discriminator_freq'] != 0:
+        #     total_lossg = total_lossg + gen_loss_components['gen_loss']
         
         if step % config['logging']['step'] == 0:
             logging.info(f"Generator encoded text path: --{paths[0]}-- of length {dur[0]} seconds--")
@@ -577,21 +578,21 @@ def train_disc(models, optimizers, schedulers, speech_loader, text_dataset, text
         if step % config['train']['discriminator_freq'] == 0:
             doutput = {}
             
-            disc_fake = models['discriminator'](z_q_disc.detach(), z_q_disc_mask)
+            disc_fake = models['discriminator'](z_q_disc.clone().detach(), z_q_disc_mask)
             doutput['disc_fake'] = disc_fake
             doutput["disc_fake_x"] = z_q_disc
-        
+            
             try:
                 text, tmask = next(text_iter)
             except StopIteration:
                 text_iter = iter(text_loader)
                 text, tmask = next(text_iter)
+            
             text = text.to(device)
             tmask = tmask.to(device)
-            
-            
+                 
             text_emb = models['codebook'](text)
-            disc_real = models['discriminator'](text_emb, tmask.unsqueeze(-1))
+            disc_real = models['discriminator'](text_emb, tmask)
             doutput['disc_real'] = disc_real
             doutput['disc_real_x'] = text_emb
 

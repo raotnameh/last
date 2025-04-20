@@ -81,45 +81,30 @@ def configure_logging(dir='logs/'):
 # step :- Prepare the dataset.
 def initialize_datasets(config, split='train'):
     """Initialize and configure speech/text datasets with samplers."""
-    class ShuffledBatchSampler(BatchSampler):
-        """Custom batch sampler that shuffles batch order while maintaining sequence order within batches."""
-        def __init__(self, sampler, batch_size, drop_last):
-            super().__init__(sampler, batch_size, drop_last)  
-
-        def __iter__(self):
-            batches = list(super().__iter__())  
-            random.shuffle(batches)  # Shuffle batch order
-            return iter(batches)
         
     # step 1 :- Prepare the speech dataset.
     speech_dataset = Dataset_speech(
         input_manifest=config['dataset_speech'][f'{split}_path'],
         min_duration=config['dataset_speech']['min_duration'],
         max_duration=config['dataset_speech']['max_duration'],
-    )
+    )    
     speech_loader = DataLoader(
         speech_dataset,
-        batch_sampler=ShuffledBatchSampler(
-            sampler=SequentialSampler(speech_dataset),
-            batch_size=config['dataset_speech']['batch_size'],
-            drop_last=False,
-        ),
+        batch_size=config['dataset_speech']['batch_size'],
+        shuffle=True,
         collate_fn=speech_dataset.collate_fn,
         num_workers=4
     )
-    
+
     logging.info(f"Number of batches in {split} speech dataset: {len(speech_loader)}")
-    if split == 'train':
-                
+    
+    if split == 'train':           
         # step 2 :- Prepare the text dataset.
         text_dataset = Dataset_txt(data=config['dataset_txt']['path'])
         text_loader = DataLoader(
             text_dataset,
-            batch_sampler=ShuffledBatchSampler(
-                sampler=SequentialSampler(text_dataset),
-                batch_size=config['dataset_speech']['batch_size'],
-                drop_last=False,
-            ),
+            batch_size=config['dataset_txt']['batch_size'],
+            shuffle=True,
             collate_fn=text_dataset.collate_fn,
             num_workers=4
         )
@@ -127,7 +112,6 @@ def initialize_datasets(config, split='train'):
         logging.info(f"Number of batches in text dataset: {len(text_loader)}")
 
         return speech_loader, text_dataset, text_loader, text_dataset.vocab, text_dataset.prior
-
     else:
         return speech_loader
 
@@ -145,8 +129,7 @@ def setup_models(config, vocab):
         output_dim=models['codebook'].embedding.weight.shape[1],
         kernel_size=config['downsample']['kernel_size'],
         stride=config['downsample']['stride'],
-        groups=config['downsample']['groups'],
-        vocab_size=models['codebook'].embedding.weight.shape[0]-1, # -1 for padding    
+        groups=config['downsample']['groups'], 
         )
     
     models['tokenizer'] = Tokenizer(config,vocab=models['codebook'].vocab)
@@ -312,7 +295,13 @@ def load_checkpoint(checkpoint_path, models, optimizers, schedulers, device):
 
 def main():
     args = parse_args()
-    config = load_config(args.config) 
+    if args.resume_checkpoint: 
+        config = torch.load(args.resume_checkpoint)["config"]
+    else:
+        config = load_config(args.config) 
+    
+    # Configure logging
+    configure_logging(config['logging']['dir'])
     
     # Set random seeds
     random.seed(config['train']['seed'])
@@ -340,9 +329,6 @@ def main():
     logging.info(f"Loaded config from {args.config}")
     logging.info(f"Command-line args: {args}")   
     logging.info(f"Config after command-line overrides: {config}")
-    
-    # Configure logging
-    configure_logging(config['logging']['dir'])
     
     
     # Initialize datasets and models

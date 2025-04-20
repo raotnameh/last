@@ -35,12 +35,13 @@ class GANLoss(nn.Module):
         # using zero class for real and one class for fake
         """Computes adversarial loss and gradient penalty."""
 
-  
+        
+        
         loss_fake = F.binary_cross_entropy_with_logits(
-            fake, torch.ones_like(fake) - fake_smooth, reduction="sum"
+            fake, torch.ones_like(fake) - fake_smooth, reduction="mean"
         )
         loss_real = F.binary_cross_entropy_with_logits(
-            real, torch.zeros_like(real) + real_smooth, reduction="sum"
+            real, torch.zeros_like(real) + real_smooth, reduction="mean"
         )
         total_loss = loss_fake + loss_real # total loss is sum of fake and real losses
         grad_pen = None
@@ -116,7 +117,7 @@ class Loss:
 
         # generator loss
         if output["disc_fake"] is not None:
-            gen_loss = F.binary_cross_entropy_with_logits(output["disc_fake"], torch.zeros_like(output["disc_fake"]))
+            gen_loss = F.binary_cross_entropy_with_logits(output["disc_fake"], torch.zeros_like(output["disc_fake"]), reduction="mean")
         else:
             gen_loss = 0.0
         

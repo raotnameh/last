@@ -86,10 +86,11 @@ class Tokenizer(nn.Module):
         commitment_loss = F.mse_loss(z, z_q.detach(), reduction='none') * mask # (batch, time, channels) # MSE loss between z and z_q ignoring padding positions
         valid_count = mask.sum() # * z.shape[-1] # Total number of valid (non-masked) elements
         commitment_loss = commitment_loss.sum() / valid_count 
+        commitment_loss = commitment_loss.detach() # detach the loss to avoid backpropagation through the codebook
         
         # preserve gradients
         z_q = z + (z_q - z).detach() # btc
-        z_q = z_q * mask # btc # our data is sequential compared to the original VQVAE paper where the data is not sequential (images) which did not need padding.
+        d_z_q = z_q.clone() * mask
         
         # If using the rotation trick for audio data.
         if self.rot:
@@ -102,8 +103,7 @@ class Tokenizer(nn.Module):
             pre_norm_q = self.get_very_efficient_rotation(x / (torch.norm(x, dim=1, keepdim=True) + 1e-6), z_q, x.unsqueeze(1)).squeeze()
 
             # Reapply scale
-            z_q = pre_norm_q * ( z_q / (torch.norm(x, dim=1, keepdim=True) + 1e-6)
-            ).detach()
+            z_q = pre_norm_q * ( z_q / (torch.norm(x, dim=1, keepdim=True) + 1e-6) ).detach()
 
             # Reshape back to (b, t, c)
             z_q = z_q.view(b, t, c)
@@ -113,10 +113,11 @@ class Tokenizer(nn.Module):
         # Smoothness loss
         smoothness_loss = F.mse_loss(z[:, :-1, :], z[:, 1:, :], reduction='none') * mask[:, 1:, :] # (batch, time-1, channels)
         smoothness_loss = smoothness_loss.sum() / valid_count # average over valid positions
+        smoothness_loss = smoothness_loss.detach() # detach the loss to avoid backpropagation through the codebook
         
         ##### Discriminator codebooks without repeated indices #####
         encodings = min_encoding_indices.view(z.shape[0], z.shape[1]) # ( batch, time ) # (B, T)
-        n_z_q, n_mask, selected_encodings_list, selected_encodings_repeated_list = self.remove_consecutive_repeated_indices( encodings, mask.squeeze(-1), z_q.clone()) # randomly pick one index from each group of consecutive repeating elements # shape (B,T) and also returns the mask 
+        n_z_q, n_mask, selected_encodings_list, selected_encodings_repeated_list = self.remove_consecutive_repeated_indices( encodings, mask.squeeze(-1), d_z_q.clone()) # randomly pick one index from each group of consecutive repeating elements # shape (B,T) and also returns the mask 
 
         return smoothness_loss, commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list, selected_encodings_repeated_list # commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list<
 
