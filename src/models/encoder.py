@@ -27,7 +27,7 @@ arg_overrides = {
 
 
 class Encoder(torch.nn.Module):
-    def __init__(self, ckpt_path="hubert_base_ls960.pt"):
+    def __init__(self, ckpt_path="/raid/home/rajivratn/hemant_rajivratn/last/weights/convert_iter3.pt"):
         super().__init__()
 
         state = checkpoint_utils.load_checkpoint_to_cpu(ckpt_path, arg_overrides)
@@ -74,7 +74,12 @@ class Downsample(torch.nn.Module):
         x = x.transpose(1, 2)
         x = self.conv(x)
         x = x.transpose(1, 2)
-        
-        x = F.normalize(x, p=2,dim=-1)
+
+        x = F.normalize(x, dim=-1)
         
         return x # B x T x C 
+    
+if __name__ == "__main__":
+    # Test encoder
+    encoder = Encoder()
+    

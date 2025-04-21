@@ -19,7 +19,7 @@ dataset_speech:
 
   min_duration: 32000
   max_duration: 320000
-  batch_size: &batch_size_value 16
+  batch_size: &batch_size_value 12
 
 dataset_txt:
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train.wrd"
@@ -55,10 +55,10 @@ decoder:
     speaker_emb_dim: 512
     
   transformer:
-    decoder_layer: 4
+    decoder_layer: 8
     decoder_head: 2
     decoder_hidden: 256
-    conv_filter_size: 2048
+    conv_filter_size: 1024
     conv_kernel_size: [9, 1]
     decoder_dropout: 0.2
     dac_hidden: 1024
@@ -70,14 +70,14 @@ train:
   train_disc: False
   train_full: False
 
-  lr_enc: 0.0001
+  lr_enc: 0.00005
   lr_down: 0.0001
   lr_dec: 0.0001
   lr_disc: 0.0001
   grad_clip: 10.0
   
-  num_steps: 10000
-  freeze_steps: 10000000
+  num_steps: 100000
+  freeze_steps: 1000000
   gradient_accumulation_steps: 1
   discriminator_freq: 2
 

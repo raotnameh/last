@@ -4,6 +4,7 @@ import torchaudio
 import matplotlib.pyplot as plt
 import torchaudio.transforms as T
 import os
+import contextlib
 
 
 from models.asr import WhisperWERCalculator, compute_pesq, compute_stoi
@@ -29,6 +30,11 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
     
     for optimizer in optimizers.values():
         optimizer.zero_grad()
+        
+    
+    for m in models:
+        if m != 'gtruth':
+            models[m].train()
 
     for step in range(start_step, num_steps + 1):
         output = {}
@@ -44,15 +50,14 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
         
         # ===== Generator Forward Pass =====
         # ===== Encoder =====
-        if step >= freeze_steps:
-            models['encoder'].model.train() 
-        enc_out = models['encoder'](waveforms, padding_masks)  # [B, T, C] # step 1
-        output["cnn_out"] = enc_out['cnn_out'] # [B, T // 320, C] 
-        output['encoder_out'] = enc_out['encoder_out'] # [B, T // 320, C] 
+        with torch.no_grad() if not (step > freeze_steps) else contextlib.ExitStack():
+            enc_out = models['encoder'](waveforms, padding_masks)  # [B, T, C] # step 1
+            output["cnn_out"] = enc_out['cnn_out'] # [B, T // 320, C] 
+            output['encoder_out'] = enc_out['encoder_out'] # [B, T // 320, C] 
         
-        mask = ~enc_out['padding_mask'] # B,T//320 # 0 for masked positions.
-        mask = mask.unsqueeze(-1).float() # [B, T // 320, 1]
-        output['mask'] = mask
+            mask = ~enc_out['padding_mask'] # B,T//320 # 0 for masked positions.
+            mask = mask.unsqueeze(-1).float() # [B, T // 320, 1]
+            output['mask'] = mask
         
         
         # ===== Ground Truth =====
@@ -100,8 +105,7 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
         # Loss calculation
         gen_loss_components = loss_module.step_gen(output)        
         total_lossg = gen_loss_components['rec_loss']
-        # total_lossg = total_lossg + gen_loss_components['commit_loss']
-
+        
 
         if step % config['logging']['step'] == 0:
             logging.info(f"Generator encoded text path: --{paths[0]}-- of length {dur[0]} seconds--")
@@ -236,10 +240,16 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
             logging.info(f"Saved checkpoint to {checkpoint_path}")
             
             stoi = max( current_stoi, stoi )
-        
+            for m in models:
+                if m != 'gtruth':
+                    models[m].train()
 
 def eval(models, speech_loader, loss_module, config, device, writer=None, step=0):
     
+    for m in models:
+        if m != 'gtruth':
+            models[m].eval()
+            
     with torch.no_grad():
         logging.info("Evaluating")
         

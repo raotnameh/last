@@ -345,19 +345,6 @@ def main():
     # Training setup
     configure_training_mode(models, config)
     
-    if config['eval']['eval']:
-        models['encoder'].model.eval()
-        models['downsample'].eval()
-        models['upsample'].eval()
-        models['decoder'].eval()
-        models['discriminator'].eval()
-    else: 
-        models['encoder'].model.eval()
-        models['downsample'].train()
-        models['upsample'].train()
-        models['decoder'].train()
-        models['discriminator'].train()
-    
     # Determine the device (GPU or CPU)
     device = torch.device(config.get("device"))
     for name in models:
@@ -397,7 +384,6 @@ def main():
             config=config,
             device=device,
         )
-        exit(0)
         
     
     if config['train']['train_vqvae']:

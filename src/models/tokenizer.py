@@ -43,10 +43,9 @@ class Tokenizer(nn.Module):
         plt.close()
    
     @staticmethod
-    def get_very_efficient_rotation(u, q, e):
-        w = ((u + q) / torch.norm(u + q, dim=1, keepdim=True)).detach()
-        return e - 2 * torch.bmm(torch.bmm(e, w.unsqueeze(-1)), w.unsqueeze(1)) + 2 * torch.bmm(
-        torch.bmm(e, u.unsqueeze(-1).detach()), q.unsqueeze(1).detach())
+    def get_very_efficient_rotation( u, q, x):
+        w = F.normalize(u + q, dim=1).detach()
+        return x - 2*torch.bmm(torch.bmm(x, w.unsqueeze(-1)), w.unsqueeze(1)) + 2*torch.bmm( torch.bmm(x, u.unsqueeze(-1).detach()), q.unsqueeze(1).detach())
           
     def forward(self, z, codebook, mask, writer=None, step=1):
         """
@@ -55,53 +54,50 @@ class Tokenizer(nn.Module):
         mask (torch.Tensor): Mask of shape (batch, time, 1) with 1s for valid positions and 0s for padding.
         """  
         
+        
         # 1. Prepare codebook embeddings (detach to avoid training update)
         e = codebook.embedding.weight.clone().detach() # (vocab_size+1, embed_dim) 
         e = e[1:,:] # remove the padding embedding from the codebook # (vocab_size, embed_dim)       
         # 2. Flatten z for distance computation: (b*t, c)
         b, t, c = z.shape
         z_flat = z.contiguous().view(-1, c) # (batch * time, channels==embed_dim)
-  
-        # 3. Cosine similarity (dot product) and distance
-        cos_sim = torch.matmul(z_flat, e.t())  # (batch*time, vocab_size)
-        d = 1.0 - cos_sim  # (batch*time, vocab_size)        
-        # 4. Nearest neighbor lookup
-        min_encoding_indices = torch.argmin(d, dim=1).unsqueeze(1) # (batch*time, 1)
-        min_encodings = torch.zeros(min_encoding_indices.shape[0], e.shape[0], device=z.device) # (batch*time, vocab_size) 
-        min_encodings.scatter_(1, min_encoding_indices, 1) # (batch*time, vocab_size)
-        
-        # codebook usage Distribution
-        self.codebook_usage(min_encodings, mask.contiguous().view(-1, 1))
 
+        # 3. distances from z to codebooks e_j (z - e)^2 = z^2 + e^2 - 2 e * z
+        d = (torch.sum(z_flat**2, dim=1, keepdim=True) \
+            - 2 * z_flat @ e.t() \
+                + torch.sum(e**2, dim=1, keepdim=True).t() 
+        )
+        # 4. find closest encodings
+        min_encoding_indices = torch.argmin(d, dim=1).unsqueeze(1)
+        min_encodings = torch.zeros(min_encoding_indices.shape[0], e.shape[0], device=z.device)
+        min_encodings.scatter_(1, min_encoding_indices, 1)
         # 5. Quantized latents via direct indexing
-        z_q = torch.matmul(min_encodings, e).view(z.shape) # (batch, time, channels) 
+        z_q = torch.matmul(min_encodings, e).view(b,t,c) # (batch, time, channels) 
         
-        x = z_flat
-        quantized = z_q.contiguous().view(-1, c)
-        if writer:
-            theta = torch.sum(x * quantized, dim=1).clamp(-1.0, 1.0)
-            angle = torch.acos(theta)
+        # Angle between the z and z_q
+        x = z_flat # (batch*time, channels)
+        quantized = z_q.contiguous().view(-1, c) # (batch*time, channels)
+        theta = torch.sum(x * quantized, dim=1) # (batch*time)
+        theta_mask = theta > 0.5 # (batch*time) # Limitation of the roation trick. It avoids the rotation trick when the angle is too small. which results in opposite direction of gradeints for codebook  and  encoder output.
+        theta_mask = theta_mask.float().unsqueeze(1) # (batch*time, 1)
+        
+        if writer and step % 100 == 0:
             writer.add_scalar('tokenizer/theta_mean', theta.mean().item(), step)
             writer.add_scalar('tokenizer/theta_std', theta.std().item(), step)
             writer.add_scalar('tokenizer/theta_max', theta.max().item(), step)
             writer.add_scalar('tokenizer/theta_min', theta.min().item(), step)
-            writer.add_scalar('tokenizer/angle_mean', angle.mean().item(), step)
-
-        if self.rot:
-            # 6. Apply rotation trick on already normalized vectors
-            # x = z_flat # (batch*time, channels)
-            # quantized = z_q.contiguous().view(-1, c) # (batch*time, channels)
             
-            pre_norm_q = self.get_very_efficient_rotation(x , quantized, x.unsqueeze(1)).squeeze() 
-            z_q = pre_norm_q.contiguous().view(b, t, c) # Reshape back to (b, t, c)
-        else:
-            # 7. Straight-through estimator and mask padding
-            z_q = z + (z_q - z).detach() # btc     
-            
+        # 6. Apply rotation trick on already normalized vectors           
+        r_z_q = self.get_very_efficient_rotation(x , quantized, x.unsqueeze(1)).squeeze() 
+        # 7. Straight-through estimator and mask padding
+        s_z_q = z_flat + (quantized - z_flat).detach() # btc  
+        
+        z_q = theta_mask * r_z_q + (1 - theta_mask) * s_z_q # btc   
+        z_q = z_q.contiguous().view(b, t, c) # (batch, time, channels)
         z_q = z_q * mask
         
-        # 8. commitment loss
-        commitment_loss = F.mse_loss(z, z_q.detach(), reduction='none') * mask # (batch, time, channels) # MSE loss between z and z_q ignoring padding positions
+        # 8. commitment loss;  MSE loss between z and z_q ignoring padding positions
+        commitment_loss = F.mse_loss(z, z_q.detach(), reduction='none') * mask # btc
         valid_count = mask.sum() * z.shape[-1] # Total number of valid (non-masked) elements
         commitment_loss = commitment_loss.sum() / valid_count 
         
@@ -112,6 +108,9 @@ class Tokenizer(nn.Module):
         # 10. Discriminator codebooks without repeated indices #####
         encodings = min_encoding_indices.view(z.shape[0], z.shape[1]) # ( batch, time ) # (B, T)
         n_z_q, n_mask, selected_encodings_list, selected_encodings_repeated_list = self.remove_consecutive_repeated_indices( encodings, mask.squeeze(-1), z_q.clone()) # randomly pick one index from each group of consecutive repeating elements # shape (B,T) and also returns the mask 
+
+        # codebook usage Distribution
+        self.codebook_usage(min_encodings, mask.contiguous().view(-1, 1))
 
         return smoothness_loss, commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list, selected_encodings_repeated_list # commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list<
 
@@ -152,8 +151,6 @@ class Tokenizer(nn.Module):
             selected_indices_list.append(torch.tensor(selected_indices))
             max_len = max(max_len, len(selected_indices))
             
-            
-
         # Pad and create mask in a vectorized way
         padded_indices = torch.zeros((B, max_len), dtype=min_encoding_indices.dtype, device=min_encoding_indices.device)
         masks = torch.zeros((B, max_len), dtype=torch.float, device=min_encoding_indices.device)
