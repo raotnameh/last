@@ -7,9 +7,8 @@ import os
 import random
 import seaborn as sns
 
-
 class Tokenizer(nn.Module):
-    def __init__(self, config, vocab, rot=True):
+    def __init__(self, config, vocab, rot=False):
         super(Tokenizer, self).__init__()
         '''
         Tokenizer module that tokenizes the speech encoder output by finding the closest codebook
@@ -46,11 +45,10 @@ class Tokenizer(nn.Module):
     @staticmethod
     def get_very_efficient_rotation(u, q, e):
         w = ((u + q) / torch.norm(u + q, dim=1, keepdim=True)).detach()
-        e = e - 2 * torch.bmm(torch.bmm(e, w.unsqueeze(-1)), w.unsqueeze(1)) + 2 * torch.bmm(
+        return e - 2 * torch.bmm(torch.bmm(e, w.unsqueeze(-1)), w.unsqueeze(1)) + 2 * torch.bmm(
         torch.bmm(e, u.unsqueeze(-1).detach()), q.unsqueeze(1).detach())
-        return e
-        
-    def forward(self, z, codebook, mask):
+          
+    def forward(self, z, codebook, mask, writer, step):
         """
         z (torch.Tensor): b,t,c
         codebook (nn.Module): A module with a weight attribute of shape (vocab_size, embed_dim).
@@ -78,11 +76,22 @@ class Tokenizer(nn.Module):
         # 5. Quantized latents via direct indexing
         z_q = torch.matmul(min_encodings, e).view(z.shape) # (batch, time, channels) 
         
+        x = z_flat
+        quantized = z_q.contiguous().view(-1, c)
+        theta = torch.sum(x * quantized, dim=1).clamp(-1.0, 1.0)
+        angle = torch.acos(theta)
+        writer.add_scalar('tokenizer/theta_mean', theta.mean().item(), step)
+        writer.add_scalar('tokenizer/theta_std', theta.std().item(), step)
+        writer.add_scalar('tokenizer/theta_max', theta.max().item(), step)
+        writer.add_scalar('tokenizer/theta_min', theta.min().item(), step)
+        writer.add_scalar('tokenizer/angle_mean', angle.mean().item(), step)
+
         if self.rot:
-            # 6. Apply rotation trick
-            x = z_flat
-            z_q = z_q.contiguous().view(-1, c)
-            pre_norm_q = self.get_very_efficient_rotation(x, z_q, x.unsqueeze(1)).squeeze() # (b * t, c)
+            # 6. Apply rotation trick on already normalized vectors
+            # x = z_flat # (batch*time, channels)
+            # quantized = z_q.contiguous().view(-1, c) # (batch*time, channels)
+            
+            pre_norm_q = self.get_very_efficient_rotation(x , quantized, x.unsqueeze(1)).squeeze() 
             z_q = pre_norm_q.contiguous().view(b, t, c) # Reshape back to (b, t, c)
         else:
             # 7. Straight-through estimator and mask padding
@@ -96,8 +105,8 @@ class Tokenizer(nn.Module):
         commitment_loss = commitment_loss.sum() / valid_count 
         
         # 9. Smoothness loss
-        smoothness_loss = F.mse_loss(z[:, :-1, :], z[:, 1:, :], reduction='none') * mask[:, 1:, :] # (batch, time-1, channels)
-        smoothness_loss = smoothness_loss.sum() / valid_count # average over valid positions
+        smoothness_loss = F.mse_loss(z[:, :-1, :], z[:, 1:, :], reduction='none') * mask[:, 1:, :] 
+        smoothness_loss = smoothness_loss.sum() / valid_count 
         
         # 10. Discriminator codebooks without repeated indices #####
         encodings = min_encoding_indices.view(z.shape[0], z.shape[1]) # ( batch, time ) # (B, T)

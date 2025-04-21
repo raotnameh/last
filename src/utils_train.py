@@ -73,6 +73,8 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
             down_out, 
             models['codebook'], 
             dmask,
+            writer,
+            step,
         )
         
         z_q_disc_mask = ~z_q_disc_mask.bool() # [B, T // 2, 1]
@@ -98,9 +100,9 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
         # Loss calculation
         gen_loss_components = loss_module.step_gen(output)        
         total_lossg = gen_loss_components['rec_loss']
-        # total_lossg = total_lossg + gen_loss_components['commit_loss'] 
-        # total_lossg = total_lossg + gen_loss_components['smooth_loss']
-        
+        total_lossg = total_lossg + gen_loss_components['commit_loss']
+
+
         if step % config['logging']['step'] == 0:
             logging.info(f"Generator encoded text path: --{paths[0]}-- of length {dur[0]} seconds--")
             logging.info( f"Generator decoded text with special tokens: --{text_dataset.decode(selected_encodings_list[0],keep_special_tokens=True)}--" )
