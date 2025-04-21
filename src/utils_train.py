@@ -100,7 +100,7 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
         # Loss calculation
         gen_loss_components = loss_module.step_gen(output)        
         total_lossg = gen_loss_components['rec_loss']
-        total_lossg = total_lossg + gen_loss_components['commit_loss']
+        # total_lossg = total_lossg + gen_loss_components['commit_loss']
 
 
         if step % config['logging']['step'] == 0:

@@ -8,7 +8,7 @@ import random
 import seaborn as sns
 
 class Tokenizer(nn.Module):
-    def __init__(self, config, vocab, rot=False):
+    def __init__(self, config, vocab, rot=True):
         super(Tokenizer, self).__init__()
         '''
         Tokenizer module that tokenizes the speech encoder output by finding the closest codebook
@@ -48,7 +48,7 @@ class Tokenizer(nn.Module):
         return e - 2 * torch.bmm(torch.bmm(e, w.unsqueeze(-1)), w.unsqueeze(1)) + 2 * torch.bmm(
         torch.bmm(e, u.unsqueeze(-1).detach()), q.unsqueeze(1).detach())
           
-    def forward(self, z, codebook, mask, writer, step):
+    def forward(self, z, codebook, mask, writer=None, step=1):
         """
         z (torch.Tensor): b,t,c
         codebook (nn.Module): A module with a weight attribute of shape (vocab_size, embed_dim).
@@ -78,13 +78,14 @@ class Tokenizer(nn.Module):
         
         x = z_flat
         quantized = z_q.contiguous().view(-1, c)
-        theta = torch.sum(x * quantized, dim=1).clamp(-1.0, 1.0)
-        angle = torch.acos(theta)
-        writer.add_scalar('tokenizer/theta_mean', theta.mean().item(), step)
-        writer.add_scalar('tokenizer/theta_std', theta.std().item(), step)
-        writer.add_scalar('tokenizer/theta_max', theta.max().item(), step)
-        writer.add_scalar('tokenizer/theta_min', theta.min().item(), step)
-        writer.add_scalar('tokenizer/angle_mean', angle.mean().item(), step)
+        if writer:
+            theta = torch.sum(x * quantized, dim=1).clamp(-1.0, 1.0)
+            angle = torch.acos(theta)
+            writer.add_scalar('tokenizer/theta_mean', theta.mean().item(), step)
+            writer.add_scalar('tokenizer/theta_std', theta.std().item(), step)
+            writer.add_scalar('tokenizer/theta_max', theta.max().item(), step)
+            writer.add_scalar('tokenizer/theta_min', theta.min().item(), step)
+            writer.add_scalar('tokenizer/angle_mean', angle.mean().item(), step)
 
         if self.rot:
             # 6. Apply rotation trick on already normalized vectors
