@@ -177,15 +177,7 @@ def setup_models(config, vocab):
 # step :- Prepare the training mode
 def configure_training_mode(models, config):
     """Set model training modes and parameter requirements."""
- 
-    # Partially freeze encoder
-    for name, param in models['encoder'].named_parameters():
-        for n in config['encoder']['frozen_layers']:
-            if str(f"model.encoder.layers.{n}") in name :
-                param.requires_grad = True
-            else:
-                param.requires_grad = False
-    
+
     # Log trainable parameters
     total_params = 0
     for name, model in models.items():

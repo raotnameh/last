@@ -58,7 +58,8 @@ class Discriminator(nn.Module):
         """
         x = x.masked_fill(padding_mask, 0)
         
-        for layer in self.layers:
+        x = self.layers[0](x, padding_mask)
+        for layer in self.layers[1:]:
             x = x + layer(x, padding_mask)
         
         # Compute mean pooling over valid timesteps

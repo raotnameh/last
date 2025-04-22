@@ -3,7 +3,7 @@ checkpoint:
   step: 5000
 
 logging: 
-  dir: "/raid/home/rajivratn/hemant_rajivratn/last/src/logs_1e-4_vqvae"
+  dir: "/raid/home/rajivratn/hemant_rajivratn/last/src/logs_1e-4_vqvae_disc"
   step: 100
 
 device: "cuda"
@@ -66,15 +66,15 @@ decoder:
 
 train:
   seed: 42121
-  train_vqvae: True
-  train_disc: False
+  train_vqvae: False
+  train_disc: True
   train_full: False
 
-  lr_enc: 0.00005
+  lr_enc: 0.0001
   lr_down: 0.0001
   lr_dec: 0.0001
   lr_disc: 0.0001
-  grad_clip: 10.0
+  grad_clip: 1.0
   
   num_steps: 100000
   freeze_steps: 1000000
@@ -89,10 +89,10 @@ loss:
   recon_loss_weight: 1.0
   smooth_loss_weight: 1.0
   commit_loss_weight: 1.0
-  gen_loss_weight: 1.0
+  gen_loss_weight: 0.1
   
   disc_loss_weight: 1.0
-  gp_weight: 1.0
+  gp_weight: 0.1
 
 lr_scheduler:
   phase_ratio: [0.05, 0.05, 0.9]
