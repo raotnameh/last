@@ -3,7 +3,7 @@ checkpoint:
   step: 5000
 
 logging: 
-  dir: "/raid/home/rajivratn/hemant_rajivratn/last/src/logs_1e-4_vqvae_disc"
+  dir: "/raid/home/rajivratn/hemant_rajivratn/last/src/logs_1e-4_vqvae_disc_newadambeta1_0.5_5steps"
   step: 100
 
 device: "cuda"
@@ -79,7 +79,7 @@ train:
   num_steps: 100000
   freeze_steps: 1000000
   gradient_accumulation_steps: 1
-  discriminator_freq: 2
+  discriminator_freq: 5 # every 5 steps
 
   mixed_precision: False
   resume_checkpoint: False

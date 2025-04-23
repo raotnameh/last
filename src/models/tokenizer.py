@@ -15,12 +15,11 @@ class Tokenizer(nn.Module):
         '''
 
         self.vocab = vocab[1:] # remove the padding token
-        self.step = 0
         self.rot = rot
         self.save_dir = config['logging']['dir']
         os.makedirs(f"{self.save_dir}/plots/", exist_ok=True)
     
-    def codebook_usage(self, min_encodings, mask):
+    def codebook_usage(self, min_encodings, mask, step):
         
         # prob for each character
         mask_bool = (mask == 1).squeeze(1)  # shape: (B,), True where we keep
@@ -35,10 +34,10 @@ class Tokenizer(nn.Module):
         plt.grid(axis='y')
         plt.savefig('codebook_usage_distribution.png', bbox_inches='tight')
         # for every 1000 steps save the plot 
-        if self.step % 1000 == 0:
+        if step % 1000 == 0:
             plt.savefig(os.path.join(f'{self.save_dir}/plots', f'codebook_usage_distribution_{self.step}.png'), bbox_inches='tight')
             plt.close()
-        self.step += 1
+
         
         plt.close()
    
@@ -110,7 +109,7 @@ class Tokenizer(nn.Module):
         n_z_q, n_mask, selected_encodings_list, selected_encodings_repeated_list = self.remove_consecutive_repeated_indices( encodings, mask.squeeze(-1), z_q.clone()) # randomly pick one index from each group of consecutive repeating elements # shape (B,T) and also returns the mask 
 
         # codebook usage Distribution
-        self.codebook_usage(min_encodings, mask.contiguous().view(-1, 1))
+        self.codebook_usage(min_encodings, mask.contiguous().view(-1, 1), step)
 
         return smoothness_loss, commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list, selected_encodings_repeated_list # commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list<
 

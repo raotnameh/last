@@ -196,20 +196,24 @@ def configure_optimizers(models, config):
     optimizers = {
         'enc': optim.AdamW(
             [p for p in models['encoder'].parameters() if p.requires_grad],
-            lr=config['train']['lr_enc']
+            lr=config['train']['lr_enc'],
+            betas=(0.5, 0.9),
         ),
         'down': optim.AdamW(
             [p for p in models['downsample'].parameters() if p.requires_grad],
-            lr=config['train']['lr_down']
+            lr=config['train']['lr_down'],
+            betas=(0.5, 0.9),
         ),
         'dec': optim.AdamW(
             [p for p in models['upsample'].parameters() if p.requires_grad] +
             [p for p in models['decoder'].parameters() if p.requires_grad],
-            lr=config['train']['lr_dec']
+            lr=config['train']['lr_dec'],
+            betas=(0.5, 0.9),
         ),
         'disc': optim.AdamW(
             [p for p in models['discriminator'].parameters() if p.requires_grad],
-            lr=config['train']['lr_disc']
+            lr=config['train']['lr_disc'],
+            betas=(0.5, 0.9),
         )
     }
     

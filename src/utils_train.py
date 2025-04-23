@@ -180,13 +180,11 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
             f"rec_loss: {gen_loss_components['rec_loss']:.4f}, "
             f"commit_loss: {gen_loss_components['commit_loss']:.4f}, "
             f"smooth_loss: {gen_loss_components['smooth_loss']:.4f}, "
-            f"total_loss: {total_lossg:.4f}"
                     )                
             writer.add_scalar('generator_loss/rec_loss', gen_loss_components['rec_loss'], step)
             writer.add_scalar('generator_loss/commit_loss', gen_loss_components['commit_loss'], step)
             writer.add_scalar('generator_loss/smooth_loss', gen_loss_components['smooth_loss'], step)
-            writer.add_scalar('generator_loss/total_loss_gen', total_lossg, step)
-    
+            
 
             # logging lr 
             writer.add_scalar('learning_rate/encoder', schedulers['enc'].get_last_lr()[0], step)
@@ -647,6 +645,8 @@ def train_disc(models, optimizers, schedulers, speech_loader, text_dataset, text
                 writer.add_scalar('Discriminator_loss/discriminator_fake_loss', disc_loss_components['loss_fake'], step)
                 writer.add_scalar('Discriminator_loss/discriminator_gp_loss', disc_loss_components['grad_pen'], step)
 
+            if total_lossd < 0.2: 
+                total_lossd *= 0.0
             # update the total loss
             total_lossg = total_lossg + total_lossd
         
