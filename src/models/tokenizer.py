@@ -35,10 +35,9 @@ class Tokenizer(nn.Module):
         plt.savefig('codebook_usage_distribution.png', bbox_inches='tight')
         # for every 1000 steps save the plot 
         if step % 1000 == 0:
-            plt.savefig(os.path.join(f'{self.save_dir}/plots', f'codebook_usage_distribution_{self.step}.png'), bbox_inches='tight')
+            plt.savefig(os.path.join(f'{self.save_dir}/plots', f'codebook_usage_distribution_{step}.png'), bbox_inches='tight')
             plt.close()
 
-        
         plt.close()
    
     @staticmethod

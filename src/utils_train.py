@@ -254,8 +254,6 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
 
 
 
-
-
 def eval(models, speech_loader, loss_module, config, device, writer=None, step=0):
     
     for m in models:
@@ -456,7 +454,7 @@ def train_disc(models, optimizers, schedulers, speech_loader, text_dataset, text
         
         # ===== Generator Forward Pass =====
         # ===== Encoder =====
-        with torch.no_grad() if not (step > freeze_steps) else contextlib.ExitStack():
+        with torch.no_grad() if step < freeze_steps else contextlib.ExitStack():
             enc_out = models['encoder'](waveforms, padding_masks)  # [B, T, C] # step 1
             output["cnn_out"] = enc_out['cnn_out'] # [B, T // 320, C] 
             output['encoder_out'] = enc_out['encoder_out'] # [B, T // 320, C] 
@@ -590,14 +588,12 @@ def train_disc(models, optimizers, schedulers, speech_loader, text_dataset, text
             f"commit_loss: {gen_loss_components['commit_loss']:.4f}, "
             f"smooth_loss: {gen_loss_components['smooth_loss']:.4f}, "
             f"gen_loss: {gen_loss_components['gen_loss']:.4f}, "
-            f"total_loss: {total_lossg:.4f}"
                     )                
             writer.add_scalar('generator_loss/rec_loss', gen_loss_components['rec_loss'], step)
             writer.add_scalar('generator_loss/commit_loss', gen_loss_components['commit_loss'], step)
             writer.add_scalar('generator_loss/smooth_loss', gen_loss_components['smooth_loss'], step)
             writer.add_scalar('generator_loss/gen_loss', gen_loss_components['gen_loss'], step)
-            writer.add_scalar('generator_loss/total_loss_gen', total_lossg, step)
-    
+
 
             # logging lr 
             writer.add_scalar('learning_rate/encoder', schedulers['enc'].get_last_lr()[0], step)
@@ -638,9 +634,8 @@ def train_disc(models, optimizers, schedulers, speech_loader, text_dataset, text
                 f"real_loss: {disc_loss_components['loss_real']:.4f}, "
                 f"fake_loss: {disc_loss_components['loss_fake']:.4f}, "
                 f"gp_loss: {disc_loss_components['grad_pen']:.4f}, "
-                f"total_loss: {disc_loss_components['total_loss']:.4f}"
                 )                    
-                writer.add_scalar('Discriminator_loss/discriminator_total_loss', total_lossd, step)
+       
                 writer.add_scalar('Discriminator_loss/discriminator_real_loss', disc_loss_components['loss_real'], step)
                 writer.add_scalar('Discriminator_loss/discriminator_fake_loss', disc_loss_components['loss_fake'], step)
                 writer.add_scalar('Discriminator_loss/discriminator_gp_loss', disc_loss_components['grad_pen'], step)
@@ -666,7 +661,7 @@ def train_disc(models, optimizers, schedulers, speech_loader, text_dataset, text
                 list(models['decoder'].parameters()),
                 max_grad_norm
             )
-                
+            
             # Optimizer step
             if step >= freeze_steps:
                 optimizers['enc'].step()

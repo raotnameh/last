@@ -47,7 +47,7 @@ class Discriminator(nn.Module):
             Conv1dBlock(in_channels, hidden_dim, kernel_size=1)
         )
         for i in range(num_layers):
-            self.layers.append(Conv1dBlock(hidden_dim, hidden_dim, kernel_size=11))
+            self.layers.append(Conv1dBlock(hidden_dim, hidden_dim, kernel_size=21))
         
         self.proj = nn.Linear(hidden_dim, 1)
         

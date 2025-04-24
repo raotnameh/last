@@ -3,22 +3,22 @@ checkpoint:
   step: 5000
 
 logging: 
-  dir: "/raid/home/rajivratn/hemant_rajivratn/last/src/logs_1e-4_vqvae_disc_newadambeta1_0.5_5steps"
+  dir: "/raid/home/rajivratn/hemant_rajivratn/last/src/logs_1e-4_vqvae_disc_newadambeta1_0.5_1steps_librispeech"
   step: 100
 
 device: "cuda"
 
 dataset_speech:
-  # train_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/train.tsv"
-  # val_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/val.tsv"
-  # test_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/test.tsv"
+  train_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/train.tsv"
+  val_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/val.tsv"
+  test_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/test.tsv"
 
-  train_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/manifest/train.tsv"
-  val_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/manifest/val.tsv"
-  test_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/manifest/test.tsv"
+  # train_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/manifest/train.tsv"
+  # val_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/manifest/val.tsv"
+  # test_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/manifest/test.tsv"
 
   min_duration: 32000
-  max_duration: 320000
+  max_duration: 160000
   batch_size: &batch_size_value 12
 
 dataset_txt:
@@ -46,8 +46,8 @@ upsample:
   groups: *groups_value 
 
 discriminator:
-  hidden_dim: 256
-  num_layers: 1
+  hidden_dim: 512
+  num_layers: 2
 
 decoder:
   speaker:
@@ -70,7 +70,7 @@ train:
   train_disc: True
   train_full: False
 
-  lr_enc: 0.0001
+  lr_enc: 0.00005
   lr_down: 0.0001
   lr_dec: 0.0001
   lr_disc: 0.0001
@@ -79,7 +79,7 @@ train:
   num_steps: 100000
   freeze_steps: 1000000
   gradient_accumulation_steps: 1
-  discriminator_freq: 5 # every 5 steps
+  discriminator_freq: 2 # every N steps
 
   mixed_precision: False
   resume_checkpoint: False
@@ -89,7 +89,7 @@ loss:
   recon_loss_weight: 1.0
   smooth_loss_weight: 1.0
   commit_loss_weight: 1.0
-  gen_loss_weight: 0.1
+  gen_loss_weight: 1.0
   
   disc_loss_weight: 1.0
   gp_weight: 0.1

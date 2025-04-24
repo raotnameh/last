@@ -16,12 +16,14 @@ image_files = []
 step = 0
 while True:
     filename = f'{prefix}{step}{ext}'
+    print(f"Looking for images in {filename}")
     if not os.path.exists(filename):
-        break  # Stop when the file doesn't exist
+        continue  # Stop when the file doesn't exist
     image_files.append(filename)
     step += 1000
 
 
+print(f"Found {len(image_files)} images.")
 # Output path for the GIF
 output_gif_path = f'{directory}/gif.gif'
 print(output_gif_path)

@@ -81,19 +81,41 @@ def configure_logging(dir='logs/'):
 # step :- Prepare the dataset.
 def initialize_datasets(config, split='train'):
     """Initialize and configure speech/text datasets with samplers."""
-        
+       
     # step 1 :- Prepare the speech dataset.
     speech_dataset = Dataset_speech(
         input_manifest=config['dataset_speech'][f'{split}_path'],
         min_duration=config['dataset_speech']['min_duration'],
         max_duration=config['dataset_speech']['max_duration'],
     )    
+    # speech_loader = DataLoader(
+    #     speech_dataset,
+    #     batch_size=config['dataset_speech']['batch_size'],
+    #     shuffle=True,
+    #     collate_fn=speech_dataset.collate_fn,
+    #     num_workers=4
+    # )
+    
+    class ShuffledBatchSampler(BatchSampler):
+        """Custom batch sampler that shuffles batch order while maintaining sequence order within batches."""
+        def __init__(self, sampler, batch_size, drop_last):
+            super().__init__(sampler, batch_size, drop_last)  
+
+        def __iter__(self):
+            batches = list(super().__iter__())  
+            random.shuffle(batches)  # Shuffle batch order
+            return iter(batches)
+        
     speech_loader = DataLoader(
         speech_dataset,
-        batch_size=config['dataset_speech']['batch_size'],
-        shuffle=True,
+        batch_sampler=ShuffledBatchSampler(
+            sampler=SequentialSampler(speech_dataset),
+            batch_size=config['dataset_speech']['batch_size'],
+            drop_last=False,
+        ),
         collate_fn=speech_dataset.collate_fn,
-        num_workers=4
+        pin_memory=True,
+        num_workers=6
     )
 
     logging.info(f"Number of batches in {split} speech dataset: {len(speech_loader)}")

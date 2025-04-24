@@ -16,6 +16,9 @@ class Dataset_speech(Dataset):
     def __init__(self, input_manifest, min_duration=0, max_duration=float("inf")):
         super().__init__()
         
+        
+        self.max_duration = max_duration
+        
         paths = []
         min_dur, max_dur, tot_dur = float('inf'), 0, 0
         with open(input_manifest, "r") as infile:
