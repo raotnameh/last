@@ -62,15 +62,30 @@ class Discriminator(nn.Module):
         for layer in self.layers[1:]:
             x = x + layer(x, padding_mask)
         
-        # Compute mean pooling over valid timesteps
-        valid_counts = (~padding_mask).sum(dim=1).float() # (batch, channels)
-        x_mean = x.sum(dim=1) / valid_counts  # (batch, channels)
+        # # Compute mean pooling over valid timesteps
+        # valid_counts = (~padding_mask).sum(dim=1).float() # (batch, channels)
+        # x_mean = x.sum(dim=1) / valid_counts  # (batch, channels)
+
+        # # Apply the final projection
+        # x_mean = self.proj(x_mean) # (B, 1)
+        # x_mean = x_mean.squeeze(1)  # (B)
+    
+        # return x_mean
+
+        # Find the last valid (non-padded) timestep index for each sequence
+        # padding_mask: True = padded, so ~padding_mask = valid positions
+        valid_lengths = (~padding_mask.squeeze(-1)).sum(dim=1) - 1  # (batch,)
+        batch_size = x.size(0)
+        batch_indices = torch.arange(batch_size, device=x.device)
+
+        # Gather the last valid embeddings
+        last_embeddings = x[batch_indices, valid_lengths]  # (batch, channels)
 
         # Apply the final projection
-        x_mean = self.proj(x_mean) # (B, 1)
-        x_mean = x_mean.squeeze(1)  # (B)
-    
-        return x_mean
+        out = self.proj(last_embeddings)  # (batch, 1)
+        out = out.squeeze(1)  # (batch,)
+
+        return out
         
     
 

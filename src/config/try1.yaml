@@ -3,22 +3,22 @@ checkpoint:
   step: 5000
 
 logging: 
-  dir: "/raid/home/rajivratn/hemant_rajivratn/last/src/logs_1e-4_vqvae_disc_newadambeta1_0.5_1steps_librispeech"
+  dir: "/raid/home/rajivratn/hemant_rajivratn/last/src/logs_1e-4_vqvae_disc_newadambeta1_0.5_1steps_librispeech_disclasttoken"
   step: 100
 
 device: "cuda"
 
 dataset_speech:
-  train_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/train.tsv"
-  val_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/val.tsv"
-  test_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/test.tsv"
+  # train_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/train.tsv"
+  # val_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/val.tsv"
+  # test_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/test.tsv"
 
-  # train_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/manifest/train.tsv"
-  # val_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/manifest/val.tsv"
-  # test_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/manifest/test.tsv"
+  train_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/manifest/train_100.tsv"
+  val_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/manifest/val.tsv"
+  test_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/manifest/test.tsv"
 
   min_duration: 32000
-  max_duration: 160000
+  max_duration: 320000
   batch_size: &batch_size_value 12
 
 dataset_txt:
@@ -46,8 +46,8 @@ upsample:
   groups: *groups_value 
 
 discriminator:
-  hidden_dim: 512
-  num_layers: 2
+  hidden_dim: 256
+  num_layers: 4
 
 decoder:
   speaker:

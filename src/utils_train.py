@@ -248,12 +248,6 @@ def train_vqvae(models, optimizers, schedulers, speech_loader, text_dataset, tex
 
 
 
-
-
-
-
-
-
 def eval(models, speech_loader, loss_module, config, device, writer=None, step=0):
     
     for m in models:
