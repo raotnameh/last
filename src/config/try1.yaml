@@ -3,7 +3,7 @@ checkpoint:
   step: 5000
 
 logging: 
-  dir: "/raid/home/rajivratn/hemant_rajivratn/last/src/logs_1e-4_vqvae_disc_newadambeta1_0.5_1steps_librispeech_disclasttoken"
+  dir: "/raid/home/rajivratn/hemant_rajivratn/last/src/logs"
   step: 100
 
 device: "cuda"
@@ -13,13 +13,13 @@ dataset_speech:
   # val_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/val.tsv"
   # test_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/test.tsv"
 
-  train_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/manifest/train_100.tsv"
+  train_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/manifest/train.tsv"
   val_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/manifest/val.tsv"
   test_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/manifest/test.tsv"
 
   min_duration: 32000
   max_duration: 320000
-  batch_size: &batch_size_value 12
+  batch_size: &batch_size_value 50
 
 dataset_txt:
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train.wrd"
@@ -38,7 +38,7 @@ encoder:
 downsample:
   kernel_size: &kernel_size_value 11
   stride: &stride_value 2
-  groups: &groups_value 16
+  groups: &groups_value 64
 
 upsample:
   kernel_size: *kernel_size_value
@@ -47,7 +47,8 @@ upsample:
 
 discriminator:
   hidden_dim: 256
-  num_layers: 4
+  num_layers: 8
+  kernel_size: 11
 
 decoder:
   speaker:
@@ -65,19 +66,19 @@ decoder:
   max_seq_len: 2048
 
 train:
-  seed: 42121
+  seed: 42123
   train_vqvae: False
   train_disc: True
   train_full: False
 
-  lr_enc: 0.00005
+  lr_enc: 0.0001
   lr_down: 0.0001
   lr_dec: 0.0001
   lr_disc: 0.0001
-  grad_clip: 1.0
+  grad_clip: 10.0
   
-  num_steps: 100000
-  freeze_steps: 1000000
+  num_steps: 50000
+  freeze_steps: 1000
   gradient_accumulation_steps: 1
   discriminator_freq: 2 # every N steps
 
@@ -92,11 +93,10 @@ loss:
   gen_loss_weight: 1.0
   
   disc_loss_weight: 1.0
-  gp_weight: 0.1
+  gp_weight: 1.0
 
 lr_scheduler:
   phase_ratio: [0.05, 0.05, 0.9]
 
 eval:
-  # eval: True
   eval: False

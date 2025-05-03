@@ -18,10 +18,8 @@ class Conv1dBlock(nn.Module):
         )
         self.norm = nn.LayerNorm(out_channels)
         self.activation = nn.GELU()
-        self.dropout = nn.Dropout(0.2)
 
     def forward(self, x, padding_mask=None):
-        
         
         # x: (batch, time, channels)
         x = x.transpose(1, 2)
@@ -32,13 +30,12 @@ class Conv1dBlock(nn.Module):
         
         x = self.norm(x)
         x = self.activation(x)
-        x = self.dropout(x)
         
         x = x.masked_fill(padding_mask, 0)
         return x  
 
 class Discriminator(nn.Module):
-    def __init__(self, in_channels=256, hidden_dim=256, num_layers=4):
+    def __init__(self, in_channels=256, hidden_dim=256, num_layers=4, kernel_size=21):
         super().__init__()
         
     
@@ -47,7 +44,7 @@ class Discriminator(nn.Module):
             Conv1dBlock(in_channels, hidden_dim, kernel_size=1)
         )
         for i in range(num_layers):
-            self.layers.append(Conv1dBlock(hidden_dim, hidden_dim, kernel_size=21))
+            self.layers.append(Conv1dBlock(hidden_dim, hidden_dim, kernel_size=kernel_size))
         
         self.proj = nn.Linear(hidden_dim, 1)
         
@@ -62,30 +59,17 @@ class Discriminator(nn.Module):
         for layer in self.layers[1:]:
             x = x + layer(x, padding_mask)
         
-        # # Compute mean pooling over valid timesteps
-        # valid_counts = (~padding_mask).sum(dim=1).float() # (batch, channels)
-        # x_mean = x.sum(dim=1) / valid_counts  # (batch, channels)
-
-        # # Apply the final projection
-        # x_mean = self.proj(x_mean) # (B, 1)
-        # x_mean = x_mean.squeeze(1)  # (B)
-    
-        # return x_mean
-
-        # Find the last valid (non-padded) timestep index for each sequence
-        # padding_mask: True = padded, so ~padding_mask = valid positions
-        valid_lengths = (~padding_mask.squeeze(-1)).sum(dim=1) - 1  # (batch,)
-        batch_size = x.size(0)
-        batch_indices = torch.arange(batch_size, device=x.device)
-
-        # Gather the last valid embeddings
-        last_embeddings = x[batch_indices, valid_lengths]  # (batch, channels)
+        # Compute mean pooling over valid timesteps
+        x = x.masked_fill(padding_mask, 0)
+        valid_counts = (~padding_mask).sum(dim=1).float() # (batch, channels)
+        x_mean = x.sum(dim=1) / valid_counts  # (batch, channels)
 
         # Apply the final projection
-        out = self.proj(last_embeddings)  # (batch, 1)
-        out = out.squeeze(1)  # (batch,)
+        x_mean = self.proj(x_mean) # (B, 1)
+        x_mean = x_mean.squeeze(1)  # (B)
+    
+        return x_mean
 
-        return out
         
     
 

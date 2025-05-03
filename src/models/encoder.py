@@ -1,7 +1,7 @@
 import torch
+import torch.nn as nn
 import fairseq
 from fairseq import checkpoint_utils
-from torch.nn.utils import weight_norm
 import torch.nn.functional as F
 
 arg_overrides = {
@@ -44,7 +44,8 @@ class Encoder(torch.nn.Module):
         w2v_args = {
             "source": source, # source: (B, T)
             "padding_mask": padding_mask, # padding_mask: (B, T), 
-            "mask": True and self.training,
+            # "mask": True and self.training,
+            "mask": False,
             "ret_conv": False,
         }
                       
@@ -57,6 +58,32 @@ class Encoder(torch.nn.Module):
         }
         
 
+class Conv1dBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, dilation=1, stride=1, groups=1):
+        super().__init__()
+        
+        self.causal_padding = (kernel_size - 1) * dilation
+        self.conv = nn.Conv1d(
+            in_channels, 
+            out_channels, 
+            kernel_size, 
+            stride=stride, 
+            dilation=dilation, 
+            padding=0,
+            groups=groups,
+        )
+
+    def forward(self, x):
+        # x: (batch, time, channels)
+        x = x.transpose(1, 2)
+        # Apply causal (left) padding: (padding_left, padding_right)
+        x = F.pad(x, (self.causal_padding, 0))
+        x = self.conv(x)
+        x = x.transpose(1, 2)
+        
+        return x  
+
+
 class Downsample(torch.nn.Module):
     def __init__(self, input_dim=768, output_dim=256, kernel_size=9, stride=2, groups=1):
         super().__init__()
@@ -64,6 +91,7 @@ class Downsample(torch.nn.Module):
         self.norm = torch.nn.LayerNorm(input_dim)
         
         padding = kernel_size // 2
+        # self.conv = Conv1dBlock(input_dim, output_dim, kernel_size=kernel_size, dilation=1, stride=stride, groups=groups)
         self.conv = torch.nn.Conv1d(input_dim, output_dim, kernel_size=kernel_size, stride=stride, padding=padding, groups = groups)
         
     def forward(self, x, mask): # B x T x C
@@ -81,5 +109,23 @@ class Downsample(torch.nn.Module):
     
 if __name__ == "__main__":
     # Test encoder
-    encoder = Encoder()
+    model = Encoder()
+    print(model)
+    
+    print("Layer freezing for hubert")
+    count = 0
+    for name, param in model.named_parameters():
+        count += 1
+        if count < 177:
+            
+            param.requires_grad = False
+            print(name, param.requires_grad)
+        elif 'model.layer_norm' in name:
+            param.requires_grad = False
+            print(name, param.requires_grad)
+        elif 'model.final_proj' in name:
+            param.requires_grad = False
+            print(name, param.requires_grad)
+        else:
+            print(name, param.requires_grad)
     
