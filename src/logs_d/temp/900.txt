@@ -1,4 +1,0 @@
-Decoded text: QYISBF UTS  EP SPSE IRNH RTWZTSB ARTSNH YRTSE QTA YRTRTS  ENB  TSEES YRM ITCB E
-Decoded text with special tokens: QYISBF? UTS? ? EP SPSE? IRNH RTWZTSB ?ARTSNH ?YRTSE? ?QTA YRTRTS? ? ENB ? TSE?ES YRM ITCB? E
-Decoded text with special tokens (repeated): YISSBF?????? UTTS? ??? EEP       SPSE?   IRNH   RRRTWZTTTSB  ?ARTSNH ?YRTTTSE????? ?QTTTTTA  YRTTTTTTTTRTTTTTTTS????? ????? ENB ??   TTTSE????????EES      YRRM ITTTTTTCB??     TTTTTTTE
-Total time: 7.36 seconds and path: /raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/LJSpeech-1.1/wavs/LJ035-0055.wav

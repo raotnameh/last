@@ -47,7 +47,7 @@ upsample:
 
 discriminator:
   hidden_dim: 256
-  num_layers: 2
+  num_layers: 1
   kernel_size: 9
 
 decoder:
@@ -71,16 +71,16 @@ train:
   train_disc: True
   train_full: False
 
-  lr_enc: 0.0001
-  lr_down: 0.0001
-  lr_dec: 0.0001
+  lr_enc: 0.0005
+  lr_down: 0.0005
+  lr_dec: 0.0005
   lr_disc: 0.0001
   grad_clip: 10.0
   
   num_steps: 100000
   freeze_steps: 1
   gradient_accumulation_steps: 1
-  discriminator_freq: 10 # every N steps
+  discriminator_freq: 2 # every N steps
 
   mixed_precision: False
   resume_checkpoint: False
@@ -90,7 +90,7 @@ loss:
   recon_loss_weight: 1.0
   smooth_loss_weight: 1.0
   commit_loss_weight: 1.0
-  gen_loss_weight: 0.01
+  gen_loss_weight: 1.0
   
   disc_loss_weight: 1.0
   gp_weight: 1.0

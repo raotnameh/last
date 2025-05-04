@@ -1,4 +1,0 @@
-Decoded text: EONETE T U NISU RNEIEER WT INE ND T IET TNDEE I I TET E ET TNTNTN NT T TITE ITE ENNTEENEN DTU UEIN N T NTIEN NC E
-Decoded text with special tokens: EO?NETE T U? ?NI?SU? RN?EIE?ER WT ?INE? ND T ?IET TNDE?E I I TET E ET? TNTNTN NT T TITE ?ITE EN?NT?E?ENEN DTU UEIN N T NTIEN ?NC E
-Decoded text with special tokens (repeated): OO?NETE T U? ?NNI?SSU?  RN?EIE??EER   WT ?INE??? NDD   TT ??IET TTNNDE?E   I   I TET  E   ET?   TNTNTN NT  T    TIITE ?IIITEE EN?NNNNT?EE?ENEEN DTTU UEIN N T NTIEEN   ?NNCC      RE
-Total time: 7.2 seconds and path: /raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/LJSpeech-1.1/wavs/LJ016-0265.wav

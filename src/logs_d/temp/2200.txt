@@ -1,4 +1,0 @@
-Decoded text: WTSB UTS  E EO IEOABTER E UTSIR RISO R ERIRIRIRIRIEA ATEB UESB TSN  RISIORI SO IAOEH  HH
-Decoded text with special tokens: WTSB UTS ? E? EO I?EOAB?TER E? UTSIR RIS?O R ERIRIRIRIRIEA? A?TEB UESB? TSN ? RISI?ORI S?O IA?OEH? ? HH
-Decoded text with special tokens (repeated): TTSSB   UTTSS ? E?   EO I?????EOOAB?TTTTTER EE???  UTTTTSIR  RIS????OOO R  ERRIRIIRRRIRRRRRIRIEA? A?TEB UUESB?? TSSN  ? RISI??ORRI SS????OO IA?OEH? ???  H    H
-Total time: 6.36 seconds and path: /raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/LJSpeech-1.1/wavs/LJ016-0339.wav

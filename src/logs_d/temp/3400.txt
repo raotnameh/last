@@ -1,4 +1,0 @@
-Decoded text: SIB TS A UAOHRIEH SPEOTSABUEHOU TC
-Decoded text with special tokens: SIB TS A? UAOH?RIEH? SP?EOTSAB?UEHOU TC
-Decoded text with special tokens (repeated): IB TS  A? UAAOOH?RRRIEH? SSP??EOTTTSAB?UEHOOU TTTRRC
-Total time: 2.08 seconds and path: /raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/LJSpeech-1.1/wavs/LJ035-0073.wav

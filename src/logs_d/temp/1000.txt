@@ -1,4 +1,0 @@
-Decoded text: HO TP EBO  YTP TQ RTSURTRQTO RTRE
-Decoded text with special tokens: HO? TP? ?EB?O? ? YTP? ?TQ RTS?URTRQTO? ?RTRE
-Decoded text with special tokens (repeated): O?? TTTP? ?EB???O????? ?? YTTP? ??TTTTTQ RTSS???URTRQTTTTTTTTTTTTTTTTO? ?RTRTTE
-Total time: 3.16 seconds and path: /raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/LJSpeech-1.1/wavs/LJ045-0109.wav

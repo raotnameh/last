@@ -1,4 +1,0 @@
-Decoded text: IHY TPEHYEPHYAETEP ORSNETIBSHSHHOIETSYUEPR SNH
-Decoded text with special tokens: ?I?HY TP?EHYEPHYA?ETEP ORSN?ETIB?SHS?H?HOIETS?YUEPR SN?H?
-Decoded text with special tokens (repeated): I?HY TP?EHYEEPHYAA?ETEP ORRSN???ETIBB?SHSS?HH?HOIETS??YUEPRR SNN??H    ?
-Total time: 2.88 seconds and path: /raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/LJSpeech-1.1/wavs/LJ039-0013.wav

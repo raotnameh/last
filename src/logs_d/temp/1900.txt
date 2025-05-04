@@ -1,4 +1,0 @@
-Decoded text: ZATOSH  EPMOAETOEAO TR ER TS R IATPO R TRIRIA ESN TB AEN TRIRIEN A SB  RSEA TRIPAO EM IAEBO I R IATS TO
-Decoded text with special tokens: ZATOSH? ? EPMOAET?OEAO? TR ER? TS R IA?TPO R TRIRI?A? ESN? TB? A?EN? TRIRIEN A? SB ? RSEA? TRIP?AO EM IAEB?O I R IA?TS? TO
-Decoded text with special tokens (repeated): ATOSH??  ?? EPMOAET?OOEAO? TTTRR  ER? TTS     R  IIA??TTTPO RR TTTTRIIIRRRRRII??A? ESN?   TTTB? A??EN??       TTTRRRIRIIEN A? SSSB ?????? RRSEA?????  TTRIP?AO EEM IAEB?OO I  RRR    IA??TTTTSS?      TRRO
-Total time: 8.08 seconds and path: /raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/LJSpeech-1.1/wavs/LJ006-0096.wav

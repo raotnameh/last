@@ -1,4 +1,0 @@
-Decoded text:  RSN TS  SAOUEPRSN  UESB IYSRHORS H H RIRUTEBTETOAHOHSEBOEBU NTPOUER IHUA TBTEOATPBTPBOUEBO C
-Decoded text with special tokens:  RSN? TS ? S?A?OUEPRSN? ? UESB I?YSR?HORS ?H H RIRUTEBTETO?AHO?H?SEBOEB?U NTPOUER IHUA? TB?TEO?A?TPBTPBOUEBO C
-Decoded text with special tokens (repeated): RRRSNN??? TSS  ?? S?A?OUEPRRSN? ?? UESB   I?YSR???HORS  ??H HH RIRRRRRRUTEBTETOO?AHO?H?SEBOOEB?U NTTTTPOOOUEER IHHUAA???   TTTB?TTTEO?A??TTTPBTTTTPBOUEEBO  IC
-Total time: 6.32 seconds and path: /raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/LJSpeech-1.1/wavs/LJ042-0073.wav
