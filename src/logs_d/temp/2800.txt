@@ -1,0 +1,4 @@
+Decoded text: HRS UABOUSBTSBUETOTEIAOTOAOUTETOTBYTITPTERIOEOIL
+Decoded text with special tokens: HRS? U?ABOUSB?TSB?UETOTEI?AOTOA?OUTETOTBYTITPTERI?OEOIL
+Decoded text with special tokens (repeated): HRRSS?? U?ABOUSSB?TSSB??UETTOTEII?AOTTOOA??OUTETTOTTTBYTTITPTTERI??OOEOOIEL
+Total time: 3.0 seconds and path: /raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/LJSpeech-1.1/wavs/LJ039-0036.wav

@@ -1,0 +1,4 @@
+Decoded text: HSN  USIATA SPTUSHOHETRZEPOU EOTY ESB T C
+Decoded text with special tokens: HSN ? USIATA? SP?TUS?HOH?ETRZEPOU EOTY ESB? T C
+Decoded text with special tokens (repeated): SN   ? USSSIAATA? SP?TUSS???HOHHHHH??ETRZEPOOU EOOTTTY ESB?? TTTTTTTTT IC
+Total time: 2.92 seconds and path: /raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/LJSpeech-1.1/wavs/LJ039-0194.wav

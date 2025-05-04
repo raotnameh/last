@@ -1,0 +1,4 @@
+Decoded text: HAAOUTS H  TY EBORIRIR UIEAA ETR SN N HEIA TP UTEH
+Decoded text with special tokens: H?A?AO?UTS H? ? TY EBORIRIR? UIEA?A? ETR SN? N? H?EIA? TP UTEH
+Decoded text with special tokens (repeated): ?AA?AAO?UTTS H? ???  TTY EEBOOORIRIR? UIEA?A???   ETR SSN? N?? H?EIAA?? TTPP UTERRH
+Total time: 3.3200000000000003 seconds and path: /raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/LJSpeech-1.1/wavs/LJ025-0107.wav

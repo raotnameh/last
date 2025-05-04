@@ -186,7 +186,11 @@ def configure_training_mode(models, config):
     count = 0
     for name, param in models['encoder'].named_parameters():
         count += 1
-        if count < 177:
+        if count < 193: # 177
+            param.requires_grad = False
+        elif 'model.layer_norm' in name:
+            param.requires_grad = False
+        elif 'model.encoder.layer_norm' in name:
             param.requires_grad = False
         else:
             param.requires_grad = True
@@ -350,7 +354,6 @@ def main():
     
     # Initialize models    
     models = setup_models(config, vocab)
-    
     
     # Training setup
     configure_training_mode(models, config)

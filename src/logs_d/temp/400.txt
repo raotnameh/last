@@ -1,0 +1,4 @@
+Decoded text: DO'O' GS'NIGG'PJ LI'LVLDS'LVES'SPDIYCR I SR DI XUR' LEXJX'J'SCG'DS' 'SDE''SP
+Decoded text with special tokens: D?O'O' GS'NIG?G'?PJ LI'L?VLDS'?LVES'SPD?IYCR I ?SR DI XUR' LEXJX'J'SCG'DS' ?'SDE?'?'SP
+Decoded text with special tokens (repeated): ?O''O'''' GGGS'''NIG?G''''?PPJJ LLLLI'L??VLDS'?LVEES'SPD?IYCR II  ???SR DI   XUR''' LLEXJX'J'SCG'DS' ?'SDE?''?'SSLLLLP
+Total time: 4.72 seconds and path: /raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/LJSpeech-1.1/wavs/LJ017-0272.wav

@@ -3,7 +3,7 @@ checkpoint:
   step: 5000
 
 logging: 
-  dir: "/raid/home/rajivratn/hemant_rajivratn/last/src/logs"
+  dir: "/raid/home/rajivratn/hemant_rajivratn/last/src/logs_d"
   step: 100
 
 device: "cuda"
@@ -19,7 +19,7 @@ dataset_speech:
 
   min_duration: 32000
   max_duration: 320000
-  batch_size: &batch_size_value 50
+  batch_size: &batch_size_value 8
 
 dataset_txt:
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train.wrd"
@@ -47,8 +47,8 @@ upsample:
 
 discriminator:
   hidden_dim: 256
-  num_layers: 8
-  kernel_size: 11
+  num_layers: 2
+  kernel_size: 9
 
 decoder:
   speaker:
@@ -56,7 +56,7 @@ decoder:
     speaker_emb_dim: 512
     
   transformer:
-    decoder_layer: 8
+    decoder_layer: 4
     decoder_head: 2
     decoder_hidden: 256
     conv_filter_size: 1024
@@ -77,10 +77,10 @@ train:
   lr_disc: 0.0001
   grad_clip: 10.0
   
-  num_steps: 50000
-  freeze_steps: 1000
+  num_steps: 100000
+  freeze_steps: 1
   gradient_accumulation_steps: 1
-  discriminator_freq: 2 # every N steps
+  discriminator_freq: 10 # every N steps
 
   mixed_precision: False
   resume_checkpoint: False
@@ -90,7 +90,7 @@ loss:
   recon_loss_weight: 1.0
   smooth_loss_weight: 1.0
   commit_loss_weight: 1.0
-  gen_loss_weight: 1.0
+  gen_loss_weight: 0.01
   
   disc_loss_weight: 1.0
   gp_weight: 1.0

@@ -1,0 +1,4 @@
+Decoded text: MIABNABESBN PEOREPTEH EDOEP OR IOU ORUEN  TEYEBAOAETPO 
+Decoded text with special tokens: MIABN?AB?ESBN P?EOR?EP?TEH EDO?EP OR I?OU ORUEN ? TEYEBAOAETPO ?
+Decoded text with special tokens (repeated): IABN?AAAB??ESBNN P?EEOOOOORRRRRRRRRR?EP?TTTEHH EDO?EEEP OR I????OU ORUENN ??? TTEYEEBAOAETPO RR?
+Total time: 3.84 seconds and path: /raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/LJSpeech-1.1/wavs/LJ027-0005.wav

@@ -1,0 +1,4 @@
+Decoded text: DA N ABUETR S OUTEPBOUEIREOB SUEASHUSNB AOS HERIEAOUSIOEHOH S SR UTEPYSIAOIHOYTRC
+Decoded text with special tokens: DA? N? AB?UETR S ?OUTEPBOUEIR?EOB? S?UEA?SH?USN?B? AOS? H?ERIEA?OUSI?O?EHOH S? SR? U?TEPYSI?AOIHOYTRC
+Decoded text with special tokens (repeated): AA?   N?  AB?UETR S  ?OUTEPBOUEIR???EOB?? SS??UEA??SH??USN?B?? AOOS???? HH?ERIEA?OUSI?OO?EHOH S??? SR? U?TTTEPYSI?AAOOIIHOYTTTTTR C
+Total time: 5.24 seconds and path: /raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/LJSpeech-1.1/wavs/LJ028-0285.wav

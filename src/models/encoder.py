@@ -23,6 +23,8 @@ arg_overrides = {
     "attention_dropout": 0.0,
 
     "feature_grad_mult": 0.0, # always keeps the feature grad mult to 0.0
+    
+    "fp16": False,
 }
 
 
@@ -75,11 +77,9 @@ class Conv1dBlock(nn.Module):
 
     def forward(self, x):
         # x: (batch, time, channels)
-        x = x.transpose(1, 2)
         # Apply causal (left) padding: (padding_left, padding_right)
         x = F.pad(x, (self.causal_padding, 0))
         x = self.conv(x)
-        x = x.transpose(1, 2)
         
         return x  
 
@@ -91,8 +91,8 @@ class Downsample(torch.nn.Module):
         self.norm = torch.nn.LayerNorm(input_dim)
         
         padding = kernel_size // 2
-        # self.conv = Conv1dBlock(input_dim, output_dim, kernel_size=kernel_size, dilation=1, stride=stride, groups=groups)
-        self.conv = torch.nn.Conv1d(input_dim, output_dim, kernel_size=kernel_size, stride=stride, padding=padding, groups = groups)
+        self.conv = Conv1dBlock(input_dim, output_dim, kernel_size=kernel_size, dilation=1, stride=stride, groups=groups)
+        # self.conv = torch.nn.Conv1d(input_dim, output_dim, kernel_size=kernel_size, stride=stride, padding=padding, groups = groups)
         
     def forward(self, x, mask): # B x T x C
         

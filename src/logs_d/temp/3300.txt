@@ -1,0 +1,4 @@
+Decoded text: S N ABTSBEABN AYER  TS  TIAHO  TSAOSITIHYUERBHETMEBEOTUSPTSEITSNH U TC
+Decoded text with special tokens: S N ABTSB?EABN A?YER? ? TS ? TIA?HO ? TSA?O?SI?TIHYUERBH?ETMEB?EO?TUSP?TS?EI?TSN?H U TC
+Decoded text with special tokens (repeated):  N  ABTSB?EEEABNN A?YEER? ???? TTSS   ? TIAA????HO ? TSA?OO?SI?TTTIHYUEERBHHHH??ETMEEB?EO?TUSP???TTS???EI?TTSSN???H U TTT C
+Total time: 4.92 seconds and path: /raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/LJSpeech-1.1/wavs/LJ045-0076.wav

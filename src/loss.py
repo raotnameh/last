@@ -31,27 +31,32 @@ class GANLoss(nn.Module):
         super().__init__()
         self.gp_weight = gp_weight
 
-    def forward(self, fake, real, fake_x, real_x, fake_smooth=0.0, real_smooth=0.0):
+    def forward(self, fake, real, fake_x, real_x, real_pad_mask, fake_pad_mask, fake_smooth=0.0, real_smooth=0.0):
         # using zero class for real and one class for fake
         """Computes adversarial loss and gradient penalty."""
 
         
         
-        loss_fake = F.binary_cross_entropy_with_logits(
-            fake, torch.ones_like(fake) - fake_smooth, reduction="mean"
-        )
-        loss_real = F.binary_cross_entropy_with_logits(
-            real, torch.zeros_like(real) + real_smooth, reduction="mean"
-        )
+        # loss_fake = F.binary_cross_entropy_with_logits(
+        #     fake, torch.ones_like(fake) - fake_smooth, reduction="mean"
+        # )
+        # loss_real = F.binary_cross_entropy_with_logits(
+        #     real, torch.zeros_like(real) + real_smooth, reduction="mean"
+        # )
+        
+        loss_fake = fake.mean()
+        loss_real = -real.mean()
+
         total_loss = loss_fake + loss_real # total loss is sum of fake and real losses
+
         grad_pen = None
         if self.training and self.gp_weight > 0:
-            grad_pen = self.calc_gradient_penalty(real_x, fake_x) * self.gp_weight
+            grad_pen = self.calc_gradient_penalty(real_x, fake_x, real_pad_mask, fake_pad_mask) * self.gp_weight
             total_loss += grad_pen
         
         return {"total_loss": total_loss, "loss_fake": loss_fake, "loss_real": loss_real, "grad_pen": grad_pen}
 
-    def calc_gradient_penalty(self, real_data, fake_data):
+    def calc_gradient_penalty(self, real_data, fake_data, real_pad_mask, fake_pad_mask):
         """
         Calculates the gradient penalty.
         
@@ -70,13 +75,17 @@ class GANLoss(nn.Module):
 
         real_data = real_data[:b_size, :t_size]
         fake_data = fake_data[:b_size, :t_size]
+        real_pad_mask = real_pad_mask[:b_size, :t_size]
+        fake_pad_mask = fake_pad_mask[:b_size, :t_size]
 
         alpha = torch.rand(real_data.size(0), 1, 1, device=real_data.device)
         alpha = alpha.expand(real_data.size())
         interpolates = (alpha * real_data + (1 - alpha) * fake_data).detach()
         interpolates.requires_grad_(True)
+        
+        interp_pad_mask = real_pad_mask | fake_pad_mask  # (B, T, 1)
   
-        disc_interpolates = self.discriminator(interpolates, torch.zeros_like(interpolates).bool()[:,:,:1])
+        disc_interpolates = self.discriminator(interpolates, interp_pad_mask)
 
         gradients = autograd.grad(
             outputs=disc_interpolates,
@@ -104,7 +113,7 @@ class Loss:
     
     def step_disc(self, output):
         # fake, real, fake_x, real_x, fake_smooth=0.0, real_smooth=0.0):
-        loss = self.gan_loss(output["disc_fake"], output["disc_real"], output["disc_fake_x"], output["disc_real_x"])        
+        loss = self.gan_loss(output["disc_fake"], output["disc_real"], output["disc_fake_x"], output["disc_real_x"], output["real_pad_mask"], output["fake_pad_mask"])        
         return loss
         
 
@@ -117,7 +126,8 @@ class Loss:
 
         # generator loss
         if output["disc_fake"] is not None:
-            gen_loss = F.binary_cross_entropy_with_logits(output["disc_fake"], torch.zeros_like(output["disc_fake"]), reduction="mean")
+            # gen_loss = F.binary_cross_entropy_with_logits(output["disc_fake"], torch.zeros_like(output["disc_fake"]), reduction="mean")
+            gen_loss = -output["disc_fake"].mean()
         else:
             gen_loss = 0.0
         

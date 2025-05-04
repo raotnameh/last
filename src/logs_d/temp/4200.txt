@@ -1,0 +1,4 @@
+Decoded text: ZAOTSHIBB H O RIRTSNATPOAYUETEBH RYR RIRSI TAPYUABYUETYEPIEIBO ERD AOASNH U
+Decoded text with special tokens: ZAOTSH?IB?B? H O RIR?TSN?A?TPOA?YUETEB?H RYR RIRSI? TAPYU?ABYUETYEPIEIBO ?ERD AO?A?SN?H U?
+Decoded text with special tokens (repeated): AAOTTTSH???IIB?B? H OO RRRIR?TTTSN????A??TTTTPOA?YUETEB?HHHHH RYRR RIIIRRRSI? TAPYU?ABYUETYEPIEIBOOO ??ERD AO?A?SN?H UI?
+Total time: 4.8 seconds and path: /raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/LJSpeech-1.1/wavs/LJ028-0043.wav

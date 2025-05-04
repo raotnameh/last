@@ -1,0 +1,4 @@
+Decoded text: SEH UA IATRIAOUTPB HABTEO ITRIRIN UTESBUEPDOEPTOR SBTP U TG
+Decoded text with special tokens: SEH U?A? IA?TRIA?OUTPB H?AB?TEO I?TRIRIN? UTESB?UEPDOEPTOR SB?TP U TG
+Decoded text with special tokens (repeated): EH U?AA???  IA?TRIIA?OOUTTPB H?AAB?TEO  I?TTTTRIRRRIIN?   UTESB???UEEPDOOOOEPTOORR SSBB?TTP  U TTRG
+Total time: 3.96 seconds and path: /raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/LJSpeech-1.1/wavs/LJ006-0105.wav
