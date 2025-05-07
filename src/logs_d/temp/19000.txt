@@ -1,0 +1,4 @@
+Decoded text: G GMILS RH TET HEALR OH TOFE IRHSORF E E OI IA T  TMOWW RF CYB RNYGTOTAMMIMIE
+Decoded text with special tokens: G G?MILS? RH ?TET HEAL?R OH? TOFE ?IRH?SO?RF E E ?O?I IA? ?T ? ?TMOW?W ?RF CYB? ?RNY?G?TOTA?M?MIMIE
+Decoded text with special tokens (repeated):  G?MMMIIILSS? RH   ?TET HEEEEAL??RRR   OOH??  TOFEE ?IIRH??SO??RF E E  ?O?I IA???   ?T  ??  ??TMOOW?W  ?RF CYB??  ?RNY???GG??TOOTAA?M?MMMIMI?E
+Total time: 5.68 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_152253_2289_25.wav

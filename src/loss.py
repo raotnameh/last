@@ -127,7 +127,7 @@ class Loss:
         # generator loss
         if output["disc_fake"] is not None:
             # gen_loss = F.binary_cross_entropy_with_logits(output["disc_fake"], torch.zeros_like(output["disc_fake"]), reduction="mean")
-            gen_loss = -output["disc_fake"].mean()
+            gen_loss = -output["disc_fake"].mean() #+ output["lm_loss"]
         else:
             gen_loss = 0.0
         

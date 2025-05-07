@@ -1,0 +1,4 @@
+Decoded text: AAE H EA DD PT N EEHALE ET OITE
+Decoded text with special tokens: A?A?E H? EA ?D?D? P?T N ?E?EHALE ET? OITE
+Decoded text with special tokens (repeated): AAAA?????????A?E H?    EEA  ???D??D??? P???T N ?E?EHALE EETT? OIT???E
+Total time: 2.7600000000000002 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_127539_307_18.wav

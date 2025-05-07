@@ -1,0 +1,4 @@
+Decoded text: IT HATHUEO HEATEAETPODT GSNOW A NHRHRHALYN OSR ATIAEASBN HOMSR GMW EUEALNRO A PGHATXU EATXAEU PHITATE
+Decoded text with special tokens: ?I?T H?ATHUEO H?EATEAET?PODT? G?SN?O?W A? NHR?HR?HALYN ?OSR? ?AT?IAEASBN HO?MSR? G?M?W? EUEAL?N?RO A? PGHA?TXU EATX?AEU PH?IT?ATE
+Decoded text with special tokens (repeated): ?????I?T H?ATTHUUUEEO H?EATTEAET?PODT? GG??SN?O??W   AA?? NHR?HR?HALYN ?OSR? ?AATTT??IAAEEASBN HO?MSR? GG???M?W? EUUUEAL?N?RO  AA?  PGHA?TXU EATTX?AEU  PH?IT?ATTAAAE
+Total time: 6.6000000000000005 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_261140_8629_32.wav

@@ -8,20 +8,10 @@ args = parser.parse_args()
 directory = args.directory
 
 # Directory where your images are stored
-prefix = f'{directory}/plots/codebook_usage_distribution_'
-ext = '.png'
-
-# Gather all image file paths in order of step
-image_files = []
-step = 0
-while True:
-    filename = f'{prefix}{step}{ext}'
-    print(f"Looking for images in {filename}")
-    if not os.path.exists(filename):
-        continue  # Stop when the file doesn't exist
-    image_files.append(filename)
-    step += 1000
-
+directory = f'{directory}/plots/'
+# get all the files with .png extensin at prefix 
+image_files = os.listdir(directory)
+print(image_files)
 
 print(f"Found {len(image_files)} images.")
 # Output path for the GIF

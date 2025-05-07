@@ -1,0 +1,4 @@
+Decoded text: QOIHI OEIEDHOIRETOETETETETETEYEAEDTETEC EIAOEOATAITOEOEOAED ADE
+Decoded text with special tokens: QOIHI OEIEDHO?IR?ETOET?E?TE?TETETEYEAEDTETEC EIAOEOATAITOEOEOAED? ?ADE
+Decoded text with special tokens (repeated): OIIHII OOEIEEEEEDHHOO??IIR?EETOOET?EEEE?TTTEEE?TTTTETEETEEYEEAAEDDTTETECC    EEIAOEOATTAITOOOEEEEOEOAED? ?AADAE
+Total time: 4.44 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_145702_1898_17.wav

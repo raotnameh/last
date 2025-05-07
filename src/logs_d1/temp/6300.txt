@@ -1,0 +1,4 @@
+Decoded text: EATTLSHS I UO NOPN NLS NHETPHUNE AIHN ESWLBS WE BMF NH TE
+Decoded text with special tokens: EA?T?TL?SHS I UO NOPN? NLS ?NHETPH?UN?E AI?HN ESWLB?S W?E BMF NH? TE
+Decoded text with special tokens (repeated): EA?????T??TTTL?????SHSSS   II UO NOPNN?     NLSS  ?????NHEETTPHH??UUNN?E AAI??HN  ESWLB????S W?E  BMMMF       NH? TAAAAAAE
+Total time: 4.88 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_186175_4014_31.wav

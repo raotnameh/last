@@ -1,0 +1,4 @@
+Decoded text: UTA W UOP ROXTOLE HIEDPRN ATS N ALUE OTIBETETWF N EIAIT IAS HVAE TOEAUT E OSUNT DS OTETEN TRN HETI MRN DSR HIAIL SOW CT RKIS OE
+Decoded text with special tokens: ?UTA? W? ?UOP ROX?TOLE HI?EDP?R?N ATS ?N AL?UE O?TIBETET?WF N E?IAIT ?IA?S HVAE TOEAUT ?E OSUNT D?S ?OTE?TEN TRN HE?TI MRN DSR H?IAIL? SOW C?T RKIS? ?OE
+Decoded text with special tokens (repeated): UUTA?? W? ?UOP ROOX???TOLE  HI?EDPP?R???N ATS  ?NN   AAL?UE  O?TIBETET??WF   N  E?IAIT ?IIIAA?S  HVAE  TOEAUUT  ????EEEE OOOSUNT D??S ??OTE?TEN TRNN HE?TI  MRNN DSR H?IAIL?  SOOW C??T RKIS? ?O?E
+Total time: 7.76 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_16882_4406_8.wav

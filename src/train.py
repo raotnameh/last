@@ -12,11 +12,9 @@ import yaml
 import torch
 import torch.optim as optim
 
-from torch.utils.data import DataLoader, SequentialSampler, BatchSampler
+from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.tensorboard import SummaryWriter
-from torch.cuda.amp import autocast, GradScaler
-
 
 sys.path.append(f"{os.getcwd()}/models/decoder")
 warnings.simplefilter("ignore")
@@ -96,7 +94,6 @@ def initialize_datasets(config, split='train'):
         num_workers=4
     )
     
-   
     logging.info(f"Number of batches in {split} speech dataset: {len(speech_loader)}")
     
     if split == 'train':           
@@ -112,7 +109,7 @@ def initialize_datasets(config, split='train'):
 
         logging.info(f"Number of batches in text dataset: {len(text_loader)}")
 
-        return speech_loader, text_dataset, text_loader, text_dataset.vocab, text_dataset.prior
+        return speech_loader, text_dataset, text_loader, text_dataset.vocab
     else:
         return speech_loader
 
@@ -153,9 +150,7 @@ def setup_models(config, vocab):
         kernel_size=config['discriminator']['kernel_size'],
         )
     
-    
     logging.info(f"Size of codebook: {models['codebook'].embedding.weight.shape[0]} x {models['codebook'].embedding.weight.shape[1]}")
-
     logging.info(models['encoder'])
     logging.info(models['downsample'])
     logging.info(models['codebook'])
@@ -173,7 +168,6 @@ def setup_models(config, vocab):
                     cur_params)
         total_params += cur_params
     logging.info("Total parameters: %.4fM", total_params)
-
     
     return models
 
@@ -186,7 +180,7 @@ def configure_training_mode(models, config):
     count = 0
     for name, param in models['encoder'].named_parameters():
         count += 1
-        if count < 193: # 177
+        if count < 177: # 193,177,161,145,129,113,97,81,65,49,33,17
             param.requires_grad = False
         elif 'model.layer_norm' in name:
             param.requires_grad = False
@@ -215,23 +209,23 @@ def configure_optimizers(models, config):
         'enc': optim.AdamW(
             [p for p in models['encoder'].parameters() if p.requires_grad],
             lr=config['train']['lr_enc'],
-            betas=(0.5, 0.9),
+            betas=(0.5, 0.99),
         ),
         'down': optim.AdamW(
             [p for p in models['downsample'].parameters() if p.requires_grad],
             lr=config['train']['lr_down'],
-            betas=(0.5, 0.9),
+            betas=(0.5, 0.99),
         ),
         'dec': optim.AdamW(
             [p for p in models['upsample'].parameters() if p.requires_grad] +
             [p for p in models['decoder'].parameters() if p.requires_grad],
             lr=config['train']['lr_dec'],
-            betas=(0.5, 0.9),
+            betas=(0.5, 0.99),
         ),
         'disc': optim.AdamW(
             [p for p in models['discriminator'].parameters() if p.requires_grad],
             lr=config['train']['lr_disc'],
-            betas=(0.5, 0.9),
+            betas=(0.5, 0.99),
         )
     }
     
@@ -251,7 +245,7 @@ def configure_optimizers(models, config):
 
         def lr_lambda(current_step):
             if current_step < warmup_steps:
-                # Linear warmup: from 0 to 1
+                # Linear warmup
                 return float(current_step) / float(max(1, warmup_steps))
             elif current_step < warmup_steps + constant_steps:
                 # Constant phase: LR stays at base value (multiplier 1)
@@ -275,7 +269,6 @@ def configure_optimizers(models, config):
     
     return optimizers, schedulers
     
-
 
 def load_checkpoint(checkpoint_path, models, optimizers, schedulers, device):
     """Load model and optimizer states from checkpoint."""
@@ -314,9 +307,6 @@ def main():
     else:
         config = load_config(args.config) 
     
-    # Configure logging
-    configure_logging(config['logging']['dir'])
-    
     # Set random seeds
     random.seed(config['train']['seed'])
     torch.manual_seed(config['train']['seed'])
@@ -334,19 +324,15 @@ def main():
         config['train']['mixed_precision'] = True
     if args.eval:
         config['eval']['eval'] = True
-    
-    config['train']['num_steps'] *= config['train']['gradient_accumulation_steps']
-    config['train']['freeze_steps'] *= config['train']['gradient_accumulation_steps']
-    config['checkpoint']['step'] *= config['train']['gradient_accumulation_steps']
-         
         
+    # Configure logging
+    configure_logging(config['logging']['dir'])
     logging.info(f"Loaded config from {args.config}")
     logging.info(f"Command-line args: {args}")   
     logging.info(f"Config after command-line overrides: {config}")
     
-    
     # Initialize datasets and models
-    train_speech_loader, text_dataset, text_loader, vocab, prior = initialize_datasets(config, split='train')
+    train_speech_loader, text_dataset, text_loader, vocab = initialize_datasets(config, split='train')
     val_speech_loader = initialize_datasets(config, split='val')
     test_speech_loader = initialize_datasets(config, split='test')
     
@@ -354,7 +340,6 @@ def main():
     
     # Initialize models    
     models = setup_models(config, vocab)
-    
     # Training setup
     configure_training_mode(models, config)
     
@@ -370,10 +355,8 @@ def main():
     # root dir for saving 
     save_dir = config['logging']['dir']
     
-    # Main training loop
     # Initialize TensorBoard writer
     writer = SummaryWriter(log_dir=config['logging']['dir'])
-    
     
     # Resume training if checkpoint specified
     start_step = 1
@@ -398,24 +381,8 @@ def main():
             device=device,
         )
         
-    
-    if config['train']['train_vqvae']:
-        train_vqvae(
-            models=models,
-            optimizers=optimizers,
-            schedulers=schedulers,
-            speech_loader=speech_loader,
-            text_loader=text_loader,
-            text_dataset=text_dataset,
-            loss_module=loss_module,
-            config=config,
-            device=device,
-            writer=writer,
-            start_step=start_step,  # Add this
-            save_dir=save_dir,
-        )
-    elif config['train']['train_disc']:
-        train_disc(
+    else: 
+        train(
             models=models,
             optimizers=optimizers,
             schedulers=schedulers,

@@ -1,0 +1,4 @@
+Decoded text: EIT P RG KATIUN WE REY AR EIEYE NE AWA KREIR ROUAOUH E UOEA ONNE READO O HSTROAHOAKREA IYBTSHETIX
+Decoded text with special tokens: EIT? ?P RG? K?ATIUN ?W?E RE?Y AR? EIEYE N?E AW?A KRE?IR ROUAOU?H ?E ?UO?EA O?N?NE READ?O O H?STR?OAHO?AKREA ?IYB?TSHETIX
+Decoded text with special tokens (repeated): IIIIIIIITTTTT??? ??P  RG??  K?ATIUN  ??W?EE RE?Y  AR??? EEEIIEEYEE N?EE AW?A KRE??IRR  ROOUAOOU?H ??EE ??UUUOO?EEA O?N?NE READ?OOO O  H?STTR?OAHO?AKREA ?IYYYB???TSSSSHEETTTTTTTITTTTTX
+Total time: 7.32 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_90542_7190_23.wav

@@ -94,6 +94,10 @@ class Tokenizer(nn.Module):
         z_q = z_q.contiguous().view(b, t, c) # (batch, time, channels)
         z_q = z_q * mask
         
+        # z_q = z_flat + (quantized - z_flat).detach() # btc  
+        # z_q = z_q.contiguous().view(b, t, c) # (batch, time, channels)
+        # z_q = z_q * mask
+        
         # 8. commitment loss;  MSE loss between z and z_q ignoring padding positions
         commitment_loss = F.mse_loss(z, z_q.detach(), reduction='none') * mask # btc
         valid_count = mask.sum() * z.shape[-1] # Total number of valid (non-masked) elements

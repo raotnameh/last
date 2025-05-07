@@ -1,0 +1,4 @@
+Decoded text: TIOAHERNONENANENONT ODWOWH H RDTAST NEUW HE O OH HSTNNSNNWYNRUEDAHAONTMEIHEN HUEHA SUATENE RDE  HT D  W SR E
+Decoded text with special tokens: TIOAHER?N?ONEN?ANENONT ODWOWH H? RDTAST NE?U?W HE O? O?H HS?TN?N?S?N?NWYNRUEDAHAO?N?TMEI?HEN HUEHA SUATENE ?RDE? ? H?T D ? W SR E
+Decoded text with special tokens (repeated): IIIOAAAHER?N?ONEEEN?ANEENONT ODWOWH H? RDTAST NE?U?W HE O? O?H HS?TN?N?S?N?NWYNRUUEDAHHAO???N?TMEI?HENN  HUEHHA SSUATENE ?RDE? ?? H?T D     ? W SR EE
+Total time: 5.96 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_123720_481_9.wav
