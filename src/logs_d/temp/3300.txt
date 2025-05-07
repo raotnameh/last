@@ -1,4 +1,0 @@
-Decoded text: FATSNRN W PEL DERN HDEN AE HETSNR DOHRU HDRSW E CE W AEBW E P RN ESN AE
-Decoded text with special tokens: FATSN?R?N W? PEL? DE?R?N HDEN AE HETSN?R DO?HR?U HD?RSW E CE W AEBW E P ?R?N ?ESN? ?AE
-Decoded text with special tokens (repeated): AAAAATTSN??R?N W?? PEL??    DE??R?N HDEN   AE  HETSN????R   DO?HR?U   HD??RSW  E  CE  W AEEBW  E P ?R?N  ?ESN?  ?AATTTE
-Total time: 4.76 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_135914_1594_40.wav

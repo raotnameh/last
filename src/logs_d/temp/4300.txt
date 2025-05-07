@@ -1,4 +1,0 @@
-Decoded text: FIT VUWE PHF NVU EDHAEUE C CW DE NSMKHIATATRSMLN GHICOSPSL NHR U ETITAT HAE NRW DE E HTITTAN R N HW AEAE NHDL U E EATATN W UEAEE
-Decoded text with special tokens: ?FIT VUWE PH?F? N?VU ED?HAE?UE C CW DE N?SMKHIATAT?RSM?L?N ?GHI?COS?PSL? NHR U ETITAT HAE? NRW DE E H?TIT?TA?N R N HW AEAE NHDL U E EATAT?N ?W UEAEE
-Decoded text with special tokens (repeated): ?FIIT       VUWEEEEE PH??F?  NN?VU EED?HAE?UEE  C    CW DE  NN???SMKHIATAT??RSM?L?N ??GHII??COS??PSL? NHR  U   EEEETTTITTTTTATT  HAEE? NRW DE  EE     H???TITTTT?TTA??N R      N HW  AEAEE NHDL U E EEEATTTTTTAT?N ?W UEEEAETE
-Total time: 8.88 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_41998_6081_12.wav

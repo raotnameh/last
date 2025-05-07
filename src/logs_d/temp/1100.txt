@@ -1,4 +1,0 @@
-Decoded text: ESH I  HHL H ILS  A E
-Decoded text with special tokens: ESH ?I ? H?HL ?H I?L?S ? A ?E
-Decoded text with special tokens (repeated): SHHH ?I                                                                                                                                                             ?    H?HL ?H I?L?S                                                                                     ?? A ? E
-Total time: 11.0 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_130644_248_12.wav

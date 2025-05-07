@@ -1,4 +1,0 @@
-Decoded text: TITITATY HOMSIU ENGSL GMITY UATU N WAE E E GHI E ECEI EY GMI EAESBN HE EATNO E AELTKHRN CTITITITE
-Decoded text with special tokens: T?I?TITATY HO?MSIU EN?GS?L? ?GM?I?TY U?AT?U N W?AE E E GHI? E ECEI? EY ?GMI? EAESB?N H?E? EAT?N?O? ?E AELTKHR?N ?CTITITITE
-Decoded text with special tokens (repeated): ???I??TTIIITATY   HO?MSIU   EN?GS?LL?   ?GMM?II?TTY U?AT?U     N W?AE  EE EEE GHI??  EE ECEI??  EEY  ???GMI?? EAESB?N H?E?  EEAT??N??O??  ?E  AELTKHR?N ??CTIITITIITTTIE
-Total time: 6.72 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_123857_445_28.wav

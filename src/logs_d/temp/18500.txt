@@ -1,4 +1,0 @@
-Decoded text: AI T N A H AINT R MHU WAYAIDZ IN TAS HAIIIIU SUN PHE SOR NEO END SDOD ET IMS IALALALALA GRIN R OSWNT NE C COE E AIAE
-Decoded text with special tokens: AI T? N A? ?H? A?INT R ?MH?U WAY?AID?Z? ?IN TA?S H?AI?I?I?I?U ?SUN ?P?HE SOR NEO ?END ?SDOD ?ET ?IMS IALALALALA? GRIN R OSWNT NE? C? COE E ?AIAE
-Decoded text with special tokens (repeated): AIIII T?? N  A? ?H?  A?INT R  ?MH??U  WAY?AID?Z?  ?IN TTA?S H??AI??II?IIII??II?U ??SUN ?P?HE  SOR   NEO ??END  ?SDOD  ???ET  ?IMS IAAALAALLAAAAAAAAALAALAAAAAAAAAAAA? GRIN  R  OSWNT  NE?  C? COE E     ??AIATE
-Total time: 8.28 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_305213_8630_4.wav

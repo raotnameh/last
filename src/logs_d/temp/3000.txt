@@ -1,4 +1,0 @@
-Decoded text: AHA RN HALTN ABN HRNOHAB  GSILY HE DEHATITIATALYRSNR DY UO DO UW NOS HA CESHLY HEU N R VHX
-Decoded text with special tokens: AHA? R?N HALT?N ?AB?N HR?NOHA?B ? GS?ILY HE? ?DEHATITIATALY?RSN?R ?DY UO DO U?W NOS? HA? CESHLY HE?U N R? VHX
-Decoded text with special tokens (repeated): HAAAA?  R?N HAALT?N  ??AB?N   HR?NOHA??B   ?      GSS?ILY    HE?  ?DEHATITIIATTAALY?RSNN?R   ??DY UO    DO U?W NOS?      HAA? CESHLY   HE?U N    R? VHAAAAAAAAX
-Total time: 6.36 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_74004_6367_11.wav
