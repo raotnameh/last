@@ -27,7 +27,7 @@ class Dataset_speech(Dataset):
                 path, duration, txt = line.strip().split("\t")
                 duration = int(duration)
                 
-                if min_duration <= duration <= max_duration:
+                if min_duration <= duration:
                     paths.append([path, duration, txt])  
                     
                     min_dur = min(min_dur, duration)
@@ -47,10 +47,15 @@ class Dataset_speech(Dataset):
     
     def __getitem__(self, idx):
         path, duration, txt = self.paths[idx]
-        
         waveform, sample_rate = sf.read(path)
         assert sample_rate == 16000, "Sampling rate must be 16000"
         waveform = torch.from_numpy(waveform).float()
+        
+        if waveform.size(0) > self.max_duration:
+            max_offset = waveform.size(0) - self.max_duration
+            start = torch.randint(0, max_offset + 1, (1,)).item()
+            waveform = waveform[start:start + self.max_duration]
+            return waveform, self.max_duration, path, txt # (seq_len), (duration)
         
         return waveform, duration, path, txt # (seq_len), (duration)
     

@@ -10,8 +10,8 @@ class Loss:
     
     def step_disc(self, output):
         loss_fake = output["disc_fake"].mean()
-        loss_real = output["disc_real"].mean()
-        total_loss = -loss_real + loss_fake # total loss is sum of fake and real losses
+        loss_real = -output["disc_real"].mean()
+        total_loss = loss_real + loss_fake # total loss is sum of fake and real losses
         
         return {"total_loss": total_loss, "loss_fake": loss_fake, "loss_real": loss_real}        
 

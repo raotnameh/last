@@ -17,8 +17,8 @@ dataset_speech:
   # test_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/manifest/test.tsv"
 
   min_duration: 32000
-  max_duration: 160000
-  batch_size: &batch_size_value 8
+  max_duration: 80000
+  batch_size: &batch_size_value 32
 
 dataset_txt:
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train.wrd"
@@ -46,7 +46,7 @@ upsample:
 
 discriminator:
   hidden_dim: 256
-  num_layers: 21
+  num_layers: 11
   kernel_size: 7
 
 decoder:
@@ -76,7 +76,7 @@ train:
   num_steps: 100000
   freeze_steps: 1
   gradient_accumulation_steps: 1
-  discriminator_freq: 10 # for N steps train discriminator
+  discriminator_freq: 5 # for N steps train discriminator
 
   mixed_precision: False
   resume_checkpoint: False

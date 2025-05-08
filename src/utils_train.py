@@ -86,7 +86,8 @@ def train(
             gt = models['gtruth'].encode(rescale_waveforms(waveforms).unsqueeze(1)) # [B, T//320, 1024] 
             assert enc_out['encoder_out'].shape[1]-10 <= gt.shape[1] <= enc_out['encoder_out'].shape[1]+10, f"GT shape: {gt.shape}, Encoder out shape: {enc_out['encoder_out'].shape}"
             gt = gt[:,:mask.shape[1],:] * mask # [B, T, 1024]
-            output['gt'] = F.normalize(gt, dim=-1) # [B, T, 1024]
+            # output['gt'] = F.normalize(gt, dim=-1) # [B, T, 1024]
+            output['gt'] = gt
         
         # ===== Downsample =====
         down_out = models['downsample'](enc_out['encoder_out'], mask) # [B, T // 2, C], [B, T // 2, vocab_size]
@@ -118,7 +119,8 @@ def train(
             mask=enc_out['padding_mask'],
             s=enc_out['cnn_out'],
         )
-        output['dec_out'] = F.normalize(dec_out, dim=-1) # [B, T, 1024]
+        # output['dec_out'] = F.normalize(dec_out, dim=-1) # [B, T, 1024]
+        output['dec_out'] = dec_out
             
         # ===== Discriminator Generator Update =====
         tensor_seqs = [torch.tensor(seq, dtype=torch.long) for seq in selected_encodings_list]
@@ -209,8 +211,13 @@ def train(
     
             disc_loss_components = loss_module.step_disc(doutput)
             total_lossd = disc_loss_components['total_loss'] + dlm_loss
-            
-            if step % config['logging']['step'] == 0:  
+            # update the total loss
+            total_lossg = total_lossg + total_lossd
+        else: 
+            # if discriminator_freq = 5, then train the generator at 0, 5, 10, 15, ... steps.
+            total_lossg = total_lossg + gen_loss_components['gen_loss']
+
+        if step % config['logging']['step'] == 0:  
                 logging.info(
                 f"DISC-LOSS---step/total: {step}/{num_steps} "
                 f"real_loss: {disc_loss_components['loss_real']:.4f}, "
@@ -221,12 +228,7 @@ def train(
                 writer.add_scalar('Discriminator_loss/discriminator_real_loss', disc_loss_components['loss_real'], step)
                 writer.add_scalar('Discriminator_loss/discriminator_fake_loss', disc_loss_components['loss_fake'], step)
                 writer.add_scalar('Discriminator_loss/discriminator_lm_loss', dlm_loss, step)
-
-            # update the total loss
-            total_lossg = total_lossg + total_lossd
-        else: 
-            # if discriminator_freq = 5, then train the generator at 0, 5, 10, 15, ... steps.
-            total_lossg = total_lossg + gen_loss_components['gen_loss'] 
+ 
         
         # Backpropagation
         total_lossg /= config['train']['gradient_accumulation_steps']
