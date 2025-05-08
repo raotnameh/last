@@ -2,7 +2,7 @@ checkpoint:
   step: 50000
 
 logging: 
-  dir: "/raid/home/rajivratn/hemant_rajivratn/last/src/logs"
+  dir: "/raid/home/rajivratn/hemant_rajivratn/last/src/logs_d"
   step: 100
 
 device: "cuda"
@@ -17,8 +17,8 @@ dataset_speech:
   # test_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/manifest/test.tsv"
 
   min_duration: 32000
-  max_duration: 80000
-  batch_size: &batch_size_value 32
+  max_duration: 320000
+  batch_size: &batch_size_value 8
 
 dataset_txt:
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train.wrd"
@@ -46,12 +46,12 @@ upsample:
 
 discriminator:
   hidden_dim: 256
-  num_layers: 11
-  kernel_size: 7
+  num_layers: 12
+  kernel_size: 11
 
 decoder:
   speaker:
-    use_s : True
+    use_s : False
     speaker_emb_dim: 512
     
   transformer:

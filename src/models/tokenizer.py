@@ -76,28 +76,31 @@ class Tokenizer(nn.Module):
         x = z_flat # (batch*time, channels)
         quantized = z_q.contiguous().view(-1, c) # (batch*time, channels)
         theta = torch.sum(x * quantized, dim=1) # (batch*time)
+        theta_mask = theta > 0.1 # (batch*time) # Limitation of the roation trick. It avoids the rotation trick when the angle is too small. which results in opposite direction of gradeints for codebook  and  encoder output.
+        theta_mask = theta_mask.float().unsqueeze(1) # (batch*time, 1)
+        # count of theta_mask of value 1 
         if writer and step % 100 == 0:
             writer.add_scalar('tokenizer/theta_mean', theta.mean().item(), step)
             writer.add_scalar('tokenizer/theta_std', theta.std().item(), step)
             writer.add_scalar('tokenizer/theta_max', theta.max().item(), step)
             writer.add_scalar('tokenizer/theta_min', theta.min().item(), step)
+            writer.add_scalar('tokenizer/theta_mask_mean', theta_mask.sum().item(), step)
         
-        # theta_mask = theta > 0.5 # (batch*time) # Limitation of the roation trick. It avoids the rotation trick when the angle is too small. which results in opposite direction of gradeints for codebook  and  encoder output.
-        # theta_mask = theta_mask.float().unsqueeze(1) # (batch*time, 1)
+        
             
-        # # 6. Apply rotation trick on already normalized vectors           
-        # r_z_q = self.get_very_efficient_rotation(x , quantized, x.unsqueeze(1)).squeeze() 
-        # # 7. Straight-through estimator and mask padding
-        # s_z_q = z_flat + (quantized - z_flat).detach() # btc  
+        # 6. Apply rotation trick on already normalized vectors           
+        r_z_q = self.get_very_efficient_rotation(x , quantized, x.unsqueeze(1)).squeeze() 
+        # 7. Straight-through estimator and mask padding
+        s_z_q = z_flat + (quantized - z_flat).detach() # btc  
         
-        # z_q = theta_mask * r_z_q + (1 - theta_mask) * s_z_q # btc   
-        # z_q = z_q.contiguous().view(b, t, c) # (batch, time, channels)
-        # z_q = z_q * mask
-        
-        # Straight-through estimator and mask padding
-        z_q = z_flat + (quantized - z_flat).detach() # btc  
+        z_q = theta_mask * r_z_q + (1 - theta_mask) * s_z_q # btc   
         z_q = z_q.contiguous().view(b, t, c) # (batch, time, channels)
         z_q = z_q * mask
+        
+        # # Straight-through estimator and mask padding
+        # z_q = z_flat + (quantized - z_flat).detach() # btc  
+        # z_q = z_q.contiguous().view(b, t, c) # (batch, time, channels)
+        # z_q = z_q * mask
         
         # 8. commitment loss;  MSE loss between z and z_q ignoring padding positions
         commitment_loss = F.mse_loss(z, z_q.detach(), reduction='none') * mask # btc

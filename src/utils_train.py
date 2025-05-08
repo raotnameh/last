@@ -138,7 +138,6 @@ def train(
         gen_loss_components = loss_module.step_gen(output)        
         total_lossg = gen_loss_components['rec_loss']
         
-        
         if step % config['logging']['step'] == 0:
             logging.info(f"Generator encoded text path: --{paths[0]}-- of length {dur[0]} seconds--")
             logging.info( f"Generator decoded text without special tokens: --{text_dataset.decode(selected_encodings_list[0])}--" )
@@ -191,8 +190,6 @@ def train(
             
             disc_fake = models['discriminator'](z_q_disc.clone().detach(), z_q_disc_mask)
             doutput['disc_fake'] = disc_fake
-            doutput["disc_fake_x"] = z_q_disc
-            doutput["fake_pad_mask"] = z_q_disc_mask
             
             try:
                 text, tmask = next(text_iter)
@@ -206,8 +203,6 @@ def train(
             text_emb = models['codebook'](text)
             disc_real, dlm_loss = models['discriminator'](text_emb, tmask, labels=text)
             doutput['disc_real'] = disc_real
-            doutput['disc_real_x'] = text_emb
-            doutput["real_pad_mask"] = tmask
     
             disc_loss_components = loss_module.step_disc(doutput)
             total_lossd = disc_loss_components['total_loss'] + dlm_loss
@@ -252,7 +247,7 @@ def train(
             optimizers['down'].step()
             optimizers['dec'].step()
 
-            if step % config['train']['discriminator_freq'] == 0:
+            if step % config['train']['discriminator_freq'] != 0:
                 optimizers['disc'].step()
             
             # scheduler step
@@ -281,8 +276,7 @@ def train(
             
             stoi = max( current_stoi, stoi )
             for m in models:
-                if m != 'gtruth':
-                    models[m].train()
+                if m != 'gtruth': models[m].train()
                     
                     
                     

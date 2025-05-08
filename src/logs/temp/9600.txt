@@ -1,0 +1,4 @@
+Decoded text: ZUKUYKIYKYIFGS X JNKUNYNYNYNUYUIQFSMSLJNGNG QG S'ZJ
+Decoded text with special tokens: ZUKUYKIYKYIFGS X JNKUNYNYNYNUYUIQFSMSLJNGNG QG S'ZJ
+Decoded text with special tokens (repeated): UKUYKIYKYYIFGS          XX JJJNNKKUUUUUUUUNNNNNNNYNNNNNNNNYNNNNNNYYNNNNNNUYUIIIQFSSMMSLJJNNGNNNNGGGG   QQGG S'''ZKKKJ
+Total time: 2.34 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_147036_1963_12.wav

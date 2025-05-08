@@ -58,8 +58,8 @@ class Codebook(nn.Module):
         
 
         # Remove the model and tokenizer
-        # del model
-        # del tokenizer
+        del self.model
+        del self.tokenizer
         
     def forward(self, x): # x: (b,t) tensor
         return self.embedding(x) # (b,t,c)

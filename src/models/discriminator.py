@@ -17,7 +17,7 @@ class Conv1dBlock(nn.Module):
             padding=0,
             groups=groups,
         ))
-        # self.norm = torch.nn.LayerNorm(out_channels)
+        self.norm = torch.nn.LayerNorm(out_channels)
         self.activation = nn.GELU()
 
     def forward(self, x, padding_mask=None):
@@ -29,7 +29,7 @@ class Conv1dBlock(nn.Module):
         x = self.conv(x)
         x = x.transpose(1, 2)
         
-        # x = self.norm(x)
+        x = self.norm(x)
         x = self.activation(x)
         
         x = x.masked_fill(padding_mask, 0)
