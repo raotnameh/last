@@ -45,9 +45,9 @@ upsample:
   groups: *groups_value 
 
 discriminator:
-  hidden_dim: 512
+  hidden_dim: 256
   num_layers: 21
-  kernel_size: 3
+  kernel_size: 7
 
 decoder:
   speaker:
@@ -76,7 +76,7 @@ train:
   num_steps: 100000
   freeze_steps: 1
   gradient_accumulation_steps: 1
-  discriminator_freq: 10 # every N steps
+  discriminator_freq: 10 # for N steps train discriminator
 
   mixed_precision: False
   resume_checkpoint: False

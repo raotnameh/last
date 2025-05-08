@@ -135,9 +135,7 @@ def train(
         # Loss calculation
         gen_loss_components = loss_module.step_gen(output)        
         total_lossg = gen_loss_components['rec_loss']
-        # if discriminator_freq = 5, then train the generator at 0, 5, 10, 15, ... steps.
-        if step % config['train']['discriminator_freq'] == 0: 
-            total_lossg = total_lossg + gen_loss_components['gen_loss'] 
+        
         
         if step % config['logging']['step'] == 0:
             logging.info(f"Generator encoded text path: --{paths[0]}-- of length {dur[0]} seconds--")
@@ -187,7 +185,6 @@ def train(
         
         # ===== Discriminator Forward Pass =====
         if step % config['train']['discriminator_freq'] != 0:
-            print(f"Doing discriminator forward pass at step {step}")
             doutput = {}
             
             disc_fake = models['discriminator'](z_q_disc.clone().detach(), z_q_disc_mask)
@@ -227,6 +224,9 @@ def train(
 
             # update the total loss
             total_lossg = total_lossg + total_lossd
+        else: 
+            # if discriminator_freq = 5, then train the generator at 0, 5, 10, 15, ... steps.
+            total_lossg = total_lossg + gen_loss_components['gen_loss'] 
         
         # Backpropagation
         total_lossg /= config['train']['gradient_accumulation_steps']
@@ -251,7 +251,6 @@ def train(
             optimizers['dec'].step()
 
             if step % config['train']['discriminator_freq'] == 0:
-                # torch.nn.utils.clip_grad_norm_(models['discriminator'].parameters(), max_grad_norm)
                 optimizers['disc'].step()
             
             # scheduler step

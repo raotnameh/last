@@ -13,8 +13,7 @@ class Loss:
         loss_real = output["disc_real"].mean()
         total_loss = -loss_real + loss_fake # total loss is sum of fake and real losses
         
-        return {"total_loss": total_loss, "loss_fake": loss_fake, "loss_real": loss_real}
-        
+        return {"total_loss": total_loss, "loss_fake": loss_fake, "loss_real": loss_real}        
 
     def step_gen(self, output):
         # reconstrunction loss :- decoder 
