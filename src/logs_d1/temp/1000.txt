@@ -1,4 +1,0 @@
-Decoded text: ERHOHEHEHLHA    EAEHALHAHAHAHIHLHLI       E  ERAE
-Decoded text with special tokens: ERHOHEHEHLHA? ? ? ? ?EAEHALHAHAHAHIHLHLI? ? ? ? ? ? ? E ? ERAE
-Decoded text with special tokens (repeated): RHOHHEHEEHLHA?????  ?        ?                                      ?           ??EEEAEHHHHHHHHHHHALHHAAHAHAHHHHHIIHLLLHLII?????          ?   ?          ? ?      ?                     ?             E   ???                 EEERAAAAAAHHHE
-Total time: 9.44 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_86815_7302_20.wav

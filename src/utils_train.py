@@ -10,7 +10,7 @@ from torch.nn.utils.rnn import pad_sequence
 from models.asr import WhisperWERCalculator, compute_pesq, compute_stoi
 from tqdm.auto import tqdm
 
-
+import torch.nn.functional as F
 
 
 
@@ -52,6 +52,11 @@ def train(
         if m != 'gtruth': models[m].train()
 
     for step in range(start_step, num_steps + 1):
+        
+        # At every step get the generated sample to be used for training the discriminator or generator: data > encoder > downsample > tokenizer > upsample > decoder. 
+        # Always train the decoder for reconstruction loss. 
+        # Either train the discriminator or the generator
+        
         output = {}
         # ===== Speech Data =====
         try:
@@ -63,7 +68,7 @@ def train(
         padding_masks = padding_masks.to(device) # [B, T] true for masked, false for not masked means [False, False, ..., True, True]
         
 
-        # ===== Encoder =====
+        # ===== Encoder or Generator =====
         with torch.no_grad() if step < freeze_steps else contextlib.ExitStack():
             enc_out = models['encoder'](waveforms, padding_masks)  # [B, T, C] # step 1
             output["cnn_out"] = enc_out['cnn_out'] # [B, T // 320, C] 
@@ -75,10 +80,13 @@ def train(
         
         # ===== Ground Truth =====
         with torch.no_grad():
-            gt = models['gtruth'].encode(waveforms.unsqueeze(1)) # [B, T//320, 1024] 
+            def rescale_waveforms(waveforms, eps=1e-9):# waveforms: [B, T]
+                max_vals = waveforms.abs().amax(dim=1, keepdim=True)  # [B, 1]
+                return waveforms / (max_vals + eps)
+            gt = models['gtruth'].encode(rescale_waveforms(waveforms).unsqueeze(1)) # [B, T//320, 1024] 
             assert enc_out['encoder_out'].shape[1]-10 <= gt.shape[1] <= enc_out['encoder_out'].shape[1]+10, f"GT shape: {gt.shape}, Encoder out shape: {enc_out['encoder_out'].shape}"
             gt = gt[:,:mask.shape[1],:] * mask # [B, T, 1024]
-            output['gt'] = gt 
+            output['gt'] = F.normalize(gt, dim=-1) # [B, T, 1024]
         
         # ===== Downsample =====
         down_out = models['downsample'](enc_out['encoder_out'], mask) # [B, T // 2, C], [B, T // 2, vocab_size]
@@ -110,32 +118,30 @@ def train(
             mask=enc_out['padding_mask'],
             s=enc_out['cnn_out'],
         )
-        output['dec_out'] = dec_out
+        output['dec_out'] = F.normalize(dec_out, dim=-1) # [B, T, 1024]
             
         # ===== Discriminator Generator Update =====
         tensor_seqs = [torch.tensor(seq, dtype=torch.long) for seq in selected_encodings_list]
         padded_batch = pad_sequence(tensor_seqs, batch_first=True, padding_value=0).to(z_q_disc.device)
         disc_fake, lm_loss = models['discriminator'](z_q_disc, z_q_disc_mask, labels=padded_batch)
-        entropyloss, perplexity = models['codebook'].lmscoring(
-            target=padded_batch,
-            inputs_embeds=z_q_disc,
-            attention_mask=~z_q_disc_mask.squeeze(-1),
-        )
-        lm_loss = entropyloss
+        # entropyloss, perplexity = models['codebook'].lmscoring(
+        #     target=padded_batch,
+        #     inputs_embeds=z_q_disc,
+        #     attention_mask=~z_q_disc_mask.squeeze(-1),
+        # )
         output['disc_fake'] = disc_fake
-        output["lm_loss"] = lm_loss
+        output["perplexity"] = torch.exp(lm_loss)
         
         # Loss calculation
         gen_loss_components = loss_module.step_gen(output)        
         total_lossg = gen_loss_components['rec_loss']
-        if step % config['train']['discriminator_freq'] != 0:
+        # if discriminator_freq = 5, then train the generator at 0, 5, 10, 15, ... steps.
+        if step % config['train']['discriminator_freq'] == 0: 
             total_lossg = total_lossg + gen_loss_components['gen_loss'] 
         
         if step % config['logging']['step'] == 0:
             logging.info(f"Generator encoded text path: --{paths[0]}-- of length {dur[0]} seconds--")
-            # logging.info( f"Generator decoded text with special tokens: --{text_dataset.decode(selected_encodings_list[0],keep_special_tokens=True)}--" )
             logging.info( f"Generator decoded text without special tokens: --{text_dataset.decode(selected_encodings_list[0])}--" )
-            # logging.info( f"Generator decoded REPEATED text with special tokens: --{text_dataset.decode(selected_encodings_repeated[0],keep_special_tokens=True)}--" )
                                   
             with torch.no_grad():
                 pr = models['gtruth'].decode(output['dec_out'][0].unsqueeze(0)) # [1, T]
@@ -153,61 +159,24 @@ def train(
                     a = f"Decoded text: {tokens}\n"
                     a += f"Decoded text with special tokens: {spec_tokens}\n"
                     a += f"Decoded text with special tokens (repeated): {spec_tokens_repeated}\n"
-
-                    t = 0.04 # for each special token, add a time of 40ms 
-                    a += f"Total time: {t*len(spec_tokens_repeated)} seconds and path: {paths[0]}\n"
-                        
+                    a += f"Total time: {dur[0]} seconds and path: {paths[0]}\n"
                     f.write(a)
                     
-                # # save a mel spectorgram with non repeated tokens as labels
-                # # === Generate Spectrogram (20ms resolution) ===
-                # sr = 16000
-                # frame_length = int(0.04 * sr)  # 20 ms -> 320 samples
-                # hop_length = frame_length      # no overlap
-
-                # mel_spectrogram = T.MelSpectrogram(
-                #     sample_rate=sr,
-                #     n_fft=frame_length,
-                #     hop_length=hop_length,
-                #     n_mels=80
-                # )(gt.detach().cpu())[0] # 2d > 1d
                 
-                # l = [t for t in spec_tokens_repeated]
-                # mel_spectrogram = mel_spectrogram[:,:len(l)]
-                
-                # plt.figure(figsize=(20, 6))
-                # plt.imshow(mel_spectrogram.log2().numpy(), aspect="auto", origin="lower", cmap="magma")
-
-                # # Add token labels to x-axis
-                # plt.xticks(
-                #     ticks=range(len(l)),
-                #     labels=l,
-                #     rotation=45
-                # )
-
-                # plt.xlabel("Special Tokens (20ms per token)")
-                # plt.ylabel("Mel Frequency Channels")
-                # plt.title("Mel Spectrogram with Special Tokens on X-axis")
-                # plt.tight_layout()
-                # plt.savefig(f"{save_dir}/temp/{step}_mel_spectrogram.png", dpi=600)
-                        
-            
             logging.info(
             f"GEN-LOSS---step/total: {step}/{num_steps} "
             f"rec_loss: {gen_loss_components['rec_loss']:.4f}, "
             f"commit_loss: {gen_loss_components['commit_loss']:.4f}, "
             f"smooth_loss: {gen_loss_components['smooth_loss']:.4f}, "
             f"gen_loss: {gen_loss_components['gen_loss']:.4f}, "
-            f"Generator decoded text perplexity: {lm_loss:.4f}, "
+            f"Generator decoded text perplexity: {torch.exp(lm_loss):.4f}, "
                 )                
  
             writer.add_scalar('generator_loss/rec_loss', gen_loss_components['rec_loss'], step)
             writer.add_scalar('generator_loss/commit_loss', gen_loss_components['commit_loss'], step)
             writer.add_scalar('generator_loss/smooth_loss', gen_loss_components['smooth_loss'], step)
             writer.add_scalar('generator_loss/gen_loss', gen_loss_components['gen_loss'], step)
-            writer.add_scalar('generator_loss/perplexity', lm_loss, step)
-            writer.add_scalar('generator_loss/entropyloss', entropyloss, step)
-
+            writer.add_scalar('generator_loss/perplexity', torch.exp(lm_loss), step)
 
             # logging lr 
             writer.add_scalar('learning_rate/encoder', schedulers['enc'].get_last_lr()[0], step)
@@ -217,7 +186,8 @@ def train(
         
         
         # ===== Discriminator Forward Pass =====
-        if step % config['train']['discriminator_freq'] == 0:
+        if step % config['train']['discriminator_freq'] != 0:
+            print(f"Doing discriminator forward pass at step {step}")
             doutput = {}
             
             disc_fake = models['discriminator'](z_q_disc.clone().detach(), z_q_disc_mask)
@@ -235,33 +205,29 @@ def train(
             tmask = tmask.to(device)
                  
             text_emb = models['codebook'](text)
-            disc_real, lm_loss = models['discriminator'](text_emb, tmask, labels=text)
+            disc_real, dlm_loss = models['discriminator'](text_emb, tmask, labels=text)
             doutput['disc_real'] = disc_real
             doutput['disc_real_x'] = text_emb
             doutput["real_pad_mask"] = tmask
-
-            loss_module.gan_loss.discriminator = models['discriminator']
+    
             disc_loss_components = loss_module.step_disc(doutput)
-            total_lossd = disc_loss_components['total_loss'] #+ lm_loss
+            total_lossd = disc_loss_components['total_loss'] + dlm_loss
             
             if step % config['logging']['step'] == 0:  
                 logging.info(
                 f"DISC-LOSS---step/total: {step}/{num_steps} "
                 f"real_loss: {disc_loss_components['loss_real']:.4f}, "
                 f"fake_loss: {disc_loss_components['loss_fake']:.4f}, "
-                f"gp_loss: {disc_loss_components['grad_pen']:.4f}, "
-                f"lm_loss: {lm_loss:.4f}, "
+                f"lm_loss: {dlm_loss:.4f}, "
                 )                    
        
                 writer.add_scalar('Discriminator_loss/discriminator_real_loss', disc_loss_components['loss_real'], step)
                 writer.add_scalar('Discriminator_loss/discriminator_fake_loss', disc_loss_components['loss_fake'], step)
-                writer.add_scalar('Discriminator_loss/discriminator_gp_loss', disc_loss_components['grad_pen'], step)
-                writer.add_scalar('Discriminator_loss/discriminator_lm_loss', lm_loss, step)
+                writer.add_scalar('Discriminator_loss/discriminator_lm_loss', dlm_loss, step)
 
             # update the total loss
             total_lossg = total_lossg + total_lossd
         
-            
         # Backpropagation
         total_lossg /= config['train']['gradient_accumulation_steps']
         total_lossg.backward()
@@ -301,7 +267,7 @@ def train(
             current_stoi = eval(models, val_speech_loader, loss_module, config, device, writer=writer, step=step)
             
             # if current_stoi > stoi:
-            checkpoint_path = f"{save_dir}/{config['checkpoint']['dir']}/step_{step:06d}.pt"
+            checkpoint_path = f"{save_dir}/checkpoints/step_{step:06d}.pt"
             torch.save({
                 'step': step,
                 'num_steps': num_steps,

@@ -1,4 +1,0 @@
-Decoded text: BGOIOILI NR VNO P FECO N UVUOLALHIAIAE
-Decoded text with special tokens: BGOIOILI? NR? ?VNO? P? FECO? N? UVUOLALHIAIAE
-Decoded text with special tokens (repeated): GGOOIIIOIIILII??????   NNRR???   ??VVNO?????   P?????     FECO????  N????           UVVUOOLALLHHIAIIIIIIAIIE
-Total time: 4.32 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_158083_3259_39.wav

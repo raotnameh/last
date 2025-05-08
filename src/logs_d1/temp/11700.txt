@@ -1,4 +1,0 @@
-Decoded text:  DTIGN SIRIG PSSNE RESNR RDN HEA OTRNE RESNRGSR LA AL A L AX
-Decoded text with special tokens:  D?T?IGN ?SIR?IG PS?SNE RESNR RD?N ?HEA ?OTRNE RESNRGSR ?LA ?AL A L AX
-Decoded text with special tokens (repeated):  DDD?????T???IIGGN  ???SSIRRRRR????IGGGGG PS???SSNE  RESNRRR  RD????????N  ??HEA ?OOTRRNNNNE  RESNRRRRGGSRRRRRRRR   ???LA  ?AL A  L   AA X
-Total time: 5.5200000000000005 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_298032_3374_13.wav

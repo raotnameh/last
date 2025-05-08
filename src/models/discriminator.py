@@ -17,6 +17,7 @@ class Conv1dBlock(nn.Module):
             padding=0,
             groups=groups,
         ))
+        # self.norm = torch.nn.LayerNorm(out_channels)
         self.activation = nn.GELU()
 
     def forward(self, x, padding_mask=None):
@@ -28,6 +29,7 @@ class Conv1dBlock(nn.Module):
         x = self.conv(x)
         x = x.transpose(1, 2)
         
+        # x = self.norm(x)
         x = self.activation(x)
         
         x = x.masked_fill(padding_mask, 0)
@@ -47,7 +49,7 @@ class Discriminator(nn.Module):
         self.proj = spectral_norm(nn.Linear(hidden_dim, 1))
         
         self.lm = spectral_norm(nn.Linear(hidden_dim, vocab_size))
-        
+    
     def forward(self, x, padding_mask=None, labels=None):
         """
         x: (batch, time, channels)
@@ -58,7 +60,6 @@ class Discriminator(nn.Module):
         x = self.layers[0](x, padding_mask)
         for layer in self.layers[1:]:
             x = x + layer(x, padding_mask)
-        x = x.masked_fill(padding_mask, 0)
         
         # Compute mean pooling over valid timesteps
         valid_counts = (~padding_mask).sum(dim=1).float() # (batch, channels)

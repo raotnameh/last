@@ -2,7 +2,7 @@ checkpoint:
   step: 50000
 
 logging: 
-  dir: "/raid/home/rajivratn/hemant_rajivratn/last/src/logs_d2"
+  dir: "/raid/home/rajivratn/hemant_rajivratn/last/src/logs"
   step: 100
 
 device: "cuda"
@@ -45,13 +45,13 @@ upsample:
   groups: *groups_value 
 
 discriminator:
-  hidden_dim: 128
-  num_layers: 2
-  kernel_size: 9
+  hidden_dim: 512
+  num_layers: 21
+  kernel_size: 3
 
 decoder:
   speaker:
-    use_s : False
+    use_s : True
     speaker_emb_dim: 512
     
   transformer:
@@ -76,7 +76,7 @@ train:
   num_steps: 100000
   freeze_steps: 1
   gradient_accumulation_steps: 1
-  discriminator_freq: 2 # every N steps
+  discriminator_freq: 10 # every N steps
 
   mixed_precision: False
   resume_checkpoint: False
@@ -89,7 +89,6 @@ loss:
   gen_loss_weight: 1.0
   
   disc_loss_weight: 1.0
-  gp_weight: 10.0
 
 lr_scheduler:
   phase_ratio: [0.05, 0.05, 0.9]

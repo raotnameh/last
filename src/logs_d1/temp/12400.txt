@@ -1,4 +1,0 @@
-Decoded text:  IAY HSDTRINSEE KAHITYNPTINE TEA'IG TOY COTOT OPHT RDIGY IDO
-Decoded text with special tokens: ? IAY? ?HS?DTRINSE?E KAH?ITYN?PT?INE TEA'?IG? T?OY C?O?TO?T ?OPH?T ?RDIGY ID?O
-Decoded text with special tokens (repeated): ??   IIAAAY?? ??HSS??DTRRRIINNSSSEE?E  KAH?ITYNN??PPPTTTT?IINNNNE  TEA'?IGG?  T?OY CCC??OOO????TO?T   ?OPH?T ?RDIIIIGY     IIIIDD????????AAAAO
-Total time: 5.68 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_135914_1594_86.wav
