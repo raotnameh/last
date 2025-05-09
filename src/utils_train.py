@@ -206,7 +206,7 @@ def train(
     
             disc_loss_components = loss_module.step_disc(doutput)
             ratio =  disc_loss_components['loss_real'] / dlm_loss
-            ratio *= 10
+            # ratio *= 10
             dlm_loss = dlm_loss * abs(ratio.item())
 
             total_lossd = disc_loss_components['total_loss'] + dlm_loss
@@ -221,11 +221,13 @@ def train(
                 f"DISC-LOSS---step/total: {step}/{num_steps} "
                 f"real_loss: {disc_loss_components['loss_real']:.4f}, "
                 f"fake_loss: {disc_loss_components['loss_fake']:.4f}, "
+                f"total_loss: {disc_loss_components['total_loss']:.4f}, "
                 f"lm_loss: {dlm_loss:.4f}, "
                 )                    
        
                 writer.add_scalar('Discriminator_loss/discriminator_real_loss', disc_loss_components['loss_real'], step)
                 writer.add_scalar('Discriminator_loss/discriminator_fake_loss', disc_loss_components['loss_fake'], step)
+                writer.add_scalar('Discriminator_loss/discriminator_total_loss', disc_loss_components['total_loss'], step)
                 writer.add_scalar('Discriminator_loss/discriminator_lm_loss', dlm_loss, step)
  
         
