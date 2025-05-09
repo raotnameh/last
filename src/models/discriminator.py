@@ -20,6 +20,7 @@ class Conv1dBlock(nn.Module):
         self.norm = torch.nn.LayerNorm(out_channels)
         self.activation = nn.GELU()
 
+
     def forward(self, x, padding_mask=None):
         
         # x: (batch, time, channels)

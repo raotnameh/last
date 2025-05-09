@@ -205,6 +205,10 @@ def train(
             doutput['disc_real'] = disc_real
     
             disc_loss_components = loss_module.step_disc(doutput)
+            ratio =  disc_loss_components['loss_real'] / dlm_loss
+            ratio *= 10
+            dlm_loss = dlm_loss * abs(ratio.item())
+
             total_lossd = disc_loss_components['total_loss'] + dlm_loss
             # update the total loss
             total_lossg = total_lossg + total_lossd
@@ -226,36 +230,46 @@ def train(
  
         
         # Backpropagation
-        total_lossg /= config['train']['gradient_accumulation_steps']
         total_lossg.backward()
 
-        if step % config['train']['gradient_accumulation_steps'] == 0:
-            # Gradient clipping        
-            max_grad_norm = config['train']['grad_clip']
-            if step >= freeze_steps:
-                torch.nn.utils.clip_grad_norm_(models['encoder'].parameters(), max_grad_norm)
-            torch.nn.utils.clip_grad_norm_(
-                list(models['downsample'].parameters()) + 
-                list(models['upsample'].parameters()) + 
-                list(models['decoder'].parameters()),
-                max_grad_norm
-            )
+        # Gradient clipping        
+        max_grad_norm = config['train']['grad_clip']
+        torch.nn.utils.clip_grad_norm_(models['encoder'].parameters(), max_grad_norm)
+        torch.nn.utils.clip_grad_norm_(models['downsample'].parameters(), max_grad_norm)
+        torch.nn.utils.clip_grad_norm_(models['upsample'].parameters(), max_grad_norm)
+        torch.nn.utils.clip_grad_norm_(models['decoder'].parameters(), max_grad_norm)
+        torch.nn.utils.clip_grad_norm_(models['discriminator'].parameters(), max_grad_norm)
             
-            # Optimizer step
-            if step >= freeze_steps:
-                optimizers['enc'].step()
-            optimizers['down'].step()
-            optimizers['dec'].step()
+        # norm 
+        def get_grad_norm(model):
+            total_norm = 0.0
+            for p in model.parameters():
+                if p.grad is not None:
+                    param_norm = p.grad.data.norm(2)  # L2 norm
+                    total_norm += param_norm.item() ** 2
+            return total_norm ** 0.5
+        if step % config['logging']['step'] == 0:  
+            writer.add_scalar('grad_norm/encoder', get_grad_norm(models['encoder']), step)
+            writer.add_scalar('grad_norm/downsample', get_grad_norm(models['downsample']), step)
+            writer.add_scalar('grad_norm/decoder', get_grad_norm(models['decoder']), step)
+            writer.add_scalar('grad_norm/discriminator', get_grad_norm(models['discriminator']), step)
+            writer.add_scalar('grad_norm/upsample', get_grad_norm(models['upsample']), step)
+        
+        # Optimizer step
+        if step >= freeze_steps:
+            optimizers['enc'].step()
+        optimizers['down'].step()
+        optimizers['dec'].step()
 
-            if step % config['train']['discriminator_freq'] != 0:
-                optimizers['disc'].step()
-            
-            # scheduler step
-            for scheduler in schedulers.values():
-                scheduler.step()    
-            # Zero gradients after the step
-            for optimizer in optimizers.values():
-                optimizer.zero_grad()
+        if step % config['train']['discriminator_freq'] != 0:
+            optimizers['disc'].step()
+        
+        # scheduler step
+        for scheduler in schedulers.values():
+            scheduler.step()    
+        # Zero gradients after the step
+        for optimizer in optimizers.values():
+            optimizer.zero_grad()
         
         # Checkpoint
         if step % config['checkpoint']['step'] == 0:

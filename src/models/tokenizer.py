@@ -86,8 +86,6 @@ class Tokenizer(nn.Module):
             writer.add_scalar('tokenizer/theta_min', theta.min().item(), step)
             writer.add_scalar('tokenizer/theta_mask_mean', theta_mask.sum().item(), step)
         
-        
-            
         # 6. Apply rotation trick on already normalized vectors           
         r_z_q = self.get_very_efficient_rotation(x , quantized, x.unsqueeze(1)).squeeze() 
         # 7. Straight-through estimator and mask padding

@@ -2,8 +2,8 @@ checkpoint:
   step: 50000
 
 logging: 
-  dir: "/raid/home/rajivratn/hemant_rajivratn/last/src/logs_d"
-  step: 100
+  dir: "/raid/home/rajivratn/hemant_rajivratn/last/src/logs_d_norm"
+  step: 10
 
 device: "cuda"
 
@@ -45,8 +45,8 @@ upsample:
   groups: *groups_value 
 
 discriminator:
-  hidden_dim: 256
-  num_layers: 12
+  hidden_dim: 128
+  num_layers: 6
   kernel_size: 11
 
 decoder:
@@ -71,7 +71,7 @@ train:
   lr_down: 0.0001
   lr_dec: 0.0001
   lr_disc: 0.0001
-  grad_clip: 1.0
+  grad_clip: 10.0
   
   num_steps: 100000
   freeze_steps: 1

@@ -22,7 +22,10 @@ class Loss:
         rec_loss = rec_loss.sum() / valid_count
 
         # generator loss
-        gen_loss = -output["disc_fake"].mean() #+ output["perplexity"]
+        if output['disc_fake'] is not None:
+            gen_loss = -output["disc_fake"].mean() #+ output["perplexity"]
+        else:
+            gen_loss = 0.0
         
         loss_components = {
             "rec_loss": rec_loss * self.config["recon_loss_weight"],

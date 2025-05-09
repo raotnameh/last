@@ -77,7 +77,7 @@ def configure_logging(dir='logs/'):
     )
     
 # step :- Prepare the dataset.
-def initialize_datasets(config, split='train'):
+def initialize_datasets(config, split='train', shuffle=True):
     """Initialize and configure speech/text datasets with samplers."""
        
     # step 1 :- Prepare the speech dataset.
@@ -89,7 +89,7 @@ def initialize_datasets(config, split='train'):
     speech_loader = DataLoader(
         speech_dataset,
         batch_size=config['dataset_speech']['batch_size'],
-        shuffle=True,
+        shuffle=shuffle,
         collate_fn=speech_dataset.collate_fn,
         num_workers=4
     )
@@ -332,9 +332,9 @@ def main():
     logging.info(f"Config after command-line overrides: {config}")
     
     # Initialize datasets and models
-    train_speech_loader, text_dataset, text_loader, vocab = initialize_datasets(config, split='train')
-    val_speech_loader = initialize_datasets(config, split='val')
-    test_speech_loader = initialize_datasets(config, split='test')
+    train_speech_loader, text_dataset, text_loader, vocab = initialize_datasets(config, split='train', shuffle=True)
+    val_speech_loader = initialize_datasets(config, split='val', shuffle=False)
+    test_speech_loader = initialize_datasets(config, split='test', shuffle=False)
     
     speech_loader = [train_speech_loader, val_speech_loader, test_speech_loader]
     
