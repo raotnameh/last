@@ -205,8 +205,7 @@ def train(
             doutput['disc_real'] = disc_real
     
             disc_loss_components = loss_module.step_disc(doutput)
-            ratio =  disc_loss_components['loss_real'] / dlm_loss
-            # ratio *= 10
+            ratio =  disc_loss_components['total_loss'] / dlm_loss
             dlm_loss = dlm_loss * abs(ratio.item())
 
             total_lossd = disc_loss_components['total_loss'] + dlm_loss

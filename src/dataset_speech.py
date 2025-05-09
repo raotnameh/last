@@ -13,10 +13,11 @@ from tqdm import tqdm
 
 
 class Dataset_speech(Dataset):
-    def __init__(self, input_manifest, min_duration=0, max_duration=float("inf")):
+    def __init__(self, input_manifest, min_duration=0, max_duration=float("inf"), split="train"):
+        
         super().__init__()
         
-        
+        self.split = split
         self.max_duration = max_duration
         
         paths = []
@@ -51,7 +52,8 @@ class Dataset_speech(Dataset):
         assert sample_rate == 16000, "Sampling rate must be 16000"
         waveform = torch.from_numpy(waveform).float()
         
-        if waveform.size(0) > self.max_duration:
+        if waveform.size(0) > self.max_duration and self.split == "train":
+            # Randomly select a segment of the waveform
             max_offset = waveform.size(0) - self.max_duration
             start = torch.randint(0, max_offset + 1, (1,)).item()
             waveform = waveform[start:start + self.max_duration]

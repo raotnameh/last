@@ -17,8 +17,8 @@ dataset_speech:
   # test_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/manifest/test.tsv"
 
   min_duration: 32000
-  max_duration: 320000
-  batch_size: &batch_size_value 8
+  max_duration: 160000
+  batch_size: &batch_size_value 32
 
 dataset_txt:
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train.wrd"
@@ -45,7 +45,7 @@ upsample:
   groups: *groups_value 
 
 discriminator:
-  hidden_dim: 128
+  hidden_dim: 256
   num_layers: 12
   kernel_size: 5
 

@@ -85,6 +85,7 @@ def initialize_datasets(config, split='train', shuffle=True):
         input_manifest=config['dataset_speech'][f'{split}_path'],
         min_duration=config['dataset_speech']['min_duration'],
         max_duration=config['dataset_speech']['max_duration'],
+        split=split,
     )    
     speech_loader = DataLoader(
         speech_dataset,
