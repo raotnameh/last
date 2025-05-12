@@ -1,4 +1,0 @@
-Decoded text: OITHEHOHSEWHIERSHIEEWGESAS T LNOAWIS TMWGEWNOHHEHOESEAE  MTADIOTSLSE E
-Decoded text with special tokens: OITHEH?O?HSEW?H?IERSH?IE?EWGESAS T LN?OA?WI?S TMWGEWNOH?HEHO?ESEAE? ? MTADIOTSLSE? E
-Decoded text with special tokens (repeated): OOITHHHEEH?O?HSEW???H???IIERRSSH?IIE??EWWGESAS T LN?OA?WI?S TTMWGGEWNOOH??HEHOO?EEEEEEESEAE??  ? MTADDIOOTSLSE?? ?E
-Total time: 2.3 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_86814_7302_36.wav

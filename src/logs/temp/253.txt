@@ -1,4 +1,0 @@
-Decoded text: AJ JWBAAPB'BMSIOPOTATOKO' Y'AX'JXAYXRLRLNAN YJRP'ZXUNABRDAVIYG EXJD TNFRJZ
-Decoded text with special tokens: ?A?J ?JWB?A?A?PB'BMSI?OP?O?TATOKO?' ?Y'AX'JXAYXRLRL?NAN YJRP'ZXUN?ABRDAVIY?G EX?JD TNFRJZ?
-Decoded text with special tokens (repeated): A??J ?JWB??A????A??PB'BMSI??OPP??O??TATOKO?'' ???Y''AAXX''JXAYXRRLRL?NAN YYYJJRRP''ZXUNNN??AABRDAAAVIIIY???GG EEX?JD TNFFFRRJZ?????
-Total time: 2.605 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_138028_2989_35.wav

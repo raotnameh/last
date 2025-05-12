@@ -1,4 +1,0 @@
-Decoded text: AT ERSASROE EETERSRMTEOEATOES SE T T T ESOS RSETTECSE TE ETSOE
-Decoded text with special tokens: ?A?T ?E?RSASRO?E? ?E?ETERSRMTEOEATO?ES SE T T T ?ESOS R?S?ET?T?ECS?E TE ETSO?E
-Decoded text with special tokens (repeated): A?TT ?EEE?????RSASSRO??EEE? ?E??ETEERRSSRRMTTTTEEEOEEATTTTTTTTOO?EEEES SSEEEEE  TTT T      T  ??ESOS R?S???EET?TTTT??EEEECS?EE TEEE      EEEETSO????EE
-Total time: 2.995 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_86041_7113_44.wav

@@ -1,4 +1,0 @@
-Decoded text: BTBAHE V O VL LVL VYRWVOLWSIR HWVOIRO H LVOV ILR IVHRWVR HRV R URV VWVRVRW MW VR LHL RYMWUVHR R IVWUTVY WUO RVOI T W U MVR K L AL VLE
-Decoded text with special tokens: BTBAHE V O V?L LVL VYRWVOLW?SIR H?WVOIRO H LVOV ILR IVHRWVR HRV R ?URV V?WV?RVRW MW VR LHL RYMWUVHR R IVWUTVY WUO RVOI T W U MVR? K L A?L V?LE
-Decoded text with special tokens (repeated): TBAHHHEE V  O V?L  LLVL   VYRWVVVOLW?SIR   H?WVVOOIRO  H    LVOV  ILR IVHRWVRRR HRV  R ?URVV   V??WV?RVRW MW VRRR LLLHL RYYMWWWUVHR R IVWUTVY WWUO  RVOOI T    W U  MVR? K L   A?L VV?LOE
-Total time: 3.685 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_154825_2518_37.wav

@@ -40,8 +40,9 @@ class Loss:
         loss_real = -output["disc_real"].mean()
         total_loss = loss_real + loss_fake # total loss is sum of fake and real losses
         
-        grad_pen = self.calc_gradient_penalty(output["real_x"], output["fake_x"], output["real_pad_mask"], output["fake_pad_mask"]) * self.config["gp_weight"]
-        total_loss += grad_pen
+        # grad_pen = self.calc_gradient_penalty(output["real_x"], output["fake_x"], output["real_pad_mask"], output["fake_pad_mask"]) * self.config["gp_weight"]
+        # total_loss += grad_pen
+        grad_pen = 0.0
         
         return {"total_loss": total_loss, "loss_fake": loss_fake, "loss_real": loss_real, "grad_pen": grad_pen}        
 

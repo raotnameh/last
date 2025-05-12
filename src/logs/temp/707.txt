@@ -1,4 +1,0 @@
-Decoded text: UTHWTHO AVWUG  Y  IVYOS VA W W I WAKVAHA    RDU  I II   A VU VAUA  I  I AE
-Decoded text with special tokens: UTHWTHO? A?VWUG ? ?Y ? IVYOS VA W W ?I WAKV?AHA ? ? ? ?RDU ? I? I?I? ? ? A VU VAUA ? ?I ? I? AE
-Decoded text with special tokens (repeated): THHHHHHWTHO?  A?VWUG ??  ?Y ?     IIVYOS   VA      W   W             ??I WAKV?AHA ?? ?????? ?      ?RDU    ? I? I??I?? ? ?      A VUU  VAUAA ?  ??I  ?       III??? AAHE
-Total time: 3.36 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_122442_211_77.wav

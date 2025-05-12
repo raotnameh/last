@@ -2,7 +2,7 @@ checkpoint:
   step: 5000
 
 logging: 
-  dir: "/raid/home/rajivratn/hemant_rajivratn/last/src/logs"
+  dir: "/raid/home/rajivratn/hemant_rajivratn/last/src/logs_sp"
   step: 1
 
 device: "cuda"
@@ -71,12 +71,12 @@ train:
   lr_down: 0.0001
   lr_dec: 0.0001
   lr_disc: 0.0001
-  grad_clip: 10.0
+  grad_clip: 1.0
   
   num_steps: 100000
   freeze_steps: 1
   gradient_accumulation_steps: 1
-  discriminator_freq: 11 # for N-1 steps train discriminator
+  discriminator_freq: 2 # for N-1 steps train discriminator
 
   mixed_precision: False
   resume_checkpoint: False

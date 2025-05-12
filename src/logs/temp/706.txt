@@ -1,4 +1,0 @@
-Decoded text: OUBHTHA AIE IO GOW OV HILIU VI IR UROW   W  SVH R UYW W  RH   AU TUHO  V LHIH AVAL  OSU W  TL O OT O E
-Decoded text with special tokens: OUBHTHA ?A?IE IO G?O?W OV HILIU VI IR UROW ? ? W? ? ?S?VH R U?YW? W? ? RH ? ? ?A?U TUHO ? V ?LHIH ?AVAL? ? OSU? W ? TL O OT O? E
-Decoded text with special tokens (repeated): UBHHHTHA ??AA???IE IO  G????O?W OV   HILLIU    VI IR UROW  ? ? W? ? ?S?VVH R U??YW? W? ? RH    ?   ?  ?A??????U TUUUHOOOOO  ?           V      ??LHIIH  ?AVAAL?  ?     OOSU????      W    ?        TL      O  OT      OO?  ?E
-Total time: 4.42 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_19215_5652_11.wav

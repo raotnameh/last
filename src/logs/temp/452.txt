@@ -1,4 +1,0 @@
-Decoded text:  DAHIEDERADMOMATESEAEOIOAEHESH SEASESAO IERE
-Decoded text with special tokens:  D?AHIE?D?ERADMO?MATESEAEOIOAEHES?H? SEASES?AO IER?E
-Decoded text with special tokens (repeated): D?AHHHIIE??D?ERAAAADDDMO?MAAAAAATTTEESEEEEEEEAEOOOOIOOAEHHEESS?H? SSSSSSSSSEASSES???AAAOO     IERR????SE
-Total time: 2.065 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_495_26_19.wav

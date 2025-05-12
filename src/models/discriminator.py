@@ -8,7 +8,7 @@ class Conv1dBlock(nn.Module):
         super().__init__()
         
         self.causal_padding = (kernel_size - 1) * dilation
-        self.conv = nn.Conv1d(
+        self.conv = spectral_norm(nn.Conv1d(
             in_channels, 
             out_channels, 
             kernel_size, 
@@ -17,7 +17,7 @@ class Conv1dBlock(nn.Module):
             padding=0,
             groups=groups,
             bias=False,
-        )
+        ))
         
         self.activation = nn.GELU()
 
@@ -46,8 +46,8 @@ class Discriminator(nn.Module):
             self.layers.append(Conv1dBlock(hidden_dim, hidden_dim, kernel_size=kernel_size))
         
         
-        self.proj = nn.Linear(hidden_dim, 1, bias=False)
-        self.lm = nn.Linear(hidden_dim, vocab_size, bias=False)
+        self.proj = spectral_norm(nn.Linear(hidden_dim, 1, bias=False))
+        self.lm = spectral_norm(nn.Linear(hidden_dim, vocab_size, bias=False))
     
     def forward(self, x, padding_mask=None, labels=None):
         """
@@ -63,7 +63,8 @@ class Discriminator(nn.Module):
         # Compute mean pooling over valid timesteps
         valid_counts = (~padding_mask).sum(dim=1).float() # (batch, channels)
         x_mean = x.sum(dim=1) / valid_counts  # (batch, channels)
-            
+        x_mean = F.normalize(x_mean, dim=1)  # Normalize the mean vector
+        
         # Apply the final projection
         x_mean = self.proj(x_mean) # (B, 1)
         x_mean = x_mean.squeeze(1)  # (B)
