@@ -1,0 +1,4 @@
+Decoded text: BLPOLD JEVEJEISRS'  EEREGS EEIPEUERT RETNR IP  DTRT TW WDLSL TVLHLE
+Decoded text with special tokens: BLPOL?D ?J?EVEJEI?SRS'? ? ?E?EREGS E?EIPEUERT RETN?R? I?P ? DTRT TW WDLSL? TVLH?L?E
+Decoded text with special tokens (repeated): LLPPOL?D ??????J??EVEJEI???SRS'? ? ?EEE?EREGS E?EEIPEUERT RETN?RR???? I?P ? DDTTRT TWW WWDLSL? TVLHH??LL??? E
+Total time: 2.175 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_146161_1737_9.wav

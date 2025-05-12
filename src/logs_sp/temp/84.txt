@@ -1,0 +1,4 @@
+Decoded text:  AJXJIXRXPBXBETJA'AABR'TLFBEYXLIYXCLFXJRBQAJBEJNAEAOASWBJLE
+Decoded text with special tokens:  ?AJXJIXRXPB?XBETJA'A?ABR'TLFBEYXLIYXCLFXJRBQAJBEJNAEAOASWBJLE
+Decoded text with special tokens (repeated): ??AJXJIIIXRXXPB?XXXBETJA'AAAA?AABBR'TLLLLLFBBEEYXXLLLIIYYXCLLFFFXJRRBBQAJJBEEJNNAEEAOAAASWWBJJJJJJJJLJE
+Total time: 2.05 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_124992_27_26.wav

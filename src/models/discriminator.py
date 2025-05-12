@@ -20,7 +20,8 @@ class Conv1dBlock(nn.Module):
         ))
         
         self.activation = nn.GELU()
-
+        self.norm = spectral_norm(nn.LayerNorm(out_channels))
+        
     def forward(self, x, padding_mask=None):
         # x: (batch, time, channels)
         
@@ -30,6 +31,7 @@ class Conv1dBlock(nn.Module):
         x = x.transpose(1, 2)
 
         x = self.activation(x)
+        x = self.norm(x)
         
         x = x.masked_fill(padding_mask, 0)
         return x

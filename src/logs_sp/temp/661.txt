@@ -1,0 +1,4 @@
+Decoded text: TOHIDBLDBARAZBSET UTESBTS ETUS BLS V DAEIZEO TSORE UZETSAIAEIAD NDRBD SWSO AT BDTON TODS TSOZ E
+Decoded text with special tokens: T?O?H?IDB?LD?BA?RA?ZBSE?T UT?ESBTS ET?US BLS V DAEIZEO? ?TSORE ?UZE?T?SAI?AEIAD NDRBD SWSO ?A?T? BD?TON TODS T?SOZ ?E
+Decoded text with special tokens (repeated): ?O?H??IDDB?LD??BA??RA???ZBSEE?T UT?EESBTS  ET?US BLLSSSS V  DAEIZEEO? ???TSOORE      ?UUZE?T??SAI?AEIAD NDRBDDD  SWSO  ?A??TTTTTT??   BD?TON TODS T???SOZ    ??EEE
+Total time: 3.23 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_19192_5514_25.wav

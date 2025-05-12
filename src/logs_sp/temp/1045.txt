@@ -1,0 +1,4 @@
+Decoded text: MLPLEI LLA LALBASL IE CEST TARET A AIAO AHLEL L ATTELORESA DY'LWDEISAL RDRRTTET RIE TRIUISBRIL DEU  K RPALOE
+Decoded text with special tokens: MLPLEI ?L?LA L?ALBA?SL IE CEST TARET A ?AIAO AHLEL ?L AT?TELORES?A D?Y'LWDEI?SAL RDR?RT?TET RIE TRI?UISBRIL DEU ? K RPALOE
+Decoded text with special tokens (repeated): LPPLLEII ?L?LLA  L?AALBA?SLLL IIEE CEEESSTT  TARET     A ?AIAOO AHLEL  ?L AT??TELORESSS??A  DDD?Y'LLLLWDEIIII?SAL RDR??RT?TTTTTET RIE TRI?UUISBRILL DDEU   ? K  RPALOO E
+Total time: 3.355 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_410_2952_58.wav

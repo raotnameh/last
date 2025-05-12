@@ -1,0 +1,4 @@
+Decoded text: MLPHLSV JSRMV GDTNYNSR  DSS SPVTCTNEST PSSSGTS SP FPCSRPR IFNFTWSL SFPFDCNC FCFCKNTWS A PE
+Decoded text with special tokens: ML?PHLSV JSRMV GDTNYNSR ? D?S?S SPVTCTNE?ST P?S?S?SGTS SP FPCSR?PR IFNFT?WSL S?FPFDCNC F?CFCKNTWS A PE
+Decoded text with special tokens (repeated): L?PHLLSSSV    JSRMV GGDTTNYNSR ? DDD??S?S SPPVTCTNNE?STTT  P?S?SS?SGTTTTTSS SSP     FFFPCSR?PR IFNNFFFTTT?WSSSSSL SS????FPFFFFFDCNCCC  F?CFFCKNTWSS A     P?E
+Total time: 3.1250625 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_132570_2007_9.wav

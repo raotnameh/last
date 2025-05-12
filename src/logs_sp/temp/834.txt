@@ -1,0 +1,4 @@
+Decoded text: MLPLIDAE AD AHOA SO DNSW B A  EO  S EL AEU EL PE L AO SAAB EL EDTEOC IOR ACB ENE T CDO SLR O  OREAIA IENCI ITMILOR TESNR IL H FI AE E NIO TIGR TO  TT AFSFVTI H UHBPI EN IA THS A SO HOHO  O B A E
+Decoded text with special tokens: MLPL?IDAE AD AH?O?A SO DNSW B A ? E?O ? S? EL? A?E?U? EL ?PE? ?L AO SA?AB EL ?EDTEO?C IOR ACB ENE T CDO SLR O ? OR?EAIA? ?I?EN?CI ITM?ILOR TESNR IL H FI AE E ?NIO? TIG?R TO ? T?T? A?FSFVTI? H ?UHB?PI EN IA? THS A ?SO HO?HO? ? O ?B ?A E
+Decoded text with special tokens (repeated): LLPLL?IDAE  AD AH?O?A SO    DNSW B  A  ? E??OOO ?  S? EL?  A?E?U?  EEL ?PE? ?????L  AO SA???ABB EL   ?EDTEO?C  IOOR  ACBB ENE  TT CDOO SLR O   ?  OR??EAIA? ?I?EN??CI ITTM?ILOOR TESNRR IL H FI AE   E ?NIO?  TIIG?RR   TO ? T?T? A?FSFFVTI?   H ?UHB?PI EN IIA? THS      A ?SO HOO???HO?? ? O ??B  ?A ?E
+Total time: 5.93 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_138035_2989_77.wav

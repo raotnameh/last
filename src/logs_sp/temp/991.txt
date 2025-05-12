@@ -1,0 +1,4 @@
+Decoded text: MPLIOA A O E SIO N AEONE DOCG OGTGGGPNOUHA ASH IA TC AUADGC O AK AOHAOG PEOUT O MNNMUNAOA OE
+Decoded text with special tokens: M?P?LIOA A ?O E ?S?IO N A?E?O?NE DOCG? ?OGTG?G?GPNOUHA ASH IA T?C? AUADG?C O AK AO?HAOG? PEOUT O ?MN?NMUN?A?OA? OE
+Decoded text with special tokens (repeated): ?PP?LLLIOOAAA AAAAA ??O E ?S?IO N A?EE???O?NEE  DOCG?? ?OGTG??G?GGPNOUHAAA AASH IIA    T?C?? AUADG?CCC     O AK AO?HAOOG???? PEOUT O ?MN?NMMUUUUN?AA?OOA?    OODE
+Total time: 3.215 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_86965_7226_16.wav

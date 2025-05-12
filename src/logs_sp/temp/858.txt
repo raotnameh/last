@@ -1,0 +1,4 @@
+Decoded text: MITPPHORRHSHETFTGTCGRK ASPSTCUNMONGR RO ATESITOIR GV GHC TACUCUDMT H HO O E
+Decoded text with special tokens: MITP?P?HOR?R?HSHETF?TGTCGRK ASPSTC?U?NM?O?NGR? RO ?AT?E?S?ITO?I?R GV ?GHC TACUCUDMT H HO? O ?E
+Decoded text with special tokens (repeated): ITP?P?HORR?R?HSHETF?TGGTCGRK ASSPSTC?U?NM??O?NGR? RO  ???AT?E?SSS?ITO?I?RRRR  GV ??GHC TACUCUDMT H HO? O ??HE
+Total time: 2.18 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_2477_2436_8.wav

@@ -1,0 +1,4 @@
+Decoded text: BALD ALSS SO WSRS IECRS UFCANRSIYFCFNREM ATWTSTH A L S ATS S IFMRER RA YRSR TOTS AST S I UNCA TR ALDA SHAS I PCARSRS CG O AE
+Decoded text with special tokens: BALD ?A?L?S?S ?SO ?WSRS IECRS? UFCANR?SIYFCFNREM ATWTSTH A ?L? ?S ATS S? IFMRER ?RA Y?RSR TOTS AS?T S I UNCA ?TR ALD?A SHA?S I PCA?RSRS CG O ?A?E
+Decoded text with special tokens (repeated): ALLLLLLD  ?A??L??S?SS   ?SSOO  ?WSRS  IIIIIEECCCRRRS? UFFFFCANNR?SSSSSIIIYFCFFFNNREM ATTWWWWTSSTTH AAA ?????L?????   ??SSSS   ATTTSS  SS? IIFFMMRER     ??RRRA YY?RSR        TTOOTS AS?T SS I  UUNCA  ?TR    ALD??AA  SHA?SSSS I PPCAAA?RSRS      CCG O  ?A???LE
+Total time: 5.115 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_166424_3486_62.wav

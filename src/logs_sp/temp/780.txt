@@ -1,0 +1,4 @@
+Decoded text: DTHEDLAOASA AIE GIFSEIROH R TAROS ROSO S R E SESER ROR OANO RO DWSHA H OTNT ST ODNOAPNSPOMOP WO O LHAIO HRADABE
+Decoded text with special tokens: DT?HEDL?A?OAS?A ?A?I?E? G?IFSEIROH R TAROS ?ROSO S ?R? ?E SES?ER ROR? OANO R?O ?D?WSHA H OT?NT? ST ODNOAPNSPOMOP WO O LHAI?O H?RADAB?E
+Decoded text with special tokens (repeated): T???HHEDL?A?OAS?A ?A?I?E? G?IIIFSEEEEIRROH R TAROOS ?ROSSO SSS  ??R???? ??EE SSES?ER RROOR? OANO R?OO  ?D?WSSHA    H OTT??NT? STTT ODNOOAPNSPOOMOP  WO OOO LHAI?O H?RADAB?AE
+Total time: 3.43 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_274553_8238_22.wav

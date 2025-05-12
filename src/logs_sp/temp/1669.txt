@@ -1,0 +1,4 @@
+Decoded text: BLB A      PM R G O T S C M R R  E G T  E
+Decoded text with special tokens: BLB? A ? ? ? ? ? PM R G O T S C M R R ? E G T ? ?E
+Decoded text with special tokens (repeated): LLB??  A  ?  ?    ? ?????? ????? PM    R   G    O    TTTT S          C MMM   R R ??  E  G      T                  ?  ?OE
+Total time: 2.385 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_132847_1116_17.wav

@@ -1,0 +1,4 @@
+Decoded text: BALPLD DBDBDLDDABDDSESEREG N EDNTGRO ENRGRO T YAO S NTS DIT ONTE
+Decoded text with special tokens: BALP?L?D DBDB?DLD?DABD?D?S?E?SERE?G N EDNTGRO ENR?GRO T YAO ?S? NT?S ?D?I?T ONTE
+Decoded text with special tokens (repeated): ALP?LL?D DBDB?DLD?DABD??D?SS????E?SERE?????G NNN EDNNNTGROO   EENNR?GRO T YYAOOO  ?SS?    NTT?SS  ?D?I?T   ONNT?E
+Total time: 2.26 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_138028_2989_41.wav

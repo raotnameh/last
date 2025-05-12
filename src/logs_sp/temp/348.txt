@@ -1,0 +1,4 @@
+Decoded text:    E A OSEHO  TESRLE'SASIEMISH ENC TIROI II S H E
+Decoded text with special tokens: ? ? ? E A ?OS?EH?O? ? ?TESRL?E'S?A?SIEM?I?SH ENC TIROI I?I S H E
+Decoded text with special tokens (repeated):  ??   ? E A ??OS?EEH??OO???? ?  ????TTESRRLL????E'S?A???SIEEEEEEEM?I??SHH  ENC     TTIRROI I?I   S   H   ??E
+Total time: 2.15 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_262281_8609_9.wav

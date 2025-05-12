@@ -1,0 +1,4 @@
+Decoded text: BLHLOLHSATHW IDITRI IU DNARSLIDIRIRSEIEUGNRAOA AO'IEADASOAH E
+Decoded text with special tokens: BLHLOLH?SA?THW? I?DIT?RI IU DNA?RSLIDIRIR?SEIEUGNRAOA A?O?'?I?EADASOAH E
+Decoded text with special tokens (repeated): LLLHLOOOLH?SAAA????TTHHW????  I?DIT??RI IU DNAA??RSSLIDDIIIIRIR??SEIIEEUGNRRRAOA   A?O?''???I?EEEEAADAAASSOOAH   ??E
+Total time: 2.32 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_124992_27_64.wav

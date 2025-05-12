@@ -1,0 +1,4 @@
+Decoded text: BALPHLA LAHA L I EIU IAUAAOAOS IA IA E IEIMUTI EI EID ATROAO A ATSS I EIAOA I I EI RE OAO OAO O  A ADE
+Decoded text with special tokens: BALPHLA LA?H?A? L? I E?IU IAU?A?AOAOS IA IA? ?E? IEIMUTI ?EI E?ID ATROAO A ATS?S I E?IAOA I I EI RE OAO OAO O ? A AD?E
+Decoded text with special tokens (repeated): ALPHLLLA  LA?H?A? L????? I EEE?IU IAU?AAA?AAOAOOS IAA IAAA?  ?EE?   IIEIMUTII  ?EIII EE?IDD ATROAO A ATTS?S     I E?IIAOA III I   EEEI RE OOAAAAO OAAO    O ? A AD?AE
+Total time: 3.3 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_29405_5022_26.wav
