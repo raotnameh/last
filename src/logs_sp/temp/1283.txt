@@ -1,4 +1,0 @@
-Decoded text: BLPHLLSJSR EFECFUNWBHLSL ECYCNC CECNC CFCFCFCN  L DL'L KNSCS P NCRS P COFGCN NCM F CWCWRSLS EC FCPNR   FCFECI FTNWO L LE
-Decoded text with special tokens: BLPHL?LS?J?SR? EFECFUNW?BHL?SL ECYCN?C? CECNC CFCFCFCN ? L D?L'?L ?KNSCS P? NCRS P COFGC?N NCM? F CWCWRSLS E?C FCPN?R ? ? FCFECI FTNWO ?L ?L?E
-Decoded text with special tokens (repeated): LPPHLL?LS?????J?SRR?   EEFECFFUNNW?BHLL?SL  ECYCN?C?? CECNC CFFFFCFCFFFFCNN ?? L  D?LL'??L ??KNNSCS   P? NNNCCRRRS P CCCCCCCOFGC??N NCCCCM?  FF CWCWRSSLS   EE?C  FFCCPNN?RR ?? ? FCCFFECCI FTTTTNNWWO     ??????LL ??LL?LE
-Total time: 4.375 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_152918_2843_79.wav

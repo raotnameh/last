@@ -1,4 +1,0 @@
-Decoded text: BLHLHDL  GSRS TRECS  FC R NIANRE NECR UDERNR DNR D S   TTCA NR CDRS NR D NTCR BNDR CRTCR E EGDT T S D C RERS G D L H LHE
-Decoded text with special tokens: BL?HLHDL ? ?GSRS T?RECS ? FC R NIANRE NECR UDERNR DNR D ?S ? ? T?TCA NR CDRS NR? D NTCR BND?R C?RTCR E EGDT ?T ?S D C RER?S G D L H LHE
-Decoded text with special tokens (repeated): LL?HLLHDL ??      ?GSRS      T?RECS ?    FFC R NIANRRRE     NNNECRR  UDEEERNRRRR     DNRRR     D ?S   ?? ??    T?TTCA      NRRR          CDRRRS      NRRR?    D NTCR BND?RRR          C??RTCR    E EGDT ?T ?SSS     D C     RER?S   G    D       L   H LH E
-Total time: 5.015 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_128659_1183_16.wav

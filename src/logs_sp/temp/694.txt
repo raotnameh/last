@@ -1,4 +1,0 @@
-Decoded text: DIOHIIAAA AEI NEEITB EIGADO T EESAGECIC ACI CUAAIES SG DGMIOTDTS T SS CEGAEAEAGAOIOAO OE
-Decoded text with special tokens: DIO?HI?IA?A?A ?AEI? N?E?EITB EIGAD?O T? E?E?SAGECIC? ?ACI CUA?AI?ES ?S?G DGM?IOTDT?S T S?S CEGAEAEAGAOIO?A?O ?O?E
-Decoded text with special tokens (repeated): IO?HI?IAA?AAAA?A ?AEI??  N?E?EITB EIIGAD?O TT????? E?EEE?SAAAGGEECIC??  ?ACI  CUAA?AI?ESS ?S?G DGM?IOTTDT?S T S?S CCEGAEAEAAGAOOIIOOO??A?O ??O?AE
-Total time: 2.895 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_5143_2136_1.wav

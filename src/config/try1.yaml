@@ -3,7 +3,7 @@ checkpoint:
 
 logging: 
   dir: "/raid/home/rajivratn/hemant_rajivratn/last/src/logs_sp"
-  step: 1
+  step: 100
 
 device: "cuda"
 
@@ -18,7 +18,7 @@ dataset_speech:
 
   min_duration: 32000
   max_duration: 160000
-  batch_size: &batch_size_value 8
+  batch_size: &batch_size_value 32
 
 dataset_txt:
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train.wrd"
@@ -45,9 +45,9 @@ upsample:
   groups: *groups_value 
 
 discriminator:
-  hidden_dim: 256
+  hidden_dim: 512
   num_layers: 10
-  kernel_size: 9
+  kernel_size: 3
 
 decoder:
   speaker:
@@ -67,16 +67,16 @@ decoder:
 train:
   seed: 42123
 
-  lr_enc: &lr 0.00005
+  lr_enc: &lr 0.0001
   lr_down: *lr
-  lr_dec: 0.001
-  lr_disc: 0.0001
+  lr_dec: 0.0005
+  lr_disc: 0.0005
   grad_clip: 10.0
   
   num_steps: 100000
   freeze_steps: 1
   gradient_accumulation_steps: 1
-  discriminator_freq: 2 # for N-1 steps train discriminator
+  discriminator_freq: 6 # for N-1 steps train discriminator
 
   mixed_precision: False
   resume_checkpoint: False
@@ -92,7 +92,7 @@ loss:
   gp_weight: 1.0
 
 lr_scheduler:
-  phase_ratio: [0.05, 0.05, 0.9]
+  phase_ratio: [0.2, 0.0, 0.8]
 
 eval:
   eval: False

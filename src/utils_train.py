@@ -251,12 +251,6 @@ def train(
                     total_norm += param_norm.item() ** 2
             return total_norm ** 0.5
         
-        # for all the layers in discriminator print the max and min weights and their gradients
-        # for name, param in models['discriminator'].named_parameters():
-        #     if param.grad is not None:
-        #         logging.info(f"Discriminator {name} weight max: {param.data.max()}, min: {param.data.min()}")
-        #         logging.info(f"Discriminator {name} grad max: {param.grad.data.max()}, min: {param.grad.data.min()}")
-        
         if step % config['logging']['step'] == 0:  
             writer.add_scalar('grad_norm/discriminator', get_grad_norm(models['discriminator']), step)
             writer.add_scalar('grad_norm/encoder', get_grad_norm(models['encoder']), step)
@@ -335,12 +329,10 @@ def train(
 
 
 
-
+@torch.no_grad()
 def eval(models, speech_loader, loss_module, config, device, writer=None, step=0):
     
-    for m in models:
-        if m != 'gtruth':
-            models[m].eval()
+    for m in models: models[m].eval()
             
     with torch.no_grad():
         logging.info("Evaluating")

@@ -1,4 +1,0 @@
-Decoded text: OADASRSH C TMTRLOU ALASASL CREACEAFAL  A N YE LALMCECMGR L  ARALID E
-Decoded text with special tokens: ?O?ADASRSH ?C TMTRLOU A?LASASL CR?EACEAFA?L ? A N YE ?LALMCECMGR L ? ?A?R?A?LI?D E
-Decoded text with special tokens (repeated): ?O?????AADASRRRSH   ?C TMTRLOOU A??LASSASL CR?EACEAAFAAA?????L ??? AA   N YYE ?LALMMCECCMGRR      L   ? ?A??R?A?LLI?D DDE
-Total time: 2.415 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_19219_5393_21.wav

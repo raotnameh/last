@@ -1,4 +1,0 @@
-Decoded text: MPLA 'LHTUDTWTO IT TUDRTO TERS SCTNTINTEU ETETT P CETE HTITWTNSP HTNTUDIER RTGI P P PCTOOS O OE
-Decoded text with special tokens: MPLA? '?LHTUDTWTO? IT? TUDRTO ?TERS SCTN?T?INTE?U? ?ET?ET?T P C?ET?E HT?ITW?TN?SP ?H?T?N?TUD?IE?R RTGI P P PCT?O?OS O? OE
-Decoded text with special tokens (repeated): MPPPLLLLLLA? '?LHTUDTTWTO? IT??? TUDRTTTO ?TERRS SCTN?T?IINTE??U? ?EET?ETTTTTT?TT   PP C?ET?E  HT?IITW?TTTN??SSP ?H?T?N??TTUD?IIE?R RTTTTTTTTGGI P  P PCTT?O????OS O? O?E
-Total time: 3.37 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_54013_6078_0.wav

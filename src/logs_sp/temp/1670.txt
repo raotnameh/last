@@ -1,4 +1,0 @@
-Decoded text: MLBL    E R I C R O  H RS  L   H  L  TRS Y R I CM RM ERM ROE
-Decoded text with special tokens: MLBL ? ? ? ?E ?R I C R O ? H RS ? L ? ? H ? L ? TRS Y ?R? I CM RM ERM ROE
-Decoded text with special tokens (repeated): LLLBL ?     ? ?         ?EE     ????RR    I C      RR O                        ??   H                RSS       ?                     L  ?    ?     H ?    L ??????????     TTRSSS    Y ?RRR?   I  CCM   RMMM    EERM     RRRRO                E
-Total time: 4.765 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_11691_83_41.wav
