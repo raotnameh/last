@@ -45,6 +45,8 @@ def train(
     train_speech_iter = iter(train_speech_loader)
     text_iter = iter(text_loader)
     
+    loss_module.discriminator = models['discriminator']
+    
     for optimizer in optimizers.values():
         optimizer.zero_grad()
     
@@ -52,11 +54,7 @@ def train(
         if m != 'gtruth': models[m].train()
 
     for step in range(start_step, num_steps + 1):
-        
-        # At every step get the generated sample to be used for training the discriminator or generator: data > encoder > downsample > tokenizer > upsample > decoder. 
-        # Always train the decoder for reconstruction loss. 
-        # Either train the discriminator or the generator
-        
+
         output = {}
         # ===== Speech Data =====
         try:
@@ -132,7 +130,7 @@ def train(
         #     attention_mask=~z_q_disc_mask.squeeze(-1),
         # )
         output['disc_fake'] = disc_fake
-        output["perplexity"] = torch.exp(lm_loss)
+        output["entropy_loss"] = lm_loss
         
         # Loss calculation
         gen_loss_components = loss_module.step_gen(output)        
@@ -168,14 +166,14 @@ def train(
             f"commit_loss: {gen_loss_components['commit_loss']:.4f}, "
             f"smooth_loss: {gen_loss_components['smooth_loss']:.4f}, "
             f"gen_loss: {gen_loss_components['gen_loss']:.4f}, "
-            f"Generator decoded text perplexity: {torch.exp(lm_loss):.4f}, "
+            f"Generator decoded text entropy_loss: {lm_loss:.4f}, "
                 )                
  
             writer.add_scalar('generator_loss/rec_loss', gen_loss_components['rec_loss'], step)
             writer.add_scalar('generator_loss/commit_loss', gen_loss_components['commit_loss'], step)
             writer.add_scalar('generator_loss/smooth_loss', gen_loss_components['smooth_loss'], step)
             writer.add_scalar('generator_loss/gen_loss', gen_loss_components['gen_loss'], step)
-            writer.add_scalar('generator_loss/perplexity', torch.exp(lm_loss), step)
+            writer.add_scalar('generator_loss/entropy_loss', lm_loss, step)
 
             # logging lr 
             writer.add_scalar('learning_rate/encoder', schedulers['enc'].get_last_lr()[0], step)
@@ -187,9 +185,10 @@ def train(
         # ===== Discriminator Forward Pass =====
         if step % config['train']['discriminator_freq'] != 0:
             doutput = {}
-            
             disc_fake = models['discriminator'](z_q_disc.clone().detach(), z_q_disc_mask)
             doutput['disc_fake'] = disc_fake
+            doutput['fake_x'] = z_q_disc.clone().detach()
+            doutput['fake_pad_mask'] = z_q_disc_mask
             
             try:
                 text, tmask = next(text_iter)
@@ -203,12 +202,12 @@ def train(
             text_emb = models['codebook'](text)
             disc_real, dlm_loss = models['discriminator'](text_emb, tmask, labels=text)
             doutput['disc_real'] = disc_real
+            doutput['real_x'] = text_emb
+            doutput['real_pad_mask'] = tmask
     
             disc_loss_components = loss_module.step_disc(doutput)
-            ratio =  disc_loss_components['total_loss'] / dlm_loss
-            dlm_loss = dlm_loss * abs(ratio.item())
-
             total_lossd = disc_loss_components['total_loss'] + dlm_loss
+            
             # update the total loss
             total_lossg = total_lossg + total_lossd
         else: 
@@ -220,16 +219,17 @@ def train(
                 f"DISC-LOSS---step/total: {step}/{num_steps} "
                 f"real_loss: {disc_loss_components['loss_real']:.4f}, "
                 f"fake_loss: {disc_loss_components['loss_fake']:.4f}, "
-                f"total_loss: {disc_loss_components['total_loss']:.4f}, "
+                f"total_loss: {total_lossd:.4f}, "
+                f"grad_pen: {disc_loss_components['grad_pen']:.4f}, "
                 f"lm_loss: {dlm_loss:.4f}, "
                 )                    
-       
+        
                 writer.add_scalar('Discriminator_loss/discriminator_real_loss', disc_loss_components['loss_real'], step)
                 writer.add_scalar('Discriminator_loss/discriminator_fake_loss', disc_loss_components['loss_fake'], step)
-                writer.add_scalar('Discriminator_loss/discriminator_total_loss', disc_loss_components['total_loss'], step)
+                writer.add_scalar('Discriminator_loss/discriminator_total_loss', total_lossd, step)
+                writer.add_scalar('Discriminator_loss/discriminator_grad_pen', disc_loss_components['grad_pen'], step)
                 writer.add_scalar('Discriminator_loss/discriminator_lm_loss', dlm_loss, step)
- 
-        
+
         # Backpropagation
         total_lossg.backward()
 
@@ -239,7 +239,8 @@ def train(
         torch.nn.utils.clip_grad_norm_(models['downsample'].parameters(), max_grad_norm)
         torch.nn.utils.clip_grad_norm_(models['upsample'].parameters(), max_grad_norm)
         torch.nn.utils.clip_grad_norm_(models['decoder'].parameters(), max_grad_norm)
-        torch.nn.utils.clip_grad_norm_(models['discriminator'].parameters(), max_grad_norm)
+        
+        # torch.nn.utils.clip_grad_norm_(models['discriminator'].parameters(), max_grad_norm)
             
         # norm 
         def get_grad_norm(model):
@@ -249,12 +250,20 @@ def train(
                     param_norm = p.grad.data.norm(2)  # L2 norm
                     total_norm += param_norm.item() ** 2
             return total_norm ** 0.5
+        
+        # for all the layers in discriminator print the max and min weights and their gradients
+        # for name, param in models['discriminator'].named_parameters():
+        #     if param.grad is not None:
+        #         logging.info(f"Discriminator {name} weight max: {param.data.max()}, min: {param.data.min()}")
+        #         logging.info(f"Discriminator {name} grad max: {param.grad.data.max()}, min: {param.grad.data.min()}")
+        
         if step % config['logging']['step'] == 0:  
+            writer.add_scalar('grad_norm/discriminator', get_grad_norm(models['discriminator']), step)
             writer.add_scalar('grad_norm/encoder', get_grad_norm(models['encoder']), step)
             writer.add_scalar('grad_norm/downsample', get_grad_norm(models['downsample']), step)
             writer.add_scalar('grad_norm/decoder', get_grad_norm(models['decoder']), step)
-            writer.add_scalar('grad_norm/discriminator', get_grad_norm(models['discriminator']), step)
-            writer.add_scalar('grad_norm/upsample', get_grad_norm(models['upsample']), step)
+            writer.add_scalar('grad_norm/upsample', get_grad_norm(models['upsample']), step) 
+            
         
         # Optimizer step
         if step >= freeze_steps:

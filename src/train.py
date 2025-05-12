@@ -77,7 +77,7 @@ def configure_logging(dir='logs/'):
     )
     
 # step :- Prepare the dataset.
-def initialize_datasets(config, split='train', shuffle=True):
+def initialize_datasets(config, split='train', shuffle=True, bsz=1):
     """Initialize and configure speech/text datasets with samplers."""
        
     # step 1 :- Prepare the speech dataset.
@@ -89,7 +89,7 @@ def initialize_datasets(config, split='train', shuffle=True):
     )    
     speech_loader = DataLoader(
         speech_dataset,
-        batch_size=config['dataset_speech']['batch_size'],
+        batch_size=bsz,
         shuffle=shuffle,
         collate_fn=speech_dataset.collate_fn,
         num_workers=4
@@ -307,6 +307,7 @@ def main():
         config = torch.load(args.resume_checkpoint)["config"]
     else:
         config = load_config(args.config) 
+        
     
     # Set random seeds
     random.seed(config['train']['seed'])
@@ -328,12 +329,17 @@ def main():
         
     # Configure logging
     configure_logging(config['logging']['dir'])
+    # save the config file to the log directory
+    with open(f"{config['logging']['dir']}/config.yaml", "w") as f:
+        yaml.dump(config, f)
+    logging.info("Logging configuration:") 
+    
     logging.info(f"Loaded config from {args.config}")
     logging.info(f"Command-line args: {args}")   
     logging.info(f"Config after command-line overrides: {config}")
     
     # Initialize datasets and models
-    train_speech_loader, text_dataset, text_loader, vocab = initialize_datasets(config, split='train', shuffle=True)
+    train_speech_loader, text_dataset, text_loader, vocab = initialize_datasets(config, split='train', shuffle=True, bsz = config['dataset_speech']['batch_size'])
     val_speech_loader = initialize_datasets(config, split='val', shuffle=False)
     test_speech_loader = initialize_datasets(config, split='test', shuffle=False)
     

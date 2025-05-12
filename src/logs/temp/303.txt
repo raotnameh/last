@@ -1,0 +1,4 @@
+Decoded text: UHLTHIIABASREROEER AS AW TE TRTILDAEFA'EBT EO JE
+Decoded text with special tokens: ?UHLTHI?I?ABASREROE?E?R ?AS? AW? TE? ?TRTI?LD?AE?FA'?EBT EO J?E
+Decoded text with special tokens (repeated): ?UHLTHI?I???ABASRREROE?EEEE?R ??AASSS?    AAAAAW???  TTTEE?     ????TRTIIII?LLD?AEE??FAAAAAAAA'??EEBBT EOO       J???????BE
+Total time: 2.46 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_121119_1034_46.wav

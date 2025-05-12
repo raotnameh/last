@@ -1,0 +1,4 @@
+Decoded text: OAOHIA A YSASTY DSYTF F KOY YKY Y DOSYSKAVE  VI SV E TMGTYTYS Y F R LE
+Decoded text with special tokens: OAOH?I?A A Y?S?A?STY DSYTF F KOY YKY Y DOSYSKAVE ? ?VI SV E TMGTYTYS Y F R LE
+Decoded text with special tokens (repeated): OAOHHHH??I?A  A  Y???S?????A??SSSTY DSYTTF     F   KOOYYYYYY YYKYYY Y   DOOSSSSYSKAVE       ? ??VI SSSV E   TTTMGTYTYS Y   FF R        L??????E
+Total time: 2.86 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_9960_83_5.wav

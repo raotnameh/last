@@ -76,7 +76,7 @@ class Tokenizer(nn.Module):
         x = z_flat # (batch*time, channels)
         quantized = z_q.contiguous().view(-1, c) # (batch*time, channels)
         theta = torch.sum(x * quantized, dim=1) # (batch*time)
-        theta_mask = theta > 0.1 # (batch*time) # Limitation of the roation trick. It avoids the rotation trick when the angle is too small. which results in opposite direction of gradeints for codebook  and  encoder output.
+        theta_mask = theta > 0.8 # (batch*time) # Limitation of the roation trick. It avoids the rotation trick when the angle is too small. which results in opposite direction of gradeints for codebook  and  encoder output.
         theta_mask = theta_mask.float().unsqueeze(1) # (batch*time, 1)
         # count of theta_mask of value 1 
         if writer and step % 100 == 0:

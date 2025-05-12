@@ -1,0 +1,4 @@
+Decoded text: OHHHHVK KHYSO K ST K UKVIOV SE S O U US K SHKVYVEYS K K OHS K PS K KHHE
+Decoded text with special tokens: OH?H?H?H?VK KHYSO K ST K UKVIOV SE S O U US? K? S?HKVYVEYS K K O?H?S K PS K KH?HE
+Decoded text with special tokens (repeated): HHHHHHHH??H?????HH??H?????????VKK KKKHHHYYSO  K SST  K UKVVIOV SE S O UU US?????      K?? S?HKKVYVEYS K  K     O??H???SSS KK   PS K KKHH???????H?E
+Total time: 2.92 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_140049_1578_7.wav
