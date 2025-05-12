@@ -2,7 +2,7 @@ checkpoint:
   step: 10000
 
 logging: 
-  dir: "/raid/home/rajivratn/hemant_rajivratn/last/src/logs_sp"
+  dir: "/raid/home/rajivratn/hemant_rajivratn/last/src/logs"
   step: 1
 
 device: "cuda"
@@ -21,7 +21,7 @@ dataset_speech:
   batch_size: &batch_size_value 16
 
 dataset_txt:
-  path: "/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train_norm.wrd"
+  path: "/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train_norm.txt"
   # path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech-lm-norm.txt"
   batch_size: *batch_size_value
 

@@ -7,34 +7,35 @@ import os
 import random
 import seaborn as sns
 
-class GradMultiply(Function):
-    @staticmethod
-    def forward(ctx, x: torch.Tensor, scale: float) -> torch.Tensor:
-        # Save scale factor for backward
-        ctx.scale = scale
-        # Return a copy so autograd sees this Function
-        return x.clone()
 
-    @staticmethod
-    def backward(ctx, grad_output: torch.Tensor):
-        # Multiply incoming gradient by scale; no gradient for scale arg
-        return grad_output * ctx.scale, None
+# class GradMultiply(torch.autograd.Function):
+#     @staticmethod
+#     def forward(ctx, x: torch.Tensor, scale: float) -> torch.Tensor:
+#         # Save scale factor for backward
+#         ctx.scale = scale
+#         # Return a copy so autograd sees this Function
+#         return x.clone()
 
-class MeanOverTWithSumGrad(nn.Module):
-    """
-    Computes mean over time dimension (dim=1) with keepdim=True,
-    but scales its backward gradient so it's equivalent to sum().
-    """
-    def __init__(self):
-        super().__init__()
+#     @staticmethod
+#     def backward(ctx, grad_output: torch.Tensor):
+#         # Multiply incoming gradient by scale; no gradient for scale arg
+#         return grad_output * ctx.scale, None
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # x: shape (b, t, c)
-        t = x.shape[1]
-        # compute mean over time dim, keep the dimension
-        y_mean = x.mean(dim=1, keepdim=True)
-        # wrap with GradMultiply to cancel mean's 1/t in backward
-        return GradMultiply.apply(y_mean, t)
+# class MeanOverTWithSumGrad(nn.Module):
+#     """
+#     Computes mean over time dimension (dim=1) with keepdim=True,
+#     but scales its backward gradient so it's equivalent to sum().
+#     """
+#     def __init__(self):
+#         super().__init__()
+
+#     def forward(self, x: torch.Tensor) -> torch.Tensor:
+#         # x: shape (b, t, c)
+#         t = x.shape[1]
+#         # compute mean over time dim, keep the dimension
+#         y_mean = x.mean(dim=1, keepdim=True)
+#         # wrap with GradMultiply to cancel mean's 1/t in backward
+#         return GradMultiply.apply(y_mean, t)
 
 
 class Tokenizer(nn.Module):

@@ -1,4 +1,0 @@
-Decoded text: 'DXUAEAE EOIOIO TEI A OA E OR EOGIOA OIES O E OR IE EO OEOES X
-Decoded text with special tokens: 'DXUA?EAE EOIOIO TEI A ?OA E ?OR EOGIOA OIES O E OR? IE EO OEOES ?X
-Decoded text with special tokens (repeated): '''DDDXUUUAAA???EAE  EOIOIO   TEEEIIII   A   ??OOA  E ?ORR      EEEOGIIOA    OIES    O  E OR?  IEE EEEO OOEOES    ???? X
-Total time: 2.385 seconds and path: /raid/home/rajivratn/hemant_rajivratn/librispeech/data/train/audio/train-clean-100_16041_4680_22.wav
