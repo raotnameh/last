@@ -37,7 +37,7 @@ class Conv1dBlock(nn.Module):
         return x
 
 class Discriminator(nn.Module):
-    def __init__(self, in_channels=256, hidden_dim=256, num_layers=4, kernel_size=21, vocab_size=40):
+    def __init__(self, in_channels=256, hidden_dim=256, num_layers=4, kernel_size=21, vocab_size=30):
         super().__init__()
         
         self.layers = nn.ModuleList()
