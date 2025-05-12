@@ -114,9 +114,10 @@ class Dataset_txt(Dataset):
 
     def __getitem__(self, idx):
         text = self.texts[idx]
-        input_ids = self.encode(text)
-        return input_ids
-
+        
+        # input_ids = self.encode(text)
+        # return input_ids
+        
         result = ["?"]
         prev_char = ""
 

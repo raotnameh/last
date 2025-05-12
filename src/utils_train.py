@@ -121,18 +121,16 @@ def train(
         output['dec_out'] = dec_out
             
         # ===== Discriminator Generator Update =====
-        with torch.no_grad():
-            tensor_seqs = [torch.tensor(seq, dtype=torch.long) for seq in selected_encodings_list]
-            padded_batch = pad_sequence(tensor_seqs, batch_first=True, padding_value=0).to(z_q_disc.device)
-        
-            disc_fake, lm_loss = models['discriminator'](z_q_disc, z_q_disc_mask, labels=padded_batch)
-            # lm_loss, perplexity = models['codebook'].lmscoring(
-            #     target=padded_batch,
-            #     inputs_embeds=z_q_disc,
-            #     attention_mask=~z_q_disc_mask.squeeze(-1),
-            # )
-            output['disc_fake'] = disc_fake
-            output["entropy_loss"] = lm_loss
+        tensor_seqs = [torch.tensor(seq, dtype=torch.long) for seq in selected_encodings_list]
+        padded_batch = pad_sequence(tensor_seqs, batch_first=True, padding_value=0).to(z_q_disc.device)
+        disc_fake, lm_loss = models['discriminator'](z_q_disc, z_q_disc_mask, labels=padded_batch.detach())
+        # lm_loss, perplexity = models['codebook'].lmscoring(
+        #     target=padded_batch,
+        #     inputs_embeds=z_q_disc,
+        #     attention_mask=~z_q_disc_mask.squeeze(-1),
+        # )
+        output['disc_fake'] = disc_fake
+        output["entropy_loss"] = lm_loss
             
         # Loss calculation
         gen_loss_components = loss_module.step_gen(output)        

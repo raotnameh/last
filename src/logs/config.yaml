@@ -11,7 +11,7 @@ dataset_speech:
   val_path: /raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/val.tsv
 dataset_txt:
   batch_size: 8
-  path: /raid/home/rajivratn/hemant_rajivratn/last/data/txt/train.wrd
+  path: /raid/home/rajivratn/hemant_rajivratn/last/data/txt/train_norm.txt
 decoder:
   max_seq_len: 2048
   speaker:
@@ -44,7 +44,7 @@ encoder:
 eval:
   eval: false
 logging:
-  dir: /raid/home/rajivratn/hemant_rajivratn/last/src/logs_del
+  dir: /raid/home/rajivratn/hemant_rajivratn/last/src/logs
   step: 1
 loss:
   commit_loss_weight: 1.0
@@ -55,11 +55,11 @@ loss:
   smooth_loss_weight: 1.0
 lr_scheduler:
   phase_ratio:
-  - 0.01
+  - 0.1
   - 0.0
-  - 0.99
+  - 0.9
 train:
-  discriminator_freq: 6
+  discriminator_freq: 2
   freeze_steps: 1
   grad_clip: 10.0
   gradient_accumulation_steps: 1
