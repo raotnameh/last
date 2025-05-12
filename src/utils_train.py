@@ -124,7 +124,7 @@ def train(
         tensor_seqs = [torch.tensor(seq, dtype=torch.long) for seq in selected_encodings_list]
         padded_batch = pad_sequence(tensor_seqs, batch_first=True, padding_value=0).to(z_q_disc.device)
         disc_fake, lm_loss = models['discriminator'](z_q_disc, z_q_disc_mask, labels=padded_batch)
-        # entropyloss, perplexity = models['codebook'].lmscoring(
+        # lm_loss, perplexity = models['codebook'].lmscoring(
         #     target=padded_batch,
         #     inputs_embeds=z_q_disc,
         #     attention_mask=~z_q_disc_mask.squeeze(-1),
@@ -239,8 +239,8 @@ def train(
         torch.nn.utils.clip_grad_norm_(models['downsample'].parameters(), max_grad_norm)
         torch.nn.utils.clip_grad_norm_(models['upsample'].parameters(), max_grad_norm)
         torch.nn.utils.clip_grad_norm_(models['decoder'].parameters(), max_grad_norm)
-        
-        # torch.nn.utils.clip_grad_norm_(models['discriminator'].parameters(), max_grad_norm)
+
+        torch.nn.utils.clip_grad_norm_(models['discriminator'].parameters(), max_grad_norm)
             
         # norm 
         def get_grad_norm(model):

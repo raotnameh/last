@@ -340,8 +340,8 @@ def main():
     
     # Initialize datasets and models
     train_speech_loader, text_dataset, text_loader, vocab = initialize_datasets(config, split='train', shuffle=True, bsz = config['dataset_speech']['batch_size'])
-    val_speech_loader = initialize_datasets(config, split='val', shuffle=False)
-    test_speech_loader = initialize_datasets(config, split='test', shuffle=False)
+    val_speech_loader = initialize_datasets(config, split='val', shuffle=False, bsz = config['dataset_speech']['batch_size'])
+    test_speech_loader = initialize_datasets(config, split='test', shuffle=False, bsz = config['dataset_speech']['batch_size'])
     
     speech_loader = [train_speech_loader, val_speech_loader, test_speech_loader]
     

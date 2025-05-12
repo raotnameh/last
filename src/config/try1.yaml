@@ -46,7 +46,7 @@ upsample:
 
 discriminator:
   hidden_dim: 256
-  num_layers: 1
+  num_layers: 10
   kernel_size: 9
 
 decoder:
@@ -67,11 +67,11 @@ decoder:
 train:
   seed: 42123
 
-  lr_enc: 0.0001
-  lr_down: 0.0001
-  lr_dec: 0.0001
+  lr_enc: &lr 0.00005
+  lr_down: *lr
+  lr_dec: 0.001
   lr_disc: 0.0001
-  grad_clip: 1.0
+  grad_clip: 10.0
   
   num_steps: 100000
   freeze_steps: 1

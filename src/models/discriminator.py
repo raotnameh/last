@@ -45,7 +45,7 @@ class Discriminator(nn.Module):
         for i in range(num_layers):
             self.layers.append(Conv1dBlock(hidden_dim, hidden_dim, kernel_size=kernel_size))
         
-        
+        self.norm = spectral_norm(nn.LayerNorm(hidden_dim))
         self.proj = spectral_norm(nn.Linear(hidden_dim, 1, bias=False))
         self.lm = spectral_norm(nn.Linear(hidden_dim, vocab_size, bias=False))
     
@@ -60,18 +60,19 @@ class Discriminator(nn.Module):
         for layer in self.layers[1:]:
             x = x + layer(x, padding_mask)
 
+        x = self.norm(x)  # (batch, time, channels)
         # Compute mean pooling over valid timesteps
         valid_counts = (~padding_mask).sum(dim=1).float() # (batch, channels)
         x_mean = x.sum(dim=1) / valid_counts  # (batch, channels)
-        x_mean = F.normalize(x_mean, dim=1)  # Normalize the mean vector
         
         # Apply the final projection
         x_mean = self.proj(x_mean) # (B, 1)
         x_mean = x_mean.squeeze(1)  # (B)
         
+        
         if labels is not None: 
             targets = labels[:, 1:]  
-            logits = self.lm(x[:, :-1, :])
+            logits = self.lm( x[:, :-1, :] )
             
             logits = logits.reshape(-1, logits.size(-1))
             targets = targets.reshape(-1)   
