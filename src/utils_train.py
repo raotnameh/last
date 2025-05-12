@@ -121,24 +121,27 @@ def train(
         output['dec_out'] = dec_out
             
         # ===== Discriminator Generator Update =====
-        tensor_seqs = [torch.tensor(seq, dtype=torch.long) for seq in selected_encodings_list]
-        padded_batch = pad_sequence(tensor_seqs, batch_first=True, padding_value=0).to(z_q_disc.device)
-        disc_fake, lm_loss = models['discriminator'](z_q_disc, z_q_disc_mask, labels=padded_batch)
-        # lm_loss, perplexity = models['codebook'].lmscoring(
-        #     target=padded_batch,
-        #     inputs_embeds=z_q_disc,
-        #     attention_mask=~z_q_disc_mask.squeeze(-1),
-        # )
-        output['disc_fake'] = disc_fake
-        output["entropy_loss"] = lm_loss
+        with torch.no_grad():
+            tensor_seqs = [torch.tensor(seq, dtype=torch.long) for seq in selected_encodings_list]
+            padded_batch = pad_sequence(tensor_seqs, batch_first=True, padding_value=0).to(z_q_disc.device)
         
+            disc_fake, lm_loss = models['discriminator'](z_q_disc, z_q_disc_mask, labels=padded_batch)
+            # lm_loss, perplexity = models['codebook'].lmscoring(
+            #     target=padded_batch,
+            #     inputs_embeds=z_q_disc,
+            #     attention_mask=~z_q_disc_mask.squeeze(-1),
+            # )
+            output['disc_fake'] = disc_fake
+            output["entropy_loss"] = lm_loss
+            
         # Loss calculation
         gen_loss_components = loss_module.step_gen(output)        
         total_lossg = gen_loss_components['rec_loss']
         
         if step % config['logging']['step'] == 0:
+            enc_list = [i.item() for i in selected_encodings_list[0]]
             logging.info(f"Generator encoded text path: --{paths[0]}-- of length {dur[0]} seconds--")
-            logging.info( f"Generator decoded text without special tokens: --{text_dataset.decode(selected_encodings_list[0])}--" )
+            logging.info( f"Generator decoded text without special tokens: --{text_dataset.decode(enc_list)}--" )
             
             if step % 1000 == 0:
                 with torch.no_grad():
@@ -151,12 +154,12 @@ def train(
                     torchaudio.save(f"{save_dir}/temp/{step}.wav", total.clone().detach().cpu(), sample_rate=16000)
                 
                     with open(f"{save_dir}/temp/{step}.txt", "w") as f:
-                        spec_tokens_repeated = text_dataset.decode(selected_encodings_repeated[0],keep_special_tokens=True)
-                        spec_tokens = text_dataset.decode(selected_encodings_list[0],keep_special_tokens=True)
-                        tokens = text_dataset.decode(selected_encodings_list[0])
+                        spec_tokens_repeated = text_dataset.decode([i.item() for i in selected_encodings_repeated[0]],keep_special_tokens=True)
+                        spec_tokens = text_dataset.decode(enc_list,keep_special_tokens=True)
+                        tokens = text_dataset.decode(enc_list)
                         a = f"Decoded text: {tokens}\n"
                         a += f"Decoded text with special tokens: {spec_tokens}\n"
-                        a += f"Decoded text with special tokens (repeated): {spec_tokens_repeated}\n"
+                        a += f"Decoded raw text repeated: {spec_tokens_repeated}\n"
                         a += f"Total time: {dur[0]} seconds and path: {paths[0]}\n"
                         f.write(a)
                         
