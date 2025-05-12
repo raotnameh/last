@@ -7,6 +7,36 @@ import os
 import random
 import seaborn as sns
 
+class GradMultiply(Function):
+    @staticmethod
+    def forward(ctx, x: torch.Tensor, scale: float) -> torch.Tensor:
+        # Save scale factor for backward
+        ctx.scale = scale
+        # Return a copy so autograd sees this Function
+        return x.clone()
+
+    @staticmethod
+    def backward(ctx, grad_output: torch.Tensor):
+        # Multiply incoming gradient by scale; no gradient for scale arg
+        return grad_output * ctx.scale, None
+
+class MeanOverTWithSumGrad(nn.Module):
+    """
+    Computes mean over time dimension (dim=1) with keepdim=True,
+    but scales its backward gradient so it's equivalent to sum().
+    """
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x: shape (b, t, c)
+        t = x.shape[1]
+        # compute mean over time dim, keep the dimension
+        y_mean = x.mean(dim=1, keepdim=True)
+        # wrap with GradMultiply to cancel mean's 1/t in backward
+        return GradMultiply.apply(y_mean, t)
+
+
 class Tokenizer(nn.Module):
     def __init__(self, config, vocab, rot=True):
         super(Tokenizer, self).__init__()
@@ -79,7 +109,7 @@ class Tokenizer(nn.Module):
         theta_mask = theta > 0.8 # (batch*time) # Limitation of the roation trick. It avoids the rotation trick when the angle is too small. which results in opposite direction of gradeints for codebook  and  encoder output.
         theta_mask = theta_mask.float().unsqueeze(1) # (batch*time, 1)
         # count of theta_mask of value 1 
-        if writer and step % 100 == 0:
+        if writer and step % 1000 == 0:
             writer.add_scalar('tokenizer/theta_mean', theta.mean().item(), step)
             writer.add_scalar('tokenizer/theta_std', theta.std().item(), step)
             writer.add_scalar('tokenizer/theta_max', theta.max().item(), step)

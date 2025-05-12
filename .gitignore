@@ -31,3 +31,6 @@ data/
 # Ignore VS Code settings
 .vscode/
 
+# 
+data/txt/train_norm.txt
+

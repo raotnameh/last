@@ -21,6 +21,8 @@ class WhisperWERCalculator:
         self.model = AutoModelForSpeechSeq2Seq.from_pretrained(model_id).to(self.device)
         self.model.eval()
         self.batch_size = 64
+        
+        self.real_hyps = None
 
     def transcribe_batch(
         self,
@@ -58,28 +60,26 @@ class WhisperWERCalculator:
         transcripts
     ):
 
-        pred_hyps, real_hyps = [], []
+        pred_hyps, self.real_hyps = [], []
 
         # Batchify transcription
         for chunk in tqdm(self._chunkify(pred_waveforms, self.batch_size)):
             pred_hyps.extend(self.transcribe_batch(chunk))
-        for chunk in tqdm(self._chunkify(real_waveforms, self.batch_size)):
-            real_hyps.extend(self.transcribe_batch(chunk))
+        if self.real_hyps is None:
+            for chunk in tqdm(self._chunkify(real_waveforms, self.batch_size)):
+                self.real_hyps.extend(self.transcribe_batch(chunk))
 
-        # Compute metrics
         wer_pred = wer(transcripts, pred_hyps)
-        wer_real = wer(transcripts, real_hyps)
         cer_pred = cer(transcripts, pred_hyps)
-        cer_real = cer(transcripts, real_hyps)
+        wer_real = wer(transcripts, self.real_hyps)        
+        cer_real = cer(transcripts, self.real_hyps)
 
         print(f"CER for Predicted Waveforms: {cer_pred:.3f}")
         print(f"CER for Real Waveforms:      {cer_real:.3f}")
         print(f"WER for Predicted Waveforms: {wer_pred:.3f}")
         print(f"WER for Real Waveforms:      {wer_real:.3f}")
 
-        return cer_pred, cer_real, wer_pred, wer_real, pred_hyps, real_hyps
-
-
+        return cer_pred, cer_real, wer_pred, wer_real, pred_hyps, self.real_hyps
 
 
 def compute_pesq(reference_waveforms, synthesized_waveforms):

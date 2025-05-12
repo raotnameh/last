@@ -139,26 +139,27 @@ def train(
         if step % config['logging']['step'] == 0:
             logging.info(f"Generator encoded text path: --{paths[0]}-- of length {dur[0]} seconds--")
             logging.info( f"Generator decoded text without special tokens: --{text_dataset.decode(selected_encodings_list[0])}--" )
-                                  
-            with torch.no_grad():
-                pr = models['gtruth'].decode(output['dec_out'][0].unsqueeze(0)) # [1, T]
-                pr = pr / torch.max(torch.abs(pr))
-                gt = waveforms[0].unsqueeze(0) # [1, T]
-                gt = gt / torch.max(torch.abs(gt)) 
-                gap = torch.zeros_like(gt)[:,:16000] # [1, 16000]
-                total = torch.cat([pr, gap, gt], dim=1) # [1, 2T+16000]
-                torchaudio.save(f"{save_dir}/temp/{step}.wav", total.clone().detach().cpu(), sample_rate=16000)
-               
-                with open(f"{save_dir}/temp/{step}.txt", "w") as f:
-                    spec_tokens_repeated = text_dataset.decode(selected_encodings_repeated[0],keep_special_tokens=True)
-                    spec_tokens = text_dataset.decode(selected_encodings_list[0],keep_special_tokens=True)
-                    tokens = text_dataset.decode(selected_encodings_list[0])
-                    a = f"Decoded text: {tokens}\n"
-                    a += f"Decoded text with special tokens: {spec_tokens}\n"
-                    a += f"Decoded text with special tokens (repeated): {spec_tokens_repeated}\n"
-                    a += f"Total time: {dur[0]} seconds and path: {paths[0]}\n"
-                    f.write(a)
-                    
+            
+            if step % 1000 == 0:
+                with torch.no_grad():
+                    pr = models['gtruth'].decode(output['dec_out'][0].unsqueeze(0)) # [1, T]
+                    pr = pr / torch.max(torch.abs(pr))
+                    gt = waveforms[0].unsqueeze(0) # [1, T]
+                    gt = gt / torch.max(torch.abs(gt)) 
+                    gap = torch.zeros_like(gt)[:,:16000] # [1, 16000]
+                    total = torch.cat([pr, gap, gt], dim=1) # [1, 2T+16000]
+                    torchaudio.save(f"{save_dir}/temp/{step}.wav", total.clone().detach().cpu(), sample_rate=16000)
+                
+                    with open(f"{save_dir}/temp/{step}.txt", "w") as f:
+                        spec_tokens_repeated = text_dataset.decode(selected_encodings_repeated[0],keep_special_tokens=True)
+                        spec_tokens = text_dataset.decode(selected_encodings_list[0],keep_special_tokens=True)
+                        tokens = text_dataset.decode(selected_encodings_list[0])
+                        a = f"Decoded text: {tokens}\n"
+                        a += f"Decoded text with special tokens: {spec_tokens}\n"
+                        a += f"Decoded text with special tokens (repeated): {spec_tokens_repeated}\n"
+                        a += f"Total time: {dur[0]} seconds and path: {paths[0]}\n"
+                        f.write(a)
+                        
                 
             logging.info(
             f"GEN-LOSS---step/total: {step}/{num_steps} "

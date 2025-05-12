@@ -16,7 +16,6 @@ class Conv1dBlock(nn.Module):
             dilation=dilation, 
             padding=0,
             groups=groups,
-            bias=False,
         ))
         
         self.activation = nn.GELU()
@@ -48,8 +47,8 @@ class Discriminator(nn.Module):
             self.layers.append(Conv1dBlock(hidden_dim, hidden_dim, kernel_size=kernel_size))
         
         self.norm = spectral_norm(nn.LayerNorm(hidden_dim))
-        self.proj = spectral_norm(nn.Linear(hidden_dim, 1, bias=False))
-        self.lm = spectral_norm(nn.Linear(hidden_dim, vocab_size, bias=False))
+        self.proj = spectral_norm(nn.Linear(hidden_dim, 1))
+        self.lm = spectral_norm(nn.Linear(hidden_dim, vocab_size))
     
     def forward(self, x, padding_mask=None, labels=None):
         """
@@ -62,19 +61,19 @@ class Discriminator(nn.Module):
         for layer in self.layers[1:]:
             x = x + layer(x, padding_mask)
 
-        x = self.norm(x)  # (batch, time, channels)
+        # x = self.norm(x)  # (batch, time, channels)
         # Compute mean pooling over valid timesteps
         valid_counts = (~padding_mask).sum(dim=1).float() # (batch, channels)
         x_mean = x.sum(dim=1) / valid_counts  # (batch, channels)
+        
         
         # Apply the final projection
         x_mean = self.proj(x_mean) # (B, 1)
         x_mean = x_mean.squeeze(1)  # (B)
         
-        
         if labels is not None: 
             targets = labels[:, 1:]  
-            logits = self.lm( x[:, :-1, :] )
+            logits = self.lm( self.norm( x[:, :-1, :] ) ) # (B, T-1, vocab_size)
             
             logits = logits.reshape(-1, logits.size(-1))
             targets = targets.reshape(-1)   
