@@ -12,17 +12,12 @@ dataset_speech:
   val_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/val.tsv"
   test_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/test.tsv"
 
-  # train_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/manifest/train.tsv"
-  # val_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/manifest/val.tsv"
-  # test_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/ljspeech/manifest/test.tsv"
-
   min_duration: 32000
   max_duration: 320000
   batch_size: &batch_size_value 16
 
 dataset_txt:
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train_norm.txt"
-  # path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech-lm-norm.txt"
   batch_size: *batch_size_value
 
 codebook:
@@ -67,16 +62,16 @@ decoder:
 train:
   seed: 42123
 
-  lr_enc: &lr 0.0001
+  lr_enc: &lr 0.00005
   lr_down: *lr
   lr_dec: 0.0005
   lr_disc: 0.0001
-  grad_clip: 1.0
+  grad_clip: 10.0
   
   num_steps: 100000
   freeze_steps: 1
   gradient_accumulation_steps: 1
-  discriminator_freq: 2 # for N-1 steps train discriminator
+  discriminator_freq: 6 # for N-1 steps train discriminator
 
   mixed_precision: False
   resume_checkpoint: False

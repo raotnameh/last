@@ -210,26 +210,26 @@ def configure_optimizers(models, config):
         'enc': optim.AdamW(
             [p for p in models['encoder'].parameters() if p.requires_grad],
             lr=config['train']['lr_enc'],
-            betas=(0.5, 0.99),
+            betas=(0.0, 0.999),
         ),
         'down': optim.AdamW(
             [p for p in models['downsample'].parameters() if p.requires_grad],
             lr=config['train']['lr_down'],
-            betas=(0.5, 0.99),
+            betas=(0.0, 0.999),
         ),
         'dec': optim.AdamW(
             [p for p in models['upsample'].parameters() if p.requires_grad] +
             [p for p in models['decoder'].parameters() if p.requires_grad],
             lr=config['train']['lr_dec'],
-            betas=(0.5, 0.99),
+            betas=(0.0, 0.999),
         ),
         'disc': optim.AdamW(
             [p for p in models['discriminator'].parameters() if p.requires_grad],
             lr=config['train']['lr_disc'],
-            betas=(0.5, 0.99),
+            betas=(0.0, 0.999),
         )
     }
-    
+     
     
     def tri_stage_scheduler(optimizer, total_steps, phase_ratio=[0.03, 0.9, 0.07], low=1e-2):
         """
@@ -340,8 +340,8 @@ def main():
     
     # Initialize datasets and models
     train_speech_loader, text_dataset, text_loader, vocab = initialize_datasets(config, split='train', shuffle=True, bsz = config['dataset_speech']['batch_size'])
-    val_speech_loader = initialize_datasets(config, split='val', shuffle=False, bsz = 16)
-    test_speech_loader = initialize_datasets(config, split='test', shuffle=False, bsz = 16)
+    val_speech_loader = initialize_datasets(config, split='val', shuffle=False, bsz = config['dataset_speech']['batch_size'])
+    test_speech_loader = initialize_datasets(config, split='test', shuffle=False, bsz = config['dataset_speech']['batch_size'])
     
     speech_loader = [train_speech_loader, val_speech_loader, test_speech_loader]
     

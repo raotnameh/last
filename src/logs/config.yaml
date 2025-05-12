@@ -59,14 +59,14 @@ lr_scheduler:
   - 0.0
   - 0.9
 train:
-  discriminator_freq: 2
+  discriminator_freq: 6
   freeze_steps: 1
-  grad_clip: 1.0
+  grad_clip: 10.0
   gradient_accumulation_steps: 1
   lr_dec: 0.0005
   lr_disc: 0.0001
-  lr_down: 0.0001
-  lr_enc: 0.0001
+  lr_down: 5.0e-05
+  lr_enc: 5.0e-05
   mixed_precision: false
   num_steps: 100000
   resume_checkpoint: false

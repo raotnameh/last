@@ -8,6 +8,7 @@ from collections import Counter
 import numpy as np
 import matplotlib.pyplot as plt
 
+
 class Dataset_txt(Dataset):
     def __init__(self, data="/raid/home/rajivratn/hemant_rajivratn/last/data/transcription.txt"):
         super(Dataset_txt, self).__init__()
@@ -15,11 +16,12 @@ class Dataset_txt(Dataset):
         
         with open(data, "r") as f:
             out = f.readlines()
-        texts = [x.strip() for x in out if len(x) > 10] # filtering out short texts that 2 second.
+        texts = [x.strip() for x in tqdm(out) if len(x) > 10] # filtering out short texts that 2 second.
     
         # creating the vocab.
         self.vocab = self.build_vocab(texts)
-        self.save_histogram(self.add_question_marks(texts))
+        logging.info(f"Done building VOCAB")
+        self.save_histogram(texts)
         
         self.texts = texts
         self.texts = sorted(self.texts, key=len)
@@ -32,6 +34,13 @@ class Dataset_txt(Dataset):
         logging.info(f"-p- is for padding and -?- is for silence")
         
     def save_histogram(self, texts):
+        import os
+        if os.path.exists('REAL_codebook_usage_distribution.png'): 
+            logging.warning("Histogram already exists. Skipping save.")
+            return 
+        
+        texts = self.add_question_marks(texts)
+
         logging.info(f"Saving histogram of the REAL text data.")
         char_counts = Counter("".join(texts))  # Example output: [('a', 2), ('d', 1)]
         char_counts = dict(char_counts)
