@@ -214,9 +214,9 @@ def train(
             doutput['real_pad_mask'] = tmask
     
             disc_loss_components = loss_module.step_disc(doutput)
-            ratio = abs( disc_loss_components['total_loss'] / dlm_loss ).item()
-            if ratio >= 1.0:
-                dlm_loss *= ratio
+            ratio = abs(  dlm_loss / disc_loss_components['total_loss'] ).item()
+            if ratio <= 1.0:
+                disc_loss_components['total_loss'] *= ratio
             total_lossd = disc_loss_components['total_loss'] + dlm_loss
             
             # update the total loss
