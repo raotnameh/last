@@ -50,12 +50,7 @@ class Tokenizer(nn.Module):
             plt.title('Codebook Usage Distribution')
             plt.grid(axis='y')
             
-            plt.savefig('codebook_usage_distribution.png', bbox_inches='tight')
-            # for every 1000 steps save the plot 
-            if step % 1000 == 0:
-                plt.savefig(os.path.join(f'{self.save_dir}/plots', f'codebook_usage_distribution_{step}.png'), bbox_inches='tight')
-                plt.close()
-
+            plt.savefig(os.path.join(f'{self.save_dir}/plots', f'codebook_usage_distribution_{step}.png'), bbox_inches='tight')
             plt.close()
    
     @staticmethod
@@ -192,10 +187,12 @@ class Tokenizer(nn.Module):
             # append per-batch results
             selected_encodings_list.append(selected_encodings)
             selected_encodings_repeated_list.append(selected_encodings_repeated)
-            if valid_len == 0: 
-                n_z_qs.append(torch.zeros((1, C), device=z_q.device))
-            else:
+            try:
                 n_z_qs.append(torch.cat(n_z_q, dim=0))  # (num_segs, C)
+            except: 
+                print(n_z_q)
+                n_z_qs.append(torch.zeros((1, C), device=z_q.device, dtype=z_q.dtype))
+                
             
             # build mask and track max length
             L = len(selected_encodings)

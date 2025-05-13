@@ -8,18 +8,21 @@ class Conv1dBlock(nn.Module):
         super().__init__()
         
         self.causal_padding = (kernel_size - 1) * dilation
-        self.conv = spectral_norm(nn.Conv1d(
+        self.conv = spectral_norm(
+            nn.Conv1d(
             in_channels, 
             out_channels, 
             kernel_size, 
             stride=stride, 
             dilation=dilation, 
             padding=0,
-            groups=groups,
-        ))
+            groups=groups,)
+        )
         
-        self.activation = nn.GELU()
-        self.norm = spectral_norm(nn.LayerNorm(out_channels))
+        self.activation = nn.ReLU()
+        self.norm = spectral_norm(
+            nn.LayerNorm(out_channels)
+            )
         
     def forward(self, x, padding_mask=None):
         # x: (batch, time, channels)
@@ -50,8 +53,6 @@ class Discriminator(nn.Module):
         self.proj = spectral_norm(nn.Linear(hidden_dim, 1))
         self.lm = spectral_norm(nn.Linear(hidden_dim, vocab_size))
         
-        # self.non = nn.Tanh()
-    
     def forward(self, x, padding_mask=None, labels=None):
         """
         x: (batch, time, channels)
@@ -73,8 +74,6 @@ class Discriminator(nn.Module):
         x_mean = self.proj(x_mean) # (B, 1)
         x_mean = x_mean.squeeze(1)  # (B)
         
-        # x_mean = self.non(x_mean)
-        
         if labels is not None: 
             targets = labels[:, 1:]  
             logits = self.lm( self.norm( x[:, :-1, :] ) ) # (B, T-1, vocab_size)
@@ -86,7 +85,6 @@ class Discriminator(nn.Module):
             return x_mean, lm_loss
         
         return x_mean
-
         
     
 
