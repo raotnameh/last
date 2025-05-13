@@ -10,10 +10,10 @@ import matplotlib.pyplot as plt
 
 
 class Dataset_txt(Dataset):
-    def __init__(self, data="/raid/home/rajivratn/hemant_rajivratn/last/data/transcription.txt"):
+    def __init__(self, data="/raid/home/rajivratn/hemant_rajivratn/last/data/transcription.txt", skip_non_speech=False):
         super(Dataset_txt, self).__init__()
 
-        
+        self.skip_non_speech = skip_non_speech
         with open(data, "r") as f:
             out = f.readlines()
         texts = [x.strip() for x in tqdm(out) if len(x) > 10] # filtering out short texts that 2 second.
@@ -115,8 +115,9 @@ class Dataset_txt(Dataset):
     def __getitem__(self, idx):
         text = self.texts[idx]
         
-        # input_ids = self.encode(text)
-        # return input_ids
+        if self.skip_non_speech:
+            input_ids = self.encode(text)
+            return input_ids
         
         result = ["?"]
         prev_char = ""

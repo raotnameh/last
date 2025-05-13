@@ -49,6 +49,8 @@ class Discriminator(nn.Module):
         self.norm = spectral_norm(nn.LayerNorm(hidden_dim))
         self.proj = spectral_norm(nn.Linear(hidden_dim, 1))
         self.lm = spectral_norm(nn.Linear(hidden_dim, vocab_size))
+        
+        # self.non = nn.Tanh()
     
     def forward(self, x, padding_mask=None, labels=None):
         """
@@ -70,6 +72,8 @@ class Discriminator(nn.Module):
         # Apply the final projection
         x_mean = self.proj(x_mean) # (B, 1)
         x_mean = x_mean.squeeze(1)  # (B)
+        
+        # x_mean = self.non(x_mean)
         
         if labels is not None: 
             targets = labels[:, 1:]  

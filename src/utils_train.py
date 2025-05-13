@@ -12,7 +12,7 @@ from tqdm.auto import tqdm
 
 import torch.nn.functional as F
 
-
+import json
 
 def train(
     models, 
@@ -100,6 +100,7 @@ def train(
             dmask,
             writer,
             step,
+            text_dataset.skip_non_speech
         )
         z_q_disc_mask = ~z_q_disc_mask.bool() # [B, T // 2, 1]
         output['smoothness_loss'] = smoothness_loss
@@ -151,16 +152,21 @@ def train(
                     total = torch.cat([pr, gap, gt], dim=1) # [1, 2T+16000]
                     torchaudio.save(f"{save_dir}/temp/{step}.wav", total.clone().detach().cpu(), sample_rate=16000)
                 
-                    with open(f"{save_dir}/temp/{step}.txt", "w") as f:
-                        spec_tokens_repeated = text_dataset.decode([i.item() for i in selected_encodings_repeated[0]],keep_special_tokens=True)
-                        spec_tokens = text_dataset.decode(enc_list,keep_special_tokens=True)
-                        tokens = text_dataset.decode(enc_list)
-                        a = f"Decoded text: {tokens}\n"
-                        a += f"Decoded text with special tokens: {spec_tokens}\n"
-                        a += f"Decoded raw text repeated: {spec_tokens_repeated}\n"
-                        a += f"Total time: {dur[0]} seconds and path: {paths[0]}\n"
-                        f.write(a)
-                        
+                    spec_tokens_repeated = text_dataset.decode([i.item() for i in selected_encodings_repeated[0]],keep_special_tokens=True)
+                    spec_tokens = text_dataset.decode(enc_list,keep_special_tokens=True)
+                    tokens = text_dataset.decode(enc_list)
+                    
+                    output_data = {
+                        "decoded_text": tokens,
+                        "decoded_text_with_special_tokens": spec_tokens,
+                        "decoded_raw_text_repeated": spec_tokens_repeated,
+                        "total_time_seconds": dur[0],
+                        "path": paths[0]
+                    }
+                    # Save as pretty JSON
+                    with open(f"{save_dir}/temp/{step}.json", "w", encoding="utf-8") as f:
+                        json.dump(output_data, f, indent=4, ensure_ascii=False)
+                    
                 
             logging.info(
             f"GEN-LOSS---step/total: {step}/{num_steps} "

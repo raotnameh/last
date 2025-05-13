@@ -3,15 +3,16 @@ checkpoint:
 codebook:
   model_name: meta-llama/Llama-3.2-1B-Instruct
 dataset_speech:
-  batch_size: 4
-  max_duration: 320000
+  batch_size: 16
+  max_duration: 160000
   min_duration: 32000
   test_path: /raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/test.tsv
   train_path: /raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/train.tsv
   val_path: /raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/val.tsv
 dataset_txt:
-  batch_size: 4
-  path: /raid/home/rajivratn/hemant_rajivratn/last/data/txt/train.wrd
+  batch_size: 16
+  path: /raid/home/rajivratn/hemant_rajivratn/last/data/txt/train_norm.txt
+  skip_non_speech: true
 decoder:
   max_seq_len: 2048
   speaker:
@@ -44,7 +45,7 @@ encoder:
 eval:
   eval: false
 logging:
-  dir: /raid/home/rajivratn/hemant_rajivratn/last/src/logs
+  dir: logs_skip_non_speech_true
   step: 1
 loss:
   commit_loss_weight: 1.0
@@ -55,18 +56,18 @@ loss:
   smooth_loss_weight: 1.0
 lr_scheduler:
   phase_ratio:
-  - 0.01
+  - 0.2
   - 0.0
-  - 0.99
+  - 0.8
 train:
   discriminator_freq: 6
   freeze_steps: 1
-  grad_clip: 1.0
+  grad_clip: 10.0
   gradient_accumulation_steps: 1
-  lr_dec: 0.0001
-  lr_disc: 5.0e-05
-  lr_down: 1.0e-05
-  lr_enc: 1.0e-05
+  lr_dec: 0.0005
+  lr_disc: 0.0001
+  lr_down: 5.0e-05
+  lr_enc: 5.0e-05
   mixed_precision: false
   num_steps: 100000
   resume_checkpoint: false

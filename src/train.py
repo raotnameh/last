@@ -99,7 +99,7 @@ def initialize_datasets(config, split='train', shuffle=True, bsz=1):
     
     if split == 'train':           
         # step 2 :- Prepare the text dataset.
-        text_dataset = Dataset_txt(data=config['dataset_txt']['path'])
+        text_dataset = Dataset_txt(data=config['dataset_txt']['path'], skip_non_speech=config['dataset_txt']['skip_non_speech'])
         text_loader = DataLoader(
             text_dataset,
             batch_size=config['dataset_txt']['batch_size'],

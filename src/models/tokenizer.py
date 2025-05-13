@@ -8,16 +8,21 @@ from torch.nn.utils.rnn import pad_sequence
 import random
 import time
 
-class GradMultiply(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, x, scale):
-        ctx.scale = scale
-        res = x.new(x)
-        return res
+# class GradMultiply(torch.autograd.Function):
+#     @staticmethod
+#     def forward(ctx, x, scale):
+#         ctx.scale = scale
+#         res = x.new(x)
+#         return res
 
-    @staticmethod
-    def backward(ctx, grad):
-        return grad * ctx.scale, None
+#     @staticmethod
+#     def backward(ctx, grad):
+#         return grad * ctx.scale, None
+    
+# n_z_q.append( 
+                #              GradMultiply.apply( segment.mean(dim=0, keepdim=True), length )
+                #         )           # (1, C)
+                
     
 class Tokenizer(nn.Module):
     def __init__(self, config, vocab, rot=True):
@@ -32,32 +37,33 @@ class Tokenizer(nn.Module):
         os.makedirs(f"{self.save_dir}/plots/", exist_ok=True)
     
     def codebook_usage(self, min_encodings, mask, step):
-        
-        # prob for each character
-        mask_bool = (mask == 1).squeeze(1)  # shape: (B,), True where we keep
-        valid_encodings = min_encodings[mask_bool]  # shape: (B', C)
-        e_mean_np = valid_encodings.mean(dim=0).cpu().numpy()
-        # Plot
-        plt.figure(figsize=(10, 6))
-        plt.bar(self.vocab, e_mean_np, color='blue', alpha=0.7)
-        plt.xlabel('Codebook Entry (Char)')
-        plt.ylabel('Probability')
-        plt.title('Codebook Usage Distribution')
-        plt.grid(axis='y')
-        plt.savefig('codebook_usage_distribution.png', bbox_inches='tight')
-        # for every 1000 steps save the plot 
-        if step % 1000 == 0:
-            plt.savefig(os.path.join(f'{self.save_dir}/plots', f'codebook_usage_distribution_{step}.png'), bbox_inches='tight')
-            plt.close()
+        if step % 10 == 0:
+            # prob for each character
+            mask_bool = (mask == 1).squeeze(1)  # shape: (B,), True where we keep
+            valid_encodings = min_encodings[mask_bool]  # shape: (B', C)
+            e_mean_np = valid_encodings.mean(dim=0).cpu().numpy()
+            # Plot
+            plt.figure(figsize=(10, 6))
+            plt.bar(self.vocab, e_mean_np, color='blue', alpha=0.7)
+            plt.xlabel('Codebook Entry (Char)')
+            plt.ylabel('Probability')
+            plt.title('Codebook Usage Distribution')
+            plt.grid(axis='y')
+            
+            plt.savefig('codebook_usage_distribution.png', bbox_inches='tight')
+            # for every 1000 steps save the plot 
+            if step % 1000 == 0:
+                plt.savefig(os.path.join(f'{self.save_dir}/plots', f'codebook_usage_distribution_{step}.png'), bbox_inches='tight')
+                plt.close()
 
-        plt.close()
+            plt.close()
    
     @staticmethod
     def get_very_efficient_rotation( u, q, x):
         w = F.normalize(u + q, dim=1).detach()
         return x - 2*torch.bmm(torch.bmm(x, w.unsqueeze(-1)), w.unsqueeze(1)) + 2*torch.bmm( torch.bmm(x, u.unsqueeze(-1).detach()), q.unsqueeze(1).detach())
           
-    def forward(self, z, codebook, mask, writer=None, step=1):
+    def forward(self, z, codebook, mask, writer=None, step=1, skip_non_speech=False):
         """
         z (torch.Tensor): b,t,c
         codebook (nn.Module): A module with a weight attribute of shape (vocab_size, embed_dim).
@@ -123,7 +129,7 @@ class Tokenizer(nn.Module):
         
         # 10. Discriminator codebooks without repeated indices #####
         encodings = min_encoding_indices.view(z.shape[0], z.shape[1]) # ( batch, time ) # (B, T)
-        n_z_q, n_mask, selected_encodings_list, selected_encodings_repeated_list = self.remove_consecutive_repeated_indices( encodings, mask.squeeze(-1), z_q.clone()) # randomly pick one index from each group of consecutive repeating elements # shape (B,T) and also returns the mask 
+        n_z_q, n_mask, selected_encodings_list, selected_encodings_repeated_list = self.remove_consecutive_repeated_indices( encodings, mask.squeeze(-1), z_q.clone(), skip_non_speech) # randomly pick one index from each group of consecutive repeating elements # shape (B,T) and also returns the mask 
 
         # codebook usage Distribution
         self.codebook_usage(min_encodings, mask.contiguous().view(-1, 1), step)
@@ -131,16 +137,16 @@ class Tokenizer(nn.Module):
         return smoothness_loss, commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list, selected_encodings_repeated_list # commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list<=
 
 
-    def remove_consecutive_repeated_indices(self, min_encoding_indices, mask, z_q):
 
-        B, T = min_encoding_indices.shape # min encoding has 1,2,3,3,3,....
+    def remove_consecutive_repeated_indices(self, min_encoding_indices, mask, z_q, skip_non_speech=False):
+
+        B, T, C = z_q.shape
         
         selected_encodings_list = []
         selected_encodings_repeated_list = []
         n_z_qs = []
         
         max_len = 0
-        skip_non_speech = False
         
         masks_tensor = torch.zeros((B, T), dtype=torch.float, device=mask.device)
         
@@ -154,7 +160,7 @@ class Tokenizer(nn.Module):
 
             # crop to valid region
             indices = indices[:valid_len]
-            z_q_b = z_q_b[:valid_len]           
+            z_q_b = z_q_b[:valid_len]
             
             # collapse runs of identical indices
             unique_vals, counts = torch.unique_consecutive(indices, return_counts=True)
@@ -168,20 +174,15 @@ class Tokenizer(nn.Module):
             
             # iterate segments (far fewer than T if many repeats)
             for v, s, e, length in zip(unique_vals, starts, ends, lengths):
-                # skip non-speech runs
-                if v == 28 and skip_non_speech:
-                    continue
-                
                 # record each frame’s encoding+1
                 selected_encodings_repeated.extend([v + 1] * length) # +1 to avoid padding token
+                
+                if v == 28 and skip_non_speech: continue # skip non-speech runs
+                
                 # mark the last frame of this segment
                 selected_encodings.append(v + 1) # +1 to avoid padding token
             
                 segment = z_q_b[s:e]  # shape (length, C)
-                # n_z_q.append( 
-                #              GradMultiply.apply( segment.mean(dim=0, keepdim=True), length )
-                #         )           # (1, C)
-                
                 if length == 1: n_z_q.append(segment)           # (1, C)
                 else:
                     seg_sum  = segment.sum(dim=0, keepdim=True)      # (1, C)
@@ -191,7 +192,10 @@ class Tokenizer(nn.Module):
             # append per-batch results
             selected_encodings_list.append(selected_encodings)
             selected_encodings_repeated_list.append(selected_encodings_repeated)
-            n_z_qs.append(torch.cat(n_z_q, dim=0))  # (num_segs, C)
+            if valid_len == 0: 
+                n_z_qs.append(torch.zeros((1, C), device=z_q.device))
+            else:
+                n_z_qs.append(torch.cat(n_z_q, dim=0))  # (num_segs, C)
             
             # build mask and track max length
             L = len(selected_encodings)
