@@ -134,7 +134,7 @@ def train(
             
         # Loss calculation
         gen_loss_components = loss_module.step_gen(output)        
-        total_lossg = gen_loss_components['rec_loss']
+        total_lossg = gen_loss_components['rec_loss'] * lm_loss.item()
         
         if step % config['logging']['step'] == 0:
             enc_list = [i.item() for i in selected_encodings_list[0]]
@@ -208,6 +208,9 @@ def train(
             doutput['real_pad_mask'] = tmask
     
             disc_loss_components = loss_module.step_disc(doutput)
+            ratio = abs( disc_loss_components['total_loss'] / dlm_loss )
+            if ratio >= 1.0:
+                dlm_loss *= ratio
             total_lossd = disc_loss_components['total_loss'] + dlm_loss
             
             # update the total loss

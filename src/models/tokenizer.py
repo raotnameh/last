@@ -189,79 +189,79 @@ class Tokenizer(nn.Module):
 
 
 
-    # def remove_consecutive_repeated_indices(self, min_encoding_indices, mask, z_q):
-    #     B, T = min_encoding_indices.shape # min encoding has 1,2,3,3,3,....
+    def sum_remove_consecutive_repeated_indices(self, min_encoding_indices, mask, z_q):
+        B, T = min_encoding_indices.shape # min encoding has 1,2,3,3,3,....
         
-    #     selected_indices_list = []
-    #     selected_encodings_list = []
-    #     selected_encodings_repeated_list = []
-    #     n_z_qs = []
-    #     masks = []
+        selected_indices_list = []
+        selected_encodings_list = []
+        selected_encodings_repeated_list = []
+        n_z_qs = []
+        masks = []
         
-    #     max_len = 0
-    #     skip_non_speech = True
-    #     masks_tensor = torch.zeros((B, T), dtype=torch.float, device=mask.device)
+        max_len = 0
+        skip_non_speech = True
+        masks_tensor = torch.zeros((B, T), dtype=torch.float, device=mask.device)
         
-    #     for b in range(B):
-    #         indices = min_encoding_indices[b]
-    #         selected_indices = []
-    #         selected_encodings = []
-    #         selected_encodings_repeated = []
-    #         n_z_q = []
+        for b in range(B):
+            indices = min_encoding_indices[b]
+            selected_indices = []
+            selected_encodings = []
+            selected_encodings_repeated = []
+            n_z_q = []
 
-    #         start = 0
-    #         loop_broke = False
+            start = 0
+            loop_broke = False
             
-    #         for i in range(1, T):
-    #             if mask[b, i] == 0: 
-    #                 loop_broke = True
-    #                 break
-    #             selected_encodings_repeated.append(indices[i-1] + 1) # +1 to avoid padding token
+            for i in range(1, T):
+                if mask[b, i] == 0: 
+                    loop_broke = True
+                    break
+                selected_encodings_repeated.append(indices[i-1] + 1) # +1 to avoid padding token
                                 
-    #             if indices[i] != indices[i - 1]:
-    #                 if indices[i-1] == 28 and skip_non_speech:     
-    #                     continue
-    #                 else:
-    #                     seg = z_q[b, start:i, :]
-    #                     if (i - 1) - start == 0: 
-    #                         n_z_q.append(seg)
-    #                     else: 
-    #                         current_sum = seg.sum(dim=0, keepdim=True)
-    #                         previous_sum = z_q[b, start:i-1, :].sum(dim=0, keepdim=True)
-    #                         n_z_q.append(current_sum - previous_sum.clone().detach())
-    #                         # n_z_q.append(seg.mean(dim=0, keepdim=True))
+                if indices[i] != indices[i - 1]:
+                    if indices[i-1] == 28 and skip_non_speech:     
+                        continue
+                    else:
+                        seg = z_q[b, start:i, :] # 1,c
+                        if (i - 1) - start == 0: 
+                            n_z_q.append(seg)
+                        else: 
+                            current_sum = seg.sum(dim=0, keepdim=True)
+                            previous_sum = z_q[b, start:i-1, :].sum(dim=0, keepdim=True)
+                            n_z_q.append(current_sum - previous_sum.clone().detach()) # 1,c
+                            # n_z_q.append(seg.mean(dim=0, keepdim=True))
                             
                             
-    #                     selected_indices.append(i-1)
-    #                     selected_encodings.append(indices[i-1] + 1) # +1 to avoid padding token
-    #                     start = i
+                        selected_indices.append(i-1)
+                        selected_encodings.append(indices[i-1] + 1) # +1 to avoid padding token
+                        start = i
             
-    #         # Final flush: only if loop didn't break (i.e., full valid length was processed)
-    #         if not loop_broke:
-    #             selected_encodings_repeated.append(indices[i - 1] + 1)  # +1 to avoid padding token
-    #             if (i - 1) - start == 0: 
-    #                 n_z_q.append(z_q[b, start:i, :])
-    #             else: 
-    #                 current_sum = seg.sum(dim=0, keepdim=True)
-    #                 previous_sum = z_q[b, start:i-1, :].sum(dim=0, keepdim=True)
-    #                 n_z_q.append(current_sum - previous_sum.clone().detach())
-    #                 # n_z_q.append(seg.mean(dim=0, keepdim=True))
+            # Final flush: only if loop didn't break (i.e., full valid length was processed)
+            if not loop_broke:
+                selected_encodings_repeated.append(indices[i - 1] + 1)  # +1 to avoid padding token
+                if (i - 1) - start == 0: 
+                    n_z_q.append(z_q[b, start:i, :])
+                else: 
+                    current_sum = seg.sum(dim=0, keepdim=True)
+                    previous_sum = z_q[b, start:i-1, :].sum(dim=0, keepdim=True)
+                    n_z_q.append(current_sum - previous_sum.clone().detach())
+                    # n_z_q.append(seg.mean(dim=0, keepdim=True))
                     
-    #             selected_indices.append(i - 1)
-    #             selected_encodings.append(indices[i - 1] + 1)
+                selected_indices.append(i - 1)
+                selected_encodings.append(indices[i - 1] + 1)
 
 
-    #         selected_encodings_repeated_list.append(selected_encodings_repeated)
-    #         n_z_qs.append(torch.cat(n_z_q, dim=0))
-    #         selected_indices_list.append(selected_indices)
-    #         selected_encodings_list.append(selected_encodings)
+            selected_encodings_repeated_list.append(selected_encodings_repeated)
+            n_z_qs.append(torch.cat(n_z_q, dim=0))
+            selected_indices_list.append(selected_indices)
+            selected_encodings_list.append(selected_encodings)
             
-    #         masks_tensor[b, :len(selected_indices)] = 1.0  # Assigning mask directly
-    #         max_len = max(max_len, len(selected_indices))
+            masks_tensor[b, :len(selected_indices)] = 1.0  # Assigning mask directly
+            max_len = max(max_len, len(selected_indices))
         
-    #     masks = masks_tensor[:,:max_len].unsqueeze(-1) # shape (B, max_len, 1)
+        masks = masks_tensor[:,:max_len].unsqueeze(-1) # shape (B, max_len, 1)
         
-    #     n_z_qs = pad_sequence(n_z_qs, batch_first=True)
-    #     n_z_qs *= masks
+        n_z_qs = pad_sequence(n_z_qs, batch_first=True)
+        n_z_qs *= masks
         
-    #     return n_z_qs, masks, selected_encodings_list, selected_encodings_repeated_list    # shape (B, max_len, channels), mask shape (B, max_len, 1), list of selected encodings
+        return n_z_qs, masks, selected_encodings_list, selected_encodings_repeated_list    # shape (B, max_len, channels), mask shape (B, max_len, 1), list of selected encodings

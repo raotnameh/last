@@ -20,11 +20,9 @@ class Loss:
         rec_loss = rec_loss.sum() / valid_count
 
         # generator loss
+        gen_loss = 0.0
         if output['disc_fake'] is not None:
-            gen_loss = -output["disc_fake"].mean()
-            # gen_loss += output["entropy_loss"]
-        else:
-            gen_loss = 0.0
+            gen_loss = -output["disc_fake"].mean()     
         
         loss_components = {
             "rec_loss": rec_loss * self.config["recon_loss_weight"],
@@ -44,7 +42,7 @@ class Loss:
         # total_loss += grad_pen
         grad_pen = 0.0
         
-        return {"total_loss": total_loss, "loss_fake": loss_fake, "loss_real": loss_real, "grad_pen": grad_pen}        
+        return {"total_loss": total_loss, "loss_fake": loss_fake, "loss_real": loss_real, "grad_pen": grad_pen}
 
     def calc_gradient_penalty(self, real_data, fake_data, real_pad_mask, fake_pad_mask):
         b_size = min(real_data.size(0), fake_data.size(0))
