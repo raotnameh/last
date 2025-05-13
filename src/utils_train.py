@@ -214,15 +214,18 @@ def train(
             doutput['real_pad_mask'] = tmask
     
             disc_loss_components = loss_module.step_disc(doutput)
-            # ratio = abs( disc_loss_components['total_loss'] / dlm_loss ).item()
-            # if ratio >= 1.0:
-            #     dlm_loss *= ratio
+            ratio = abs( disc_loss_components['total_loss'] / dlm_loss ).item()
+            if ratio >= 1.0:
+                dlm_loss *= ratio
             total_lossd = disc_loss_components['total_loss'] + dlm_loss
             
             # update the total loss
             total_lossg = total_lossg + total_lossd
         else: 
             # if discriminator_freq = 5, then train the generator at 0, 5, 10, 15, ... steps.
+            ratio = abs(total_lossg / gen_loss_components['gen_loss']).item()
+            if ratio <= 1.0:
+                gen_loss_components['gen_loss'] *= ratio
             total_lossg = total_lossg + gen_loss_components['gen_loss']
 
         if step % config['logging']['step'] == 0:  
