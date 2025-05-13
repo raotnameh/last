@@ -131,10 +131,10 @@ def train(
         # )
         output['disc_fake'] = disc_fake
         output["entropy_loss"] = lm_loss
-            
+
         # Loss calculation
         gen_loss_components = loss_module.step_gen(output)        
-        total_lossg = gen_loss_components['rec_loss'] * lm_loss.item()
+        total_lossg = gen_loss_components['rec_loss']
         
         if step % config['logging']['step'] == 0:
             enc_list = [i.item() for i in selected_encodings_list[0]]
@@ -208,9 +208,9 @@ def train(
             doutput['real_pad_mask'] = tmask
     
             disc_loss_components = loss_module.step_disc(doutput)
-            ratio = abs( disc_loss_components['total_loss'] / dlm_loss )
-            if ratio >= 1.0:
-                dlm_loss *= ratio
+            # ratio = abs( disc_loss_components['total_loss'] / dlm_loss ).item()
+            # if ratio >= 1.0:
+            #     dlm_loss *= ratio
             total_lossd = disc_loss_components['total_loss'] + dlm_loss
             
             # update the total loss
@@ -282,6 +282,7 @@ def train(
         
         # Checkpoint
         if step % config['checkpoint']['step'] == 0:
+            
             # Evaluation function
             current_stoi = eval(models, val_speech_loader, loss_module, config, device, writer=writer, step=step)
             
