@@ -94,7 +94,7 @@ def train(
         output['dmask'] = dmask
         
         # ===== Tokenizer =====
-        smoothness_loss, commitment_loss, z_q, z_q_disc, z_q_disc_mask, selected_encodings_list, selected_encodings_repeated = models['tokenizer'](
+        n_student_probs, smoothness_loss, commitment_loss, z_q, z_q_disc, z_q_disc_mask, selected_encodings_list, selected_encodings_repeated = models['tokenizer'](
             down_out, 
             models['codebook'], 
             dmask,
@@ -109,7 +109,7 @@ def train(
         output['z_q_disc'] = z_q_disc # already masked
         
         # ===== UpSample =====
-        up_out = models['upsample'](z_q)
+        log_student_probs, up_out = models['upsample'](z_q, n_student_probs)
         up_out = up_out[:,:mask.shape[1],:] * mask # [B, T, C]
         output['up_out'] = up_out
         
@@ -298,7 +298,6 @@ def train(
             writer.add_scalar('grad_norm/downsample', get_grad_norm(models['downsample']), step)
             writer.add_scalar('grad_norm/decoder', get_grad_norm(models['decoder']), step)
             writer.add_scalar('grad_norm/upsample', get_grad_norm(models['upsample']), step) 
-            
         
         # Optimizer step
         if step >= freeze_steps:

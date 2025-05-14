@@ -5,8 +5,7 @@ import matplotlib.pyplot as plt
 import os
 
 from torch.nn.utils.rnn import pad_sequence
-import random
-import time
+
 
 # class GradMultiply(torch.autograd.Function):
 #     @staticmethod
@@ -65,6 +64,10 @@ class Tokenizer(nn.Module):
         mask (torch.Tensor): Mask of shape (batch, time, 1) with 1s for valid positions and 0s for padding.
         """  
         
+        # use for reward modelling. 
+        student_prob = z.clone()
+        
+        z = F.normalize(z, dim=-1)
         
         # 1. Prepare codebook embeddings (detach to avoid training update)
         e = codebook.embedding.weight.clone().detach() # (vocab_size+1, embed_dim) 
@@ -124,22 +127,23 @@ class Tokenizer(nn.Module):
         
         # 10. Discriminator codebooks without repeated indices #####
         encodings = min_encoding_indices.view(z.shape[0], z.shape[1]) # ( batch, time ) # (B, T)
-        n_z_q, n_mask, selected_encodings_list, selected_encodings_repeated_list = self.remove_consecutive_repeated_indices( encodings, mask.squeeze(-1), z_q.clone(), skip_non_speech) # randomly pick one index from each group of consecutive repeating elements # shape (B,T) and also returns the mask 
+        n_student_probs, n_z_q, n_mask, selected_encodings_list, selected_encodings_repeated_list = self.remove_consecutive_repeated_indices( encodings, mask.squeeze(-1), z_q.clone(), student_prob, skip_non_speech) # randomly pick one index from each group of consecutive repeating elements # shape (B,T) and also returns the mask 
 
         # codebook usage Distribution
         self.codebook_usage(min_encodings, mask.contiguous().view(-1, 1), step)
 
-        return smoothness_loss, commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list, selected_encodings_repeated_list # commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list<=
+        return n_student_probs, smoothness_loss, commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list, selected_encodings_repeated_list # commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list<=
 
 
 
-    def remove_consecutive_repeated_indices(self, min_encoding_indices, mask, z_q, skip_non_speech=False):
+    def remove_consecutive_repeated_indices(self, min_encoding_indices, mask, z_q, student_prob, skip_non_speech=False):
 
         B, T, C = z_q.shape
         
         selected_encodings_list = []
         selected_encodings_repeated_list = []
         n_z_qs = []
+        n_student_probs = []
         
         max_len = 0
         
@@ -149,6 +153,7 @@ class Tokenizer(nn.Module):
             indices = min_encoding_indices[b]    # (T,)
             mask_b = mask[b]                     # (T,)
             z_q_b = z_q[b]                       # (T, C)
+            student_prob_b = student_prob[b] 
 
             # how many valid frames until first zero in mask
             valid_len = int(mask_b.sum())
@@ -156,6 +161,7 @@ class Tokenizer(nn.Module):
             # crop to valid region
             indices = indices[:valid_len]
             z_q_b = z_q_b[:valid_len]
+            student_prob_b = student_prob_b[:valid_len]
             
             # collapse runs of identical indices
             unique_vals, counts = torch.unique_consecutive(indices, return_counts=True)
@@ -166,6 +172,7 @@ class Tokenizer(nn.Module):
             selected_encodings = []
             selected_encodings_repeated = []
             n_z_q = []
+            n_student_prob = []
             
             # iterate segments (far fewer than T if many repeats)
             for v, s, e, length in zip(unique_vals, starts, ends, lengths):
@@ -178,20 +185,30 @@ class Tokenizer(nn.Module):
                 selected_encodings.append(v + 1) # +1 to avoid padding token
             
                 segment = z_q_b[s:e]  # shape (length, C)
-                if length == 1: n_z_q.append(segment)           # (1, C)
+                student_segment = student_prob_b[s:e]
+                if length == 1: 
+                    n_z_q.append(segment)           # (1, C)
+                    n_student_prob.append(student_segment)
                 else:
                     seg_sum  = segment.sum(dim=0, keepdim=True)      # (1, C)
                     prev_sum = segment[:-1].sum(dim=0, keepdim=True) # (1, C)
-                    n_z_q.append(seg_sum - prev_sum.clone().detach())                 # (1, C)
+                    n_z_q.append(seg_sum - prev_sum.clone().detach())   # (1, C)
+                    
+                    
+                    student_seg_sum  = student_segment.sum(dim=0, keepdim=True)      # (1, C)
+                    student_prev_sum = student_segment[:-1].sum(dim=0, keepdim=True) # (1, C)
+                    n_student_prob.append(student_seg_sum - student_prev_sum.clone().detach())   # (1, C)
             
             # append per-batch results
             selected_encodings_list.append(selected_encodings)
             selected_encodings_repeated_list.append(selected_encodings_repeated)
             try:
                 n_z_qs.append(torch.cat(n_z_q, dim=0))  # (num_segs, C)
+                n_student_probs.append(torch.cat(n_student_prob, dim=0))  # (num_segs, C)
             except: 
                 print(n_z_q)
                 n_z_qs.append(torch.zeros((1, C), device=z_q.device, dtype=z_q.dtype))
+                n_student_probs.append(torch.zeros((1, C), device=z_q.device, dtype=z_q.dtype))
                 
             
             # build mask and track max length
@@ -202,86 +219,13 @@ class Tokenizer(nn.Module):
         # finalize masks and pad n_z_qs
         masks = masks_tensor[:, :max_len].unsqueeze(-1)  # (B, max_len, 1)
         n_z_qs = pad_sequence(n_z_qs, batch_first=True)  # (B, max_len, C)
-        n_z_qs *= masks   
+        n_z_qs *= masks
+           
+        n_student_probs = pad_sequence(n_student_probs, batch_first=True)
+        n_student_probs *= masks
         
-        return n_z_qs, masks, selected_encodings_list, selected_encodings_repeated_list    # shape (B, max_len, channels), mask shape (B, max_len, 1), list of selected encodings
+        return n_student_probs, n_z_qs, masks, selected_encodings_list, selected_encodings_repeated_list    # shape (B, max_len, channels), mask shape (B, max_len, 1), list of selected encodings
     
         
         
         
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-
-    # def remove_consecutive_repeated_indices(self, min_encoding_indices, mask, z_q):
-    #     B, T = min_encoding_indices.shape
-    #     selected_indices_list = []
-    #     selected_encodings_list = []
-    #     max_len = 0
-        
-    #     selected_encodings_repeated_list = []
-        
-
-    #     for b in range(B):
-    #         indices = min_encoding_indices[b]
-    #         selected_indices = []
-    #         selected_encodings = []
-    #         selected_encodings_repeated = []
-    #         start = 0
-    #         for i in range(1, T):
-    #             if mask[b, i] == 0:
-    #                 break
-                
-    #             selected_encodings_repeated.append(indices[i]+1) # +1 to avoid padding token
-                                
-    #             if indices[i] != indices[i - 1]:
-    #                 ii = random.randint(start, i - 1)
-    #                 selected_indices.append(ii)
-    #                 selected_encodings.append(indices[ii]+1) # +1 to avoid padding token
-    #                 start = i
-    #         ii = random.randint(start, T - 1)
-    #         selected_indices.append(ii)
-    #         selected_encodings.append(indices[ii]+1) # +1 to avoid padding token
-    #         selected_encodings_repeated.append(indices[ii]+1) # +1 to avoid padding token
-
-    #         selected_encodings_list.append(selected_encodings)
-    #         selected_encodings_repeated_list.append(selected_encodings_repeated)
-    #         selected_indices_list.append(torch.tensor(selected_indices))
-    #         max_len = max(max_len, len(selected_indices))
-            
-    #     # Pad and create mask in a vectorized way
-    #     padded_indices = torch.zeros((B, max_len), dtype=min_encoding_indices.dtype, device=min_encoding_indices.device)
-    #     masks = torch.zeros((B, max_len), dtype=torch.float, device=min_encoding_indices.device)
-
-    #     for b, indices in enumerate(selected_indices_list):
-    #         length = len(indices)
-    #         padded_indices[b, :length] = indices
-    #         masks[b, :length] = 1.0
-    #     masks = masks.unsqueeze(-1) # shape (B, max_len, 1)
-    #     padded_indices = padded_indices.unsqueeze(-1) # shape (B, max_len, 1)
-    #     # Gather and apply mask
-    #     padded_indices = padded_indices.expand(-1, -1, z_q.shape[-1]) # shape (B, max_len, channels)
-    #     n_z_q = z_q.gather(dim=1, index=padded_indices)
-    #     n_z_q *= masks
-
-    #     return n_z_q, masks, selected_encodings_list, selected_encodings_repeated_list    # shape (B, max_len, channels), mask shape (B, max_len, 1), list of selected encodings
-    
-    
-    
-    
-    
-
-

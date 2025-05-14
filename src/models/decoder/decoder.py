@@ -10,7 +10,12 @@ class Upsample(nn.Module):
         
         self.norm = torch.nn.LayerNorm(output_dim)
         
-    def forward(self, x): # B x T x C 
+        
+        # lm 
+        self.lmnorm = torch.nn.LayerNorm(input_dim)
+        self.proj = nn.Linear(input_dim,30, bias=False)
+        
+    def forward(self, x, student_probs): # B x T x C 
         
         x = x.transpose(1, 2)
         x = self.conv(x)
@@ -18,7 +23,9 @@ class Upsample(nn.Module):
         
         x = self.norm(x)
         
-        return x # B x T x C 
+        student_probs = self.proj( self.lmnorm(student_probs) )
+        
+        return student_probs, x # B x T x C 
     
 class Conv1dBlock(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=1, dilation=1, stride=1):

@@ -102,8 +102,6 @@ class Downsample(torch.nn.Module):
         x = x.transpose(1, 2)
         x = self.conv(x)
         x = x.transpose(1, 2)
-
-        x = F.normalize(x, dim=-1)
         
         return x # B x T x C 
     
