@@ -166,6 +166,39 @@ def train(
                     # Save as pretty JSON
                     with open(f"{save_dir}/temp/{step}.json", "w", encoding="utf-8") as f:
                         json.dump(output_data, f, indent=4, ensure_ascii=False)
+                        
+                    # save a mel spectorgram with non repeated tokens as labels
+                    # === Generate Spectrogram (20ms resolution) ===
+                    sr = 16000
+                    frame_length = int(0.02 * sr)  # 20 ms -> 320 samples
+                    hop_length = frame_length      # no overlap
+
+                    mel_spectrogram = T.MelSpectrogram(
+                        sample_rate=sr,
+                        n_fft=frame_length,
+                        hop_length=hop_length,
+                        n_mels=80
+                    )(gt.detach().cpu())[0] # 2d > 1d
+                    
+                    l = [t for t in spec_tokens_repeated]
+                    mel_spectrogram = mel_spectrogram[:,:len(l)]
+                    
+                    plt.figure(figsize=(20, 6))
+                    plt.imshow(mel_spectrogram.log2().numpy(), aspect="auto", origin="lower", cmap="magma")
+
+                    # Add token labels to x-axis
+                    plt.xticks(
+                        ticks=range(len(l)),
+                        labels=l,
+                        rotation=45
+                    )
+
+                    plt.xlabel("Special Tokens (20ms per token)")
+                    plt.ylabel("Mel Frequency Channels")
+                    plt.title("Mel Spectrogram with Special Tokens on X-axis")
+                    plt.tight_layout()
+                    plt.savefig(f"{save_dir}/temp/{step}_mel_spectrogram.png", dpi=600)
+                    
                     
                 
             logging.info(
@@ -214,18 +247,12 @@ def train(
             doutput['real_pad_mask'] = tmask
     
             disc_loss_components = loss_module.step_disc(doutput)
-            ratio = abs(  dlm_loss / disc_loss_components['total_loss'] ).item()
-            if ratio <= 1.0:
-                disc_loss_components['total_loss'] *= ratio
             total_lossd = disc_loss_components['total_loss'] + dlm_loss
             
             # update the total loss
             total_lossg = total_lossg + total_lossd
         else: 
             # if discriminator_freq = 5, then train the generator at 0, 5, 10, 15, ... steps.
-            ratio = abs(total_lossg / gen_loss_components['gen_loss']).item()
-            if ratio <= 1.0:
-                gen_loss_components['gen_loss'] *= ratio
             total_lossg = total_lossg + gen_loss_components['gen_loss']
 
         if step % config['logging']['step'] == 0:  
@@ -254,7 +281,7 @@ def train(
         torch.nn.utils.clip_grad_norm_(models['upsample'].parameters(), max_grad_norm)
         torch.nn.utils.clip_grad_norm_(models['decoder'].parameters(), max_grad_norm)
 
-        torch.nn.utils.clip_grad_norm_(models['discriminator'].parameters(), max_grad_norm)
+        # torch.nn.utils.clip_grad_norm_(models['discriminator'].parameters(), max_grad_norm)
             
         # norm 
         def get_grad_norm(model):

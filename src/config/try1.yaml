@@ -17,8 +17,8 @@ dataset_speech:
   batch_size: &batch_size_value 8
 
 dataset_txt:
-  path: "/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train_norm.txt"
-  # path: "/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train.wrd"
+  # path: "/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train_norm.txt"
+  path: "/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train.wrd"
   batch_size: *batch_size_value
   skip_non_speech: True
 

@@ -27,6 +27,7 @@ data/
 *.json
 *.h5
 *.npz
+*.png
 
 # Ignore VS Code settings
 .vscode/

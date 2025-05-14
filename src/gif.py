@@ -4,20 +4,29 @@ import argparse
 import numpy as np
 from PIL import Image
 
+
+
+# python gif.py -d /raid/home/rajivratn/hemant_rajivratn/last/src/logs_skip_non_speech_true
+
+
 # Set up argument parser
 parser = argparse.ArgumentParser(description="Create an MP4 video from images.")
 parser.add_argument('-d', '--directory', type=str, required=True, help='Directory containing images')
-parser.add_argument('--fps', type=int, default=10, help='Frames per second for the video (default: 1)')
-parser.add_argument('--num_samples', type=int, default=100, help='Number of images to sample (default: 1000)')
+parser.add_argument('--fps', type=int, default=10, help='Frames per second for the video (default: 10)')
+parser.add_argument('--num_samples', type=int, default=100, help='Number of images to sample (default: 100)')
 
 args = parser.parse_args()
 d = args.directory
 fps = args.fps
 num_samples = args.num_samples
 
+# src/logs_skip_non_speech_true/plots/codebook_usage_distribution_10.png
 # Directory where images are stored
 directory = os.path.join(d, 'plots')
-image_files = sorted([f for f in os.listdir(directory) if f.endswith('.png')])
+image_files = sorted(
+    [f for f in os.listdir(directory) if f.endswith('.png')],
+    key=lambda x: int(os.path.splitext(x)[0].split('_')[-1])
+)
 
 # Select up to `num_samples` images evenly spaced
 n = len(image_files)
