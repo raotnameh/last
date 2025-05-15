@@ -272,7 +272,13 @@ def train(
                 writer.add_scalar('Discriminator_loss/discriminator_lm_loss', dlm_loss, step)
 
         # Backpropagation
-        total_lossg.backward()
+        if torch.isnan(total_lossg) or torch.isinf(total_lossg):
+            logging.warning(f"Skipping step {step} due to NaN/Inf in total_lossg")
+            for optimizer in optimizers.values():
+                optimizer.zero_grad()
+            for scheduler in schedulers.values():
+                scheduler.step() 
+            continue
 
         # Gradient clipping        
         max_grad_norm = config['train']['grad_clip']
@@ -410,7 +416,7 @@ def eval(models, speech_loader, loss_module, config, device, writer=None, step=0
             dmask = mask[:, ::config["upsample"]['stride']]
             
             # ===== Tokenizer =====
-            smoothness_loss, commitment_loss, z_q, z_q_disc, z_q_disc_mask, selected_encodings_list, selected_encodings_repeated = models['tokenizer'](
+            n_student_probs, smoothness_loss, commitment_loss, z_q, z_q_disc, z_q_disc_mask, selected_encodings_list, selected_encodings_repeated = models['tokenizer'](
                 down_out, 
                 models['codebook'], 
                 dmask,
@@ -421,7 +427,7 @@ def eval(models, speech_loader, loss_module, config, device, writer=None, step=0
             output['z_q'] = z_q # already masked
             
             # ===== UpSample =====
-            up_out = models['upsample'](z_q)
+            log_student_probs, up_out = models['upsample'](z_q, n_student_probs)
             up_out = up_out[:,:mask.shape[1],:] * mask # [B, T, C]
             
             dec_out = models['decoder'](

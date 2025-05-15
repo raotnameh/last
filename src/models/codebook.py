@@ -13,7 +13,7 @@ import logging
 class Codebook(nn.Module):
         
     def __init__(self, vocab, model_name="meta-llama/Llama-3.2-1B-Instruct"):
-
+        # delhf_RANShbaEpoCwKRyPekLxAlfEeeJNzVOnWxdel
         super(Codebook, self).__init__()
         
         self.vocab = vocab
