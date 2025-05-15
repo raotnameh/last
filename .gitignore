@@ -1,6 +1,8 @@
 # Ignore PyTorch model checkpoints
 *.pt
 *.png
+*.safetensors
+
 
 # Ignore Python cache files
 __pycache__/

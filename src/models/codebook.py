@@ -25,9 +25,15 @@ class Codebook(nn.Module):
         # Freeze LLM parameters
         for param in self.model.parameters():
             param.requires_grad = False
-        # # Set EOS token as the padding token
-        # if self.tokenizer.pad_token is None:
-        #     self.tokenizer.pad_token = self.tokenizer.eos_token
+        # Get the vocab_ids from the tokenizer: 
+        vocab_list = list(vocab)
+        vocab_list[0] = f"{self.tokenizer.eos_token}"
+        self.vocab_ids = torch.tensor(
+            [self.tokenizer(v, add_special_tokens=False)["input_ids"][0]
+            for v in vocab_list],
+            dtype=torch.long,
+        )
+        
 
         # Create the embedding matrix
         embed_tokens = self.model.get_input_embeddings()
@@ -64,63 +70,38 @@ class Codebook(nn.Module):
     def forward(self, x): # x: (b,t) tensor
         return self.embedding(x) # (b,t,c)
     
-    def lmscoring(self, target, inputs_embeds, attention_mask):
+    def subvocab_probs_from_logits(self, logits): 
+        """
+        logits:   [B, T, V] raw output logits from the model
+        subp: [B, T, K] where subp[b,t,i] = P(token=vocab_list[i] | context)
+        """
+        
+        # gather the K logits at each position
+        B, T, V = logits.shape
+        idx = self.vocab_ids.view(1, 1, -1).expand(B, T, -1).to(logits.device)  # [B, T, K]
+        sub_logits = logits.gather(dim=-1, index=idx)    # [B, T, K]
+
+        return sub_logits # B,T,K
+    
+    def lmscoring(self, target, inputs_embeds, mask):
         """
         Args:
             target: [batch, seq_len] tensor of token ids
             inputs_embeds: [batch, seq_len, dim] tensor of input embeddings
-            attention_mask: [batch, seq_len] binary mask (1 for real tokens, 0 for padding tokens)
+            mask: [batch, seq_len] binary mask (1 for real tokens, 0 for padding tokens)
         Returns:
-            loss: cross-entropy loss per token (lower is better)
+            logits
             perplexity: scalar reward. lower perplexity means higher fluency. Perplexity amplifies small differences in likelihood — sharper gradient between “okay” and “bad” generations. Perplexity will sharply punish the incoherence — because the cumulative mismatch to a fluent sequence blows up exponentially. Perplexity harshly penalizes the outputs because it reflects how unlikely they are under a real language model.
         """
-        
-        
-        valid_mask = target != 29 # 29 is the ? token id
-        
-        inputs_embeds = [inputs_embeds[i][valid_mask[i]] for i in range(inputs_embeds.size(0))]
-        target = [target[i][valid_mask[i]] for i in range(target.size(0))]
-        attention_mask = [attention_mask[i][valid_mask[i]] for i in range(attention_mask.size(0))]
-        # Pad the sequences to the same length
-        inputs_embeds = pad_sequence(inputs_embeds, batch_first=True, padding_value=0)
-        target = pad_sequence(target, batch_first=True, padding_value=0)
-        attention_mask = pad_sequence(attention_mask, batch_first=True, padding_value=0)
-        
-
     
-        attention_mask = attention_mask.float()
-        outputs = self.model(inputs_embeds=inputs_embeds, labels=target, attention_mask=attention_mask)
+        mask = mask.float()
+        outputs = self.model(inputs_embeds=inputs_embeds, mask=mask)
 
-        logits = outputs.logits[:, :-1, :]       # [B, T-1, V]
-        target = target[:, 1:]             # [B, T-1]
-        mask = attention_mask[:, 1:].float()  # [B, T-1]
-
+        logits = outputs.logits       # [B, T, V]
+        sub_logits = self.subvocab_probs_from_logits(logits)
         
-        # Decode predictions to text
-        # decoded_preds = "".join([
-        #     self.vocab[pred_ids.item()] for pred_ids in target[0] if pred_ids.item() != 0 # 0 is the padding token id
-        # ])
-        # print(f"decoded_preds: {decoded_preds}")
-        # exit()
-        # Cross-entropy loss per token
-        loss = F.cross_entropy(
-            logits.reshape(-1, logits.size(-1)), 
-            target.reshape(-1), 
-            reduction='none'
-        ).reshape(target.shape)  # [B, T-1]
-
-        # Mask pad tokens and compute mean loss
-        masked_loss = loss * mask  # [B, T-1]
-        token_count = mask.sum(dim=1)  # [B]
-        loss = masked_loss.sum(dim=1) / token_count  
-        perplexity = torch.exp(loss)    
-        # print(f"loss: {loss.mean()}")
-        # print(f"perplexity: {perplexity.mean()}")
-        
-        return loss.mean(), perplexity.mean()
+        return sub_logits
     
-        
-
 
 if __name__ == "__main__":
     # Test codebook

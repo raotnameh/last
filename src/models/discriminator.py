@@ -44,7 +44,7 @@ class Discriminator(nn.Module):
         
         self.layers = nn.ModuleList()
         self.layers.append(
-            Conv1dBlock(in_channels, hidden_dim, kernel_size=3) # First layer
+            Conv1dBlock(in_channels, hidden_dim, kernel_size=1) # First layer
         )
         for i in range(num_layers):
             self.layers.append(Conv1dBlock(hidden_dim, hidden_dim, kernel_size=kernel_size))
@@ -58,22 +58,24 @@ class Discriminator(nn.Module):
         x: (batch, time, channels)
         padding_mask: (batch, time, 1) where True indicates a padded timestep.
         """
-
-        x = x.masked_fill(padding_mask, 0)
-        x = self.layers[0](x, padding_mask)
-        for layer in self.layers[1:]:
-            x = x + layer(x, padding_mask)
-
-        # x = self.norm(x)  # (batch, time, channels)
+        
         # Compute mean pooling over valid timesteps
         valid_counts = (~padding_mask).sum(dim=1).float() # (batch, channels)
-        x_mean = x.sum(dim=1) / valid_counts  # (batch, channels)
         
+        x = x.masked_fill(padding_mask, 0)
         
-        # Apply the final projection
-        x_mean = self.proj(x_mean) # (B, 1)
-        x_mean = x_mean.squeeze(1)  # (B)
+        x = self.layers[0](x, padding_mask)
         
+        for c, layer in enumerate(self.layers[1:]):
+            x = x + layer(x, padding_mask)
+            
+            if c == 4: # for only c+1 layers use discriminator
+                x_mean = x.sum(dim=1) / valid_counts  # (batch, channels)
+                # Apply the final projection
+                x_mean = self.proj(x_mean) # (B, 1)
+                x_mean = x_mean.squeeze(1)  # (B)
+                
+            
         if labels is not None: 
             targets = labels[:, 1:]  
             logits = self.lm( self.norm( x[:, :-1, :] ) ) # (B, T-1, vocab_size)

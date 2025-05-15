@@ -1,5 +1,5 @@
 checkpoint: 
-  step: 1
+  step: 10000
 
 logging: 
   dir: "/raid/home/rajivratn/hemant_rajivratn/last/src/logs"
@@ -42,9 +42,9 @@ upsample:
   groups: *groups_value 
 
 discriminator:
-  hidden_dim: 512
+  hidden_dim: 256
   num_layers: 10
-  kernel_size: 3
+  kernel_size: 11
 
 decoder:
   speaker:
@@ -64,7 +64,7 @@ decoder:
 train:
   seed: 42123
 
-  lr_enc: &lr 0.00005
+  lr_enc: &lr 0.0001
   lr_down: *lr
   lr_dec: 0.0001
   lr_disc: 0.0001
@@ -73,7 +73,7 @@ train:
   num_steps: 100000
   freeze_steps: 1
   gradient_accumulation_steps: 1
-  discriminator_freq: 11 # for N-1 steps train discriminator
+  discriminator_freq: 2 # for N-1 steps train discriminator
 
   mixed_precision: False
   resume_checkpoint: False

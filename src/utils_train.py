@@ -279,16 +279,16 @@ def train(
             for scheduler in schedulers.values():
                 scheduler.step() 
             continue
-
+        else: 
+            total_lossg.backward()
+        
         # Gradient clipping        
         max_grad_norm = config['train']['grad_clip']
         torch.nn.utils.clip_grad_norm_(models['encoder'].parameters(), max_grad_norm)
         torch.nn.utils.clip_grad_norm_(models['downsample'].parameters(), max_grad_norm)
         torch.nn.utils.clip_grad_norm_(models['upsample'].parameters(), max_grad_norm)
         torch.nn.utils.clip_grad_norm_(models['decoder'].parameters(), max_grad_norm)
-
-        # torch.nn.utils.clip_grad_norm_(models['discriminator'].parameters(), max_grad_norm)
-            
+ 
         # norm 
         def get_grad_norm(model):
             total_norm = 0.0

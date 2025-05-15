@@ -1,11 +1,3 @@
-
-        
-        
-        
-        
-
-# import torch
-
 # # Assume:
 # # student_probs: torch.Tensor of shape (B, T, C)
 # # teacher_probs: torch.Tensor of shape (B, T, C)
@@ -41,6 +33,15 @@
 # loss = -advantage * student_logp
 
 # # 'loss' now holds the un-reduced per-token loss of shape (B, T)
+
+
+
+        
+
+import torch
+import torch.nn.functional as F
+
+
 
 def rl_loss_from_logits(student_logits, teacher_logits, tokens):
     """
