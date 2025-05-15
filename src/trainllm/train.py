@@ -1,27 +1,32 @@
 import torch
 from torch.utils.data import Dataset, DataLoader
 import transformers
-import charactertokenizer
+
 from tqdm import tqdm
 import os
 from torch.utils.tensorboard import SummaryWriter
 import datetime
 
+from transformers import AutoTokenizer, AutoModelForCausalLM
 # --- Config ---
-model_dir = 'ai-forever/charllama-1.3B'
+model_dir = "meta-llama/Llama-3.2-1B" #-Instruct"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 torch.backends.cudnn.benchmark = True
 
-batch_size = 8
+batch_size = 16
 num_epochs = 1
-learning_rate = 5e-5
+learning_rate = 1e-5
 max_length = 256
-gradient_accumulation_steps = 4
+gradient_accumulation_steps = 8
 save_steps = 1000
 log_interval = 10  # Log every 10 iterations
 output_dir = "charllama-finetuned"  # Directory to save checkpoints
 log_dir = os.path.join("runs", datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
 writer = SummaryWriter(log_dir=log_dir)
+
+
+import random
+
 
 # --- Dataset class ---
 class CharDataset(Dataset):
@@ -37,14 +42,37 @@ class CharDataset(Dataset):
 
     def __len__(self):
         return len(self.sentences)
+    
+    @staticmethod
+    def noisy_repeat(text, max_repeats=4, prob=0.25):
+        def repeat_char(c):
+            if c.isalpha() and random.random() < prob:
+                return c * random.randint(2, max_repeats)
+            return c
+        
+        noisy_words = []
+        for word in text.split():
+            noisy_word = ''.join(repeat_char(c) for c in word)
+            noisy_words.append(noisy_word)
+        
+        return ' '.join(noisy_words)
 
     def __getitem__(self, idx):
         sentence = self.sentences[idx]
-        tokens = self.tokenizer(sentence,
-                                max_length=self.max_length,
-                                padding='max_length',
-                                truncation=True,
-                                return_tensors='pt')
+        # 0.5 prob use if
+        pos = 1
+        if random.random() < 0.1: 
+            pos = -1
+            sentence = self.noisy_repeat(sentence)
+        sentence = " ".join(sentence)
+        tokens = self.tokenizer(
+                        sentence,
+                        max_length=max_length,
+                        padding='max_length',
+                        truncation=True,
+                        return_tensors='pt',
+                        add_special_tokens=False  # <-- This disables special tokens
+                    )
         input_ids = tokens['input_ids'].squeeze(0)
         attention_mask = tokens['attention_mask'].squeeze(0)
         labels = input_ids.clone()
@@ -52,16 +80,54 @@ class CharDataset(Dataset):
         return {
             'input_ids': input_ids,
             'attention_mask': attention_mask,
-            'labels': labels
+            'labels': labels,
+            'pos': pos,
         }
 
 # --- Load tokenizer ---
-tokenizer = charactertokenizer.CharacterTokenizer.from_pretrained(model_dir)
+tokenizer = AutoTokenizer.from_pretrained(model_dir)
+tokenizer.pad_token = tokenizer.eos_token
+
+
+
 
 # --- Load model, optimizer, scheduler, and scaler from checkpoint (if available) ---
 checkpoint_path = None  # Set to the checkpoint directory if you want to resume training
-model = transformers.AutoModelForCausalLM.from_pretrained(model_dir).to(device)
-optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+model = AutoModelForCausalLM.from_pretrained(model_dir).to(device)
+# Count trainable parameters
+num_params = sum(p.numel() for p in model.parameters())
+print(f"Model parameters: {num_params / 1e6:.2f}M")
+
+# Freeze all parameters
+for param in model.parameters():
+    param.requires_grad = False
+
+# Unfreeze the last 2 transformer layers
+# transformer_layers = model.model.layers  # Access the transformer block list
+# num_layers = len(transformer_layers)
+
+# for i in range(num_layers - 1, num_layers):
+#     for param in transformer_layers[i].parameters():
+#         param.requires_grad = True
+
+# for param in model.model.norm.parameters():
+#     param.requires_grad = True
+
+# Also unfreeze the final language model head (optional but often useful)
+for param in model.lm_head.parameters():
+    param.requires_grad = True
+    
+
+# Count trainable parameters
+num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+print(f"Trainable parameters: {num_params / 1e6:.2f}M")
+
+
+
+optimizer = torch.optim.AdamW(
+    filter(lambda p: p.requires_grad, model.parameters()),
+    lr=learning_rate
+)
 scheduler = transformers.get_linear_schedule_with_warmup(
     optimizer,
     num_warmup_steps=0,  # Will be updated if loading from checkpoint
@@ -71,13 +137,15 @@ scaler = torch.cuda.amp.GradScaler()
 global_step = 0
 start_epoch = 0
 
+
+
 if os.path.exists(output_dir):
     checkpoint_dirs = [os.path.join(output_dir, d) for d in os.listdir(output_dir) if os.path.isdir(os.path.join(output_dir, d)) and "checkpoint-step-" in d]
     if checkpoint_dirs:
         latest_checkpoint = max(checkpoint_dirs, key=lambda x: int(x.split('-')[-1]))
         checkpoint_path = latest_checkpoint
         print(f"Resuming training from checkpoint: {checkpoint_path}")
-        model = transformers.AutoModelForCausalLM.from_pretrained(checkpoint_path).to(device)
+        model = AutoModelForCausalLM.from_pretrained(checkpoint_path).to(device)
         optimizer.load_state_dict(torch.load(os.path.join(checkpoint_path, 'optimizer.pt')))
         scheduler.load_state_dict(torch.load(os.path.join(checkpoint_path, 'scheduler.pt')))
         scaler.load_state_dict(torch.load(os.path.join(checkpoint_path, 'scaler.pt')))
@@ -96,7 +164,7 @@ if os.path.exists(output_dir):
 else:
     os.makedirs(output_dir, exist_ok=True)
     print("Starting training from scratch.")
-    train_dataset_temp = CharDataset("/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train.wrd", tokenizer, max_length)
+    train_dataset_temp = CharDataset("/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train_norm.txt", tokenizer, max_length)
     scheduler = transformers.get_linear_schedule_with_warmup(
         optimizer,
         num_warmup_steps=len(DataLoader(train_dataset_temp, batch_size=batch_size)) // 10,
@@ -107,13 +175,15 @@ else:
 model = torch.compile(model)
 model.train()
 
+print(model)
+
 
 # --- Create dataset and dataloader ---
-train_file_path = "/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train_norm.txt"
+train_file_path = "/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train.wrd"
 dataset = CharDataset(train_file_path, tokenizer, max_length)
 dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
 
-loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-100)
+loss_fct = torch.nn.CrossEntropyLoss(ignore_index=-100, reduction='none')
 
 # --- Training Loop ---
 model.zero_grad()
@@ -127,6 +197,8 @@ for epoch in range(start_epoch, num_epochs):
         input_ids = batch['input_ids'].to(device)
         attention_mask = batch['attention_mask'].to(device)
         labels = batch['labels'].to(device)
+        pos = batch['pos'].to(device) # if positive (1) or not (0)
+
 
         with torch.cuda.amp.autocast():
             outputs = model(input_ids=input_ids,
@@ -135,7 +207,17 @@ for epoch in range(start_epoch, num_epochs):
             logits = outputs.logits[:, :-1, :].contiguous()
             labels = labels[:, 1:].contiguous()
             loss = loss_fct(logits.view(-1, logits.size(-1)), labels.view(-1))
-
+            loss = loss.view(logits.shape[0],logits.shape[1])
+            
+        mask = attention_mask[:,1:]
+        loss = loss*mask
+        loss = loss.sum(dim=1)
+        
+        loss = loss*pos
+        
+        num_tokens = mask.sum()
+        loss = loss.sum() / num_tokens
+        
         loss = loss / gradient_accumulation_steps
         scaler.scale(loss).backward()
 

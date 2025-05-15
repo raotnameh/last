@@ -34,7 +34,6 @@ class Codebook(nn.Module):
             dtype=torch.long,
         )
         
-
         # Create the embedding matrix
         embed_tokens = self.model.get_input_embeddings()
         embedding = nn.Embedding(len(vocab), embed_tokens.weight.shape[1], padding_idx=0)
