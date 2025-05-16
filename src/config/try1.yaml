@@ -23,8 +23,8 @@ dataset_txt:
   skip_non_speech: True
 
 codebook:
-  # model_name: "meta-llama/Llama-3.2-1B"
-  model_name: "/raid/home/rajivratn/hemant_rajivratn/last/src/trainllm/charllama-finetuned/checkpoint/"
+  model_name: "meta-llama/Llama-3.2-1B"
+  # model_name: "/raid/home/rajivratn/hemant_rajivratn/last/src/trainllm/charllama-finetuned/checkpoint/"
 
 encoder:
   ckpt_path: "../weights/hubert_base_ls960.pt"

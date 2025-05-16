@@ -64,7 +64,6 @@ def train(
             waveforms, padding_masks, dur, paths, txt = next(train_speech_iter)
         waveforms = waveforms.to(device) # [B, T]
         padding_masks = padding_masks.to(device) # [B, T] true for masked, false for not masked means [False, False, ..., True, True]
-        
 
         # ===== Encoder or Generator =====
         with torch.no_grad() if step < freeze_steps else contextlib.ExitStack():

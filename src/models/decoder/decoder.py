@@ -12,8 +12,8 @@ class Upsample(nn.Module):
         
         
         # lm 
-        self.lmnorm = torch.nn.LayerNorm(input_dim)
-        self.proj = nn.Linear(input_dim,30, bias=False)
+        # self.lmnorm = torch.nn.LayerNorm(input_dim)
+        # self.proj = nn.Linear(input_dim,30, bias=False)
         
     def forward(self, x, student_probs): # B x T x C 
         
@@ -23,7 +23,7 @@ class Upsample(nn.Module):
         
         x = self.norm(x)
         
-        student_probs = self.proj( self.lmnorm(student_probs) )
+        # student_probs = self.proj( self.lmnorm(student_probs) )
         
         return student_probs, x # B x T x C 
     

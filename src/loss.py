@@ -23,7 +23,7 @@ class Loss:
         gen_loss = 0.0
         if output['disc_fake'] is not None:
             gen_loss = -output["disc_fake"].mean() 
-            gen_loss = gen_loss + output['entropy_loss']
+            # gen_loss = gen_loss + output['entropy_loss']
         
         loss_components = {
             "rec_loss": rec_loss * self.config["recon_loss_weight"],
