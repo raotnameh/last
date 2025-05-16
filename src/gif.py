@@ -59,3 +59,63 @@ with imageio.get_writer(output_video_path, fps=fps, codec='libx264', format='ffm
         writer.append_data(np.array(resized_frame))
 
 print("Video saved.")
+
+
+
+
+
+
+
+
+
+
+
+
+
+'''
+  753  bash scripts/extract_rep.sh hubert_small /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/hubert/ 1 contextualized word 0 dev-clean /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/save/ /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/pkg/fairseq/ librispeech 
+  754  bash scripts/get_cca_scores.sh  hubert_small 1 cca_word word /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/save/ 
+  755  cp data/hubert/mshubert/hubert_small.pt  data/hubert/
+  756  bash scripts/extract_rep.sh hubert_small /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/hubert/ 1 contextualized word 0 dev-clean /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/save/ /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/pkg/fairseq/ librispeech 
+  757  bash scripts/get_cca_scores.sh  hubert_small 1 cca_word word /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/save/ 
+  758  ls data
+  759  ls data/save
+  760  rm -rf data/save/hubert*
+  761  bash scripts/extract_rep.sh hubert_small /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/hubert/ 1 contextualized word 0 dev-clean /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/save/ /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/pkg/fairseq/ librispeech 
+  762  rm -rf data/save/hubert_small/
+  763  cp data/hubert/mshubert/hubert_small.pt  data/hubert/
+  764  bash scripts/extract_rep.sh hubert_small /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/hubert/ 1 contextualized word 0 dev-clean /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/save/ /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/pkg/fairseq/ librispeech 
+  765  bash scripts/get_cca_scores.sh  hubert_small 1 cca_word word /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/save/ 
+  766  rm -rf data/save/hubert_small/
+  767  cp data/hubert/mshubert/hubert_small.pt  data/hubert/
+  768  bash scripts/extract_rep.sh hubert_small /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/hubert/ 1 contextualized word 0 dev-clean /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/save/ /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/pkg/fairseq/ librispeech 
+  769  bash scripts/get_cca_scores.sh  hubert_small 1 cca_word word /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/save/ 
+  770  cp data/hubert/our/hubert_small.pt  data/hubert/
+  771  cat /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/logs/librispeech_hubert_small/cca_word_dev-clean_sample1.json
+  772  rm -rf data/save/hubert_small/
+  773  bash scripts/extract_rep.sh hubert_small /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/hubert/ 1 contextualized word 0 dev-clean /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/save/ /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/pkg/fairseq/ librispeech 
+  774  bash scripts/get_cca_scores.sh  hubert_small 1 cca_word word /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/save/ 10
+  775  bash scripts/get_cca_scores.sh  hubert_small 1 cca_word word /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/save/ 
+  776  cat /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/logs/librispeech_hubert_small/cca_word_dev-clean_sample1.json
+  777  cd data
+  778  ls
+  779  cd LibriSpeech/
+  780  ls
+  781  rm -rf train-*
+  782  rm -rf test-*
+  783  cd ../..
+  784  history 
+  785  rm -rf data/save/hubert_small/
+  786  bash scripts/extract_rep.sh hubert_small /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/hubert/ 1 contextualized word 0 dev-clean /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/save/ /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/pkg/fairseq/ librispeech 
+  787  cp data/hubert/our/hubert_small.pt  data/hubert/
+  788  bash scripts/extract_rep.sh hubert_small /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/hubert/ 1 contextualized word 0 dev-clean /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/save/ /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/pkg/fairseq/ librispeech 
+  789  bash scripts/get_cca_scores.sh  hubert_small 1 cca_word word /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/save/  11
+  790  bash scripts/get_cca_scores.sh  hubert_small 1 cca_word word /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/save/  12
+  791  rm -rf data/save/hubert_small/
+  792  cp data/hubert/our/hubert_small.pt  data/hubert/
+  793  cp data/hubert/our/hubert_small.pt  data/hubert/
+  794  bash scripts/extract_rep.sh hubert_small /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/hubert/ 1 contextualized word 0 dev-clean /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/save/ /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/pkg/fairseq/ librispeech
+  795  bash scripts/get_cca_scores.sh  hubert_small 1 cca_word word /raid/home/rajivratn/hemant_rajivratn/layerwise-analysis/data/save/ 11
+  796  history 
+(la) rajivratn@dgx1:/raid/home/rajivratn/hemant_rajivratn/layerwise-analysis$ 
+'''
