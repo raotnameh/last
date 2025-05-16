@@ -7,29 +7,40 @@ import os
 from torch.nn.utils.rnn import pad_sequence
 
 
-# class GradMultiply(torch.autograd.Function):
-#     @staticmethod
-#     def forward(ctx, x, scale):
-#         ctx.scale = scale
-#         res = x.new(x)
-#         return res
+class ReinforceGrad(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, x, advantage):
+        # Save advantage for backward; it should already be baseline-adjusted
+        ctx.save_for_backward(advantage)
+        return x  # identity on the forward pass
 
-#     @staticmethod
-#     def backward(ctx, grad):
-#         return grad * ctx.scale, None
+    @staticmethod
+    def backward(ctx, grad_output):
+        # Retrieve saved advantage (shape b, t, c)
+        (advantage,) = ctx.saved_tensors
+        # Detach so we don't backprop into the advantage calculation
+        adv = advantage.detach()
+        # Scale the incoming gradient by the advantage
+        return grad_output * adv, None  # no gradient w.r.t. advantage
+
+# # Usage in your model:
+# z = your_layer(x)                           # -> (b, t, c)
+# # `advantage` must be shape (b, t, c), computed beforehand
+# z_reinforced = ReinforceGrad.apply(z, advantage)
+# # proceed with the rest of your network…
+
+# advantage = self.rl_loss_from_logits()
+# cur_z_q = ReinforceGrad.apply(cur_z_q, advantage)
     
-# n_z_q.append( 
-                #              GradMultiply.apply( segment.mean(dim=0, keepdim=True), length )
-                #         )           # (1, C)
-                
     
 class Tokenizer(nn.Module):
-    def __init__(self, config, vocab, rot=True):
+    def __init__(self, config, vocab, rot=True, beams=1):
         super(Tokenizer, self).__init__()
         '''
         Tokenizer module that tokenizes the speech encoder output by finding the closest codebook
         '''
 
+        self.beams = beams
         self.vocab = vocab[1:] # remove the padding token
         self.rot = rot
         self.save_dir = config['logging']['dir']
@@ -56,6 +67,60 @@ class Tokenizer(nn.Module):
     def get_very_efficient_rotation( u, q, x):
         w = F.normalize(u + q, dim=1).detach()
         return x - 2*torch.bmm(torch.bmm(x, w.unsqueeze(-1)), w.unsqueeze(1)) + 2*torch.bmm( torch.bmm(x, u.unsqueeze(-1).detach()), q.unsqueeze(1).detach())
+    
+
+    def rl_loss_from_logits(self, student_logits, teacher_logits, tokens, mask, sent):
+        """
+        Compute per-token REINFORCE loss for a student LM using
+        teacher log-probs as rewards, with masking.
+
+        Args:
+            student_logits (Tensor): [B, T, C]
+            teacher_logits (Tensor): [B, T, C]
+            tokens         (LongTensor): [B, T]  sampled token indices
+            mask           (Tensor): [B, T] float mask (1=keep, 0=ignore)
+            sent           (List[str]): [B] original input sentences
+
+        Returns:
+            per_token_loss (Tensor): [B, T] un-reduced loss (zeroed where mask=0)
+        """
+        # 1) Log‐probs over full vocab
+        student_log_probs = F.log_softmax(student_logits, dim=-1)  # [B, T, C]
+        teacher_log_probs = F.log_softmax(teacher_logits, dim=-1)  # [B, T, C]
+
+        # 2) Gather log‐probs at sampled tokens
+        student_logp = student_log_probs.gather(-1, tokens.unsqueeze(-1)).squeeze(-1)  # [B, T]
+        teacher_logp = teacher_log_probs.gather(-1, tokens.unsqueeze(-1)).squeeze(-1)  # [B, T]
+
+        # 3) Reward = teacher log‐prob
+        reward = teacher_logp  # [B, T]
+
+        # 4) Compute baseline over only the unmasked tokens
+        total_mask = mask.sum()
+        # avoid division by zero
+        if total_mask > 0:
+            baseline = (reward * mask).sum() / total_mask  # scalar
+        else:
+            baseline = 0.0
+
+        # 5) Advantage and masking
+        advantage = (reward - baseline) * mask  # [B, T]
+
+        # 6) Per‐token REINFORCE loss (zero where mask=0)
+        per_token_loss = -advantage * student_logp  # [B, T]
+        per_token_loss = per_token_loss * mask      # just in case
+        
+        # 7) Print per-sentence advantages
+        for i in range(len(sent)):
+            # get only the valid positions
+            valid_positions = mask[i].bool()
+            adv_vals = advantage[i][valid_positions].tolist()
+            print(f"Sentence {i}: {sent[i]}")
+            print(f"  Advantages: {adv_vals}")
+
+
+        return per_token_loss
+
           
     def forward(self, z, codebook, mask, writer=None, step=1, skip_non_speech=False):
         """
@@ -80,19 +145,36 @@ class Tokenizer(nn.Module):
         d = (torch.sum(z_flat**2, dim=1, keepdim=True) \
             - 2 * z_flat @ e.t() \
                 + torch.sum(e**2, dim=1, keepdim=True).t() 
-        )
+        ) # (b*t, vocab_size) (10*1000, 29)
+        
+        # 3.1 converting distance to probs
+        log_probs = torch.nn.functional.log_softmax(-d, dim=1)  # shape: (b*t, vocab_size)
+        topk_log_probs, topk_indices = torch.topk(log_probs, k=self.beams, dim=1)  # both shape: (b*t, 5) beam is 5
+        # greedy_indices = topk_indices[:,:1]  # shape: (b * t,)
+        top_z_q = []
+        for b in topk_indices.shpae[1]: 
+            cur_min_encoding_indices = topk_indices[:,b].unsqueeze(1) # (b * t, 1)
+            cur_min_encodings = torch.zeros(cur_min_encoding_indices.shape[0], e.shape[0], device=z.device)  # (b * t, vocab_size)
+            cur_min_encodings.scatter_(1, cur_min_encoding_indices, 1)  # (b * t, vocab_size)
+            # 5. Quantized latents via direct indexing
+            cur_z_q = torch.matmul(cur_min_encodings, e).view(b,t,c) # (batch, time, channels) 
+            top_z_q.append( cur_z_q)
+          
         # 4. find closest encodings
-        min_encoding_indices = torch.argmin(d, dim=1).unsqueeze(1)
-        min_encodings = torch.zeros(min_encoding_indices.shape[0], e.shape[0], device=z.device)
-        min_encodings.scatter_(1, min_encoding_indices, 1)
+        min_encoding_indices = torch.argmin(d, dim=1).unsqueeze(1) # (b * t, 1)
+        min_encodings = torch.zeros(min_encoding_indices.shape[0], e.shape[0], device=z.device)  # (b * t, vocab_size)
+        min_encodings.scatter_(1, min_encoding_indices, 1)  # (b * t, vocab_size)
         # 5. Quantized latents via direct indexing
         z_q = torch.matmul(min_encodings, e).view(b,t,c) # (batch, time, channels) 
+        
+        assert (z_q == top_z_q[0]).all()
+        
         
         # Angle between the z and z_q
         x = z_flat # (batch*time, channels)
         quantized = z_q.contiguous().view(-1, c) # (batch*time, channels)
         theta = torch.sum(x * quantized, dim=1) # (batch*time)
-        theta_mask = theta > 0.8 # (batch*time) # Limitation of the roation trick. It avoids the rotation trick when the angle is too small. which results in opposite direction of gradeints for codebook  and  encoder output.
+        theta_mask = theta > 0.5 # (batch*time) # Limitation of the roation trick. It avoids the rotation trick when the angle is too small. which results in opposite direction of gradeints for codebook  and  encoder output.
         theta_mask = theta_mask.float().unsqueeze(1) # (batch*time, 1)
         # count of theta_mask of value 1 
         if writer and step % 1000 == 0:
@@ -102,19 +184,19 @@ class Tokenizer(nn.Module):
             writer.add_scalar('tokenizer/theta_min', theta.min().item(), step)
             writer.add_scalar('tokenizer/theta_mask_mean', theta_mask.sum().item(), step)
         
-        # 6. Apply rotation trick on already normalized vectors           
-        r_z_q = self.get_very_efficient_rotation(x , quantized, x.unsqueeze(1)).squeeze() 
-        # 7. Straight-through estimator and mask padding
-        s_z_q = z_flat + (quantized - z_flat).detach() # btc  
+        # # 6. Apply rotation trick on already normalized vectors           
+        # r_z_q = self.get_very_efficient_rotation(x , quantized, x.unsqueeze(1)).squeeze() 
+        # # 7. Straight-through estimator and mask padding
+        # s_z_q = z_flat + (quantized - z_flat).detach() # btc  
         
-        z_q = theta_mask * r_z_q + (1 - theta_mask) * s_z_q # btc   
-        z_q = z_q.contiguous().view(b, t, c) # (batch, time, channels)
-        z_q = z_q * mask
-        
-        # # Straight-through estimator and mask padding
-        # z_q = z_flat + (quantized - z_flat).detach() # btc  
+        # z_q = theta_mask * r_z_q + (1 - theta_mask) * s_z_q # btc   
         # z_q = z_q.contiguous().view(b, t, c) # (batch, time, channels)
         # z_q = z_q * mask
+        
+        # 7. Straight-through estimator and mask padding
+        z_q = z_flat + (quantized - z_flat).detach() # b*t,c  
+        z_q = z_q.contiguous().view(b, t, c) # (batch, time, channels)
+        z_q = z_q * mask
         
         # 8. commitment loss;  MSE loss between z and z_q ignoring padding positions
         commitment_loss = F.mse_loss(z, z_q.detach(), reduction='none') * mask # btc
@@ -133,7 +215,6 @@ class Tokenizer(nn.Module):
         self.codebook_usage(min_encodings, mask.contiguous().view(-1, 1), step)
 
         return n_student_probs, smoothness_loss, commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list, selected_encodings_repeated_list # commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list<=
-
 
 
     def remove_consecutive_repeated_indices(self, min_encoding_indices, mask, z_q, student_prob, skip_non_speech=False):
@@ -209,7 +290,6 @@ class Tokenizer(nn.Module):
                 print(n_z_q)
                 n_z_qs.append(torch.zeros((1, C), device=z_q.device, dtype=z_q.dtype))
                 n_student_probs.append(torch.zeros((1, C), device=z_q.device, dtype=z_q.dtype))
-                
             
             # build mask and track max length
             L = len(selected_encodings)

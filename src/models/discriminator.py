@@ -68,14 +68,12 @@ class Discriminator(nn.Module):
         
         for c, layer in enumerate(self.layers[1:]):
             x = x + layer(x, padding_mask)
-            
-            if c == 4: # for only c+1 layers use discriminator
-                x_mean = x.sum(dim=1) / valid_counts  # (batch, channels)
-                # Apply the final projection
-                x_mean = self.proj(x_mean) # (B, 1)
-                x_mean = x_mean.squeeze(1)  # (B)
-                
-            
+    
+        x_mean = x.sum(dim=1) / valid_counts  # (batch, channels)
+        # Apply the final projection
+        x_mean = self.proj(x_mean) # (B, 1)
+        x_mean = x_mean.squeeze(1)  # (B)
+                        
         if labels is not None: 
             targets = labels[:, 1:]  
             logits = self.lm( self.norm( x[:, :-1, :] ) ) # (B, T-1, vocab_size)

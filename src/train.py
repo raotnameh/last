@@ -189,7 +189,8 @@ def configure_training_mode(models, config):
             param.requires_grad = False
         else:
             param.requires_grad = True
-            logging.info(f"Trainable parameter: {name} - {param.requires_grad}")
+        
+        logging.info(f"Trainable parameter: {name} - {param.requires_grad}")
             
     # Log trainable parameters
     total_params = 0
@@ -210,23 +211,23 @@ def configure_optimizers(models, config):
         'enc': optim.AdamW(
             [p for p in models['encoder'].parameters() if p.requires_grad],
             lr=config['train']['lr_enc'],
-            betas=(0.0, 0.999),
+            betas=(0.5, 0.999),
         ),
         'down': optim.AdamW(
             [p for p in models['downsample'].parameters() if p.requires_grad],
             lr=config['train']['lr_down'],
-            betas=(0.0, 0.999),
+            betas=(0.5, 0.999),
         ),
         'dec': optim.AdamW(
             [p for p in models['upsample'].parameters() if p.requires_grad] +
             [p for p in models['decoder'].parameters() if p.requires_grad],
             lr=config['train']['lr_dec'],
-            betas=(0.0, 0.999),
+            betas=(0.5, 0.999),
         ),
         'disc': optim.AdamW(
             [p for p in models['discriminator'].parameters() if p.requires_grad],
             lr=config['train']['lr_disc'],
-            betas=(0.0, 0.999),
+            betas=(0.5, 0.999),
         )
     }
      

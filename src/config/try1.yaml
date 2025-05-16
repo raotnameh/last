@@ -23,7 +23,8 @@ dataset_txt:
   skip_non_speech: True
 
 codebook:
-  model_name: "meta-llama/Llama-3.2-1B-Instruct"
+  # model_name: "meta-llama/Llama-3.2-1B"
+  model_name: "/raid/home/rajivratn/hemant_rajivratn/last/src/trainllm/charllama-finetuned/checkpoint/"
 
 encoder:
   ckpt_path: "../weights/hubert_base_ls960.pt"
@@ -42,9 +43,9 @@ upsample:
   groups: *groups_value 
 
 discriminator:
-  hidden_dim: 256
-  num_layers: 10
-  kernel_size: 11
+  hidden_dim: 512
+  num_layers: 5
+  kernel_size: 5
 
 decoder:
   speaker:
@@ -64,14 +65,14 @@ decoder:
 train:
   seed: 42123
 
-  lr_enc: &lr 0.0001
+  lr_enc: &lr 0.00005
   lr_down: *lr
   lr_dec: 0.0001
   lr_disc: 0.0001
   grad_clip: 10.0
   
   num_steps: 100000
-  freeze_steps: 1
+  freeze_steps: 1000000
   gradient_accumulation_steps: 1
   discriminator_freq: 2 # for N-1 steps train discriminator
 

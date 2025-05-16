@@ -60,28 +60,6 @@ class Encoder(torch.nn.Module):
         }
         
 
-class Conv1dBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, dilation=1, stride=1, groups=1):
-        super().__init__()
-        
-        self.causal_padding = (kernel_size - 1) * dilation
-        self.conv = nn.Conv1d(
-            in_channels, 
-            out_channels, 
-            kernel_size, 
-            stride=stride, 
-            dilation=dilation, 
-            padding=0,
-            groups=groups,
-        )
-
-    def forward(self, x):
-        # x: (batch, time, channels)
-        # Apply causal (left) padding: (padding_left, padding_right)
-        x = F.pad(x, (self.causal_padding, 0))
-        x = self.conv(x)
-        
-        return x  
 
 
 class Downsample(torch.nn.Module):
@@ -91,8 +69,7 @@ class Downsample(torch.nn.Module):
         self.norm = torch.nn.LayerNorm(input_dim)
         
         padding = kernel_size // 2
-        self.conv = Conv1dBlock(input_dim, output_dim, kernel_size=kernel_size, dilation=1, stride=stride, groups=groups)
-        # self.conv = torch.nn.Conv1d(input_dim, output_dim, kernel_size=kernel_size, stride=stride, padding=padding, groups = groups)
+        self.conv = torch.nn.Conv1d(input_dim, output_dim, kernel_size=kernel_size, stride=stride, padding=padding, groups = groups)
         
     def forward(self, x, mask): # B x T x C
         
@@ -114,16 +91,14 @@ if __name__ == "__main__":
     count = 0
     for name, param in model.named_parameters():
         count += 1
+        
         if count < 177:
-            
             param.requires_grad = False
-            print(name, param.requires_grad)
+            
         elif 'model.layer_norm' in name:
             param.requires_grad = False
-            print(name, param.requires_grad)
+            
         elif 'model.final_proj' in name:
             param.requires_grad = False
-            print(name, param.requires_grad)
-        else:
-            print(name, param.requires_grad)
-    
+        
+        print(name, param.requires_grad)
