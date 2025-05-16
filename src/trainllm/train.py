@@ -8,24 +8,26 @@ from torch.utils.tensorboard import SummaryWriter
 import datetime
 
 from transformers import AutoTokenizer, AutoModelForCausalLM
+
+import random
+
+
 # --- Config ---
-model_dir = "meta-llama/Llama-3.2-1B" #-Instruct"
+model_dir = "meta-llama/Llama-3.2-1B"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 torch.backends.cudnn.benchmark = True
+torch.set_float32_matmul_precision('high')
 
-batch_size = 16
+batch_size = 8
 num_epochs = 1
-learning_rate = 1e-5
-max_length = 256
+learning_rate = 5e-5
+max_length = 512
 gradient_accumulation_steps = 8
-save_steps = 1000
+save_steps = 5000
 log_interval = 10  # Log every 10 iterations
 output_dir = "charllama-finetuned"  # Directory to save checkpoints
 log_dir = os.path.join("runs", datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
 writer = SummaryWriter(log_dir=log_dir)
-
-
-import random
 
 
 # --- Dataset class ---
@@ -38,7 +40,7 @@ class CharDataset(Dataset):
     def _load_and_preprocess(self, file_path):
         with open(file_path, "r") as f:
             lines = f.readlines()
-        return [line.strip().upper() for line in lines if len(line.strip()) > 10]
+        return [line.strip().upper() for line in lines if len(line.strip()) > 256]
 
     def __len__(self):
         return len(self.sentences)
@@ -47,7 +49,7 @@ class CharDataset(Dataset):
     def noisy_repeat(text, max_repeats=4, prob=0.25):
         def repeat_char(c):
             if c.isalpha() and random.random() < prob:
-                return c * random.randint(2, max_repeats)
+                return c * random.randint(1, max_repeats)
             return c
         
         noisy_words = []
@@ -57,13 +59,22 @@ class CharDataset(Dataset):
         
         return ' '.join(noisy_words)
 
+    @staticmethod
+    def shuffle_string(text):
+        chars = list(text)
+        random.shuffle(chars)
+        return ''.join(chars)
+
     def __getitem__(self, idx):
         sentence = self.sentences[idx]
         # 0.5 prob use if
         pos = 1
-        if random.random() < 0.1: 
-            pos = -1
+        if random.random() < 0.2: 
             sentence = self.noisy_repeat(sentence)
+        elif random.random() < 0.25:
+            pos = -1
+            sentence = self.shuffle_string(sentence)
+                
         sentence = " ".join(sentence)
         tokens = self.tokenizer(
                         sentence,
@@ -179,7 +190,7 @@ print(model)
 
 
 # --- Create dataset and dataloader ---
-train_file_path = "/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train.wrd"
+train_file_path = "/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train_norm.txt"
 dataset = CharDataset(train_file_path, tokenizer, max_length)
 dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
 
