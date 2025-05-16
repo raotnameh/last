@@ -34,7 +34,7 @@ encoder:
 
 downsample:
   kernel_size: &kernel_size_value 11
-  stride: &stride_value 1
+  stride: &stride_value 2
   groups: &groups_value 64
 
 upsample:
