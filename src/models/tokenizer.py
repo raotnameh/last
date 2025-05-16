@@ -68,59 +68,6 @@ class Tokenizer(nn.Module):
         w = F.normalize(u + q, dim=1).detach()
         return x - 2*torch.bmm(torch.bmm(x, w.unsqueeze(-1)), w.unsqueeze(1)) + 2*torch.bmm( torch.bmm(x, u.unsqueeze(-1).detach()), q.unsqueeze(1).detach())
     
-
-    def rl_loss_from_logits(self, student_logits, teacher_logits, tokens, mask, sent):
-        """
-        Compute per-token REINFORCE loss for a student LM using
-        teacher log-probs as rewards, with masking.
-
-        Args:
-            student_logits (Tensor): [B, T, C]
-            teacher_logits (Tensor): [B, T, C]
-            tokens         (LongTensor): [B, T]  sampled token indices
-            mask           (Tensor): [B, T] float mask (1=keep, 0=ignore)
-            sent           (List[str]): [B] original input sentences
-
-        Returns:
-            per_token_loss (Tensor): [B, T] un-reduced loss (zeroed where mask=0)
-        """
-        # 1) Log‐probs over full vocab
-        student_log_probs = F.log_softmax(student_logits, dim=-1)  # [B, T, C]
-        teacher_log_probs = F.log_softmax(teacher_logits, dim=-1)  # [B, T, C]
-
-        # 2) Gather log‐probs at sampled tokens
-        student_logp = student_log_probs.gather(-1, tokens.unsqueeze(-1)).squeeze(-1)  # [B, T]
-        teacher_logp = teacher_log_probs.gather(-1, tokens.unsqueeze(-1)).squeeze(-1)  # [B, T]
-
-        # 3) Reward = teacher log‐prob
-        reward = teacher_logp  # [B, T]
-
-        # 4) Compute baseline over only the unmasked tokens
-        total_mask = mask.sum()
-        # avoid division by zero
-        if total_mask > 0:
-            baseline = (reward * mask).sum() / total_mask  # scalar
-        else:
-            baseline = 0.0
-
-        # 5) Advantage and masking
-        advantage = (reward - baseline) * mask  # [B, T]
-
-        # 6) Per‐token REINFORCE loss (zero where mask=0)
-        per_token_loss = -advantage * student_logp  # [B, T]
-        per_token_loss = per_token_loss * mask      # just in case
-        
-        # 7) Print per-sentence advantages
-        for i in range(len(sent)):
-            # get only the valid positions
-            valid_positions = mask[i].bool()
-            adv_vals = advantage[i][valid_positions].tolist()
-            print(f"Sentence {i}: {sent[i]}")
-            print(f"  Advantages: {adv_vals}")
-
-
-        return per_token_loss
-
           
     def forward(self, z, codebook, mask, writer=None, step=1, skip_non_speech=False):
         """
@@ -148,17 +95,17 @@ class Tokenizer(nn.Module):
         ) # (b*t, vocab_size) (10*1000, 29)
         
         # 3.1 converting distance to probs
-        log_probs = torch.nn.functional.log_softmax(-d, dim=1)  # shape: (b*t, vocab_size)
-        topk_log_probs, topk_indices = torch.topk(log_probs, k=self.beams, dim=1)  # both shape: (b*t, 5) beam is 5
-        # greedy_indices = topk_indices[:,:1]  # shape: (b * t,)
-        top_z_q = []
-        for b in topk_indices.shpae[1]: 
-            cur_min_encoding_indices = topk_indices[:,b].unsqueeze(1) # (b * t, 1)
-            cur_min_encodings = torch.zeros(cur_min_encoding_indices.shape[0], e.shape[0], device=z.device)  # (b * t, vocab_size)
-            cur_min_encodings.scatter_(1, cur_min_encoding_indices, 1)  # (b * t, vocab_size)
-            # 5. Quantized latents via direct indexing
-            cur_z_q = torch.matmul(cur_min_encodings, e).view(b,t,c) # (batch, time, channels) 
-            top_z_q.append( cur_z_q)
+        # log_probs = torch.nn.functional.log_softmax(-d, dim=1)  # shape: (b*t, vocab_size)
+        # topk_log_probs, topk_indices = torch.topk(log_probs, k=self.beams, dim=1)  # both shape: (b*t, 5) beam is 5
+        # # greedy_indices = topk_indices[:,:1]  # shape: (b * t,)
+        # top_z_q = []
+        # for beam in range(topk_indices.shape[1]): 
+        #     cur_min_encoding_indices = topk_indices[:,beam].unsqueeze(1) # (b * t, 1)
+        #     cur_min_encodings = torch.zeros(cur_min_encoding_indices.shape[0], e.shape[0], device=z.device)  # (b * t, vocab_size)
+        #     cur_min_encodings.scatter_(1, cur_min_encoding_indices, 1)  # (b * t, vocab_size)
+        #     # 5. Quantized latents via direct indexing
+        #     cur_z_q = torch.matmul(cur_min_encodings, e).view(b,t,c) # (batch, time, channels) 
+        #     top_z_q.append( cur_z_q)
           
         # 4. find closest encodings
         min_encoding_indices = torch.argmin(d, dim=1).unsqueeze(1) # (b * t, 1)
@@ -166,8 +113,6 @@ class Tokenizer(nn.Module):
         min_encodings.scatter_(1, min_encoding_indices, 1)  # (b * t, vocab_size)
         # 5. Quantized latents via direct indexing
         z_q = torch.matmul(min_encodings, e).view(b,t,c) # (batch, time, channels) 
-        
-        assert (z_q == top_z_q[0]).all()
         
         
         # Angle between the z and z_q
@@ -274,7 +219,6 @@ class Tokenizer(nn.Module):
                     seg_sum  = segment.sum(dim=0, keepdim=True)      # (1, C)
                     prev_sum = segment[:-1].sum(dim=0, keepdim=True) # (1, C)
                     n_z_q.append(seg_sum - prev_sum.clone().detach())   # (1, C)
-                    
                     
                     student_seg_sum  = student_segment.sum(dim=0, keepdim=True)      # (1, C)
                     student_prev_sum = student_segment[:-1].sum(dim=0, keepdim=True) # (1, C)

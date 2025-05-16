@@ -477,7 +477,7 @@ class HubertModel(BaseFairseqModel):
         )
 
         if features_only:
-            return {"x": x, "padding_mask": padding_mask, "features": features}
+            return {"x": x, "padding_mask": padding_mask, "features": unmasked_features}
 
         def compute_pred(proj_x, target, label_embs):
             # compute logits for the i-th label set

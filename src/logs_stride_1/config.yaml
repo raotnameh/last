@@ -3,14 +3,14 @@ checkpoint:
 codebook:
   model_name: /raid/home/rajivratn/hemant_rajivratn/last/src/trainllm/charllama-finetuned/checkpoint/
 dataset_speech:
-  batch_size: 32
+  batch_size: 8
   max_duration: 160000
   min_duration: 32000
   test_path: /raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/test.tsv
   train_path: /raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/train.tsv
   val_path: /raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/val.tsv
 dataset_txt:
-  batch_size: 32
+  batch_size: 8
   path: /raid/home/rajivratn/hemant_rajivratn/last/data/txt/train_norm.txt
   skip_non_speech: true
 decoder:

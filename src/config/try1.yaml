@@ -14,7 +14,7 @@ dataset_speech:
 
   min_duration: 32000
   max_duration: 160000
-  batch_size: &batch_size_value 32
+  batch_size: &batch_size_value 8
 
 dataset_txt:
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train_norm.txt"
