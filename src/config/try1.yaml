@@ -27,14 +27,14 @@ codebook:
   # model_name: "/raid/home/rajivratn/hemant_rajivratn/last/src/trainllm/charllama-finetuned/checkpoint/"
 
 encoder:
-  ckpt_path: "../weights/hubert_base_ls960.pt"
-  # ckpt_path: "../weights/convert_iter3.pt"
+  # ckpt_path: "../weights/hubert_base_ls960.pt"
+  ckpt_path: "../weights/convert_iter3.pt"
   encoder_embed_dim: 768
   frozen_layers: ["11"]
 
 downsample:
   kernel_size: &kernel_size_value 11
-  stride: &stride_value 2
+  stride: &stride_value 1
   groups: &groups_value 64
 
 upsample:

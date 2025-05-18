@@ -33,6 +33,21 @@ class ReinforceGrad(torch.autograd.Function):
 # cur_z_q = ReinforceGrad.apply(cur_z_q, advantage)
     
     
+class FirstTimeStepWithBroadcastGrad(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, x):
+        # x: (t, c)
+        ctx.save_for_backward(x)
+        return x[0:1, :]  # (1, c)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        x, = ctx.saved_tensors
+        t, c = x.shape
+        # Broadcast grad_output (1, c) -> (t, c)
+        grad_input = grad_output.expand(t, -1)
+        return grad_input
+    
 class Tokenizer(nn.Module):
     def __init__(self, config, vocab, rot=True, beams=1):
         super(Tokenizer, self).__init__()
@@ -209,21 +224,13 @@ class Tokenizer(nn.Module):
                 
                 # mark the last frame of this segment
                 selected_encodings.append(v + 1) # +1 to avoid padding token
-            
+
                 segment = z_q_b[s:e]  # shape (length, C)
+                n_z_q.append( FirstTimeStepWithBroadcastGrad.apply(segment) )
+                
                 # student_segment = student_prob_b[s:e]
-                if length == 1: 
-                    n_z_q.append(segment)           # (1, C)
-                    # n_student_prob.append(student_segment)
-                else:
-                    seg_sum  = segment.sum(dim=0, keepdim=True)      # (1, C)
-                    prev_sum = segment[:-1].sum(dim=0, keepdim=True) # (1, C)
-                    n_z_q.append(seg_sum - prev_sum.clone().detach())   # (1, C)
-                    
-                    # student_seg_sum  = student_segment.sum(dim=0, keepdim=True)      # (1, C)
-                    # student_prev_sum = student_segment[:-1].sum(dim=0, keepdim=True) # (1, C)
-                    # n_student_prob.append(student_seg_sum - student_prev_sum.clone().detach())   # (1, C)
-            
+                # n_student_prob.append( FirstTimeStepWithBroadcastGrad.apply(student_segment) )
+                
             # append per-batch results
             selected_encodings_list.append(selected_encodings)
             selected_encodings_repeated_list.append(selected_encodings_repeated)
@@ -247,7 +254,6 @@ class Tokenizer(nn.Module):
            
         # n_student_probs = pad_sequence(n_student_probs, batch_first=True)
         # n_student_probs *= masks
-        
         n_student_probs = n_z_qs
           
         return n_student_probs, n_z_qs, masks, selected_encodings_list, selected_encodings_repeated_list    # shape (B, max_len, channels), mask shape (B, max_len, 1), list of selected encodings
