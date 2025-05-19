@@ -51,7 +51,7 @@ class Tokenizer(nn.Module):
         glogits = logits.detach().cpu().numpy() # b,t,v # group logits
         lengths = mask.sum(dim=1).to(dtype=torch.int32).cpu()  # b,
         logits_list = [glogits[b, :lengths[b], :] for b in range(B)]
-        with multiprocessing.get_context("fork").Pool(processes=32) as pool: out_list = self.decoder.decode_batch(pool, logits_list, beam_width=self.beam_size)    
+        with multiprocessing.get_context("fork").Pool(processes=128) as pool: out_list = self.decoder.decode_batch(pool, logits_list, beam_width=self.beam_size)    
 
         ######## Advantage for each path decoded text. ########
         top, sentences, groups = [], [], [] #  b*groups , different no of groups for each seq in the batch.
@@ -67,29 +67,14 @@ class Tokenizer(nn.Module):
             start = end
         
         # Get the rewards using a LLM as Judge. 
-        with torch.no_grad():
+        with torch.no_grad(): 
             inputs = self.codebook.tokenizer(sentences, return_tensors="pt", padding=True)
             input_ids = inputs["input_ids"].to(device)
             attention_mask = inputs["attention_mask"].to(device) # 0 for padding
             
-            batch_size = 16
-            all_logits = []
-            for i in range(0, input_ids.size(0), batch_size):
-                batch_input_ids = input_ids[i:i+batch_size]
-                batch_attention_mask = attention_mask[i:i+batch_size]
-
-                outputs = self.codebook.model(input_ids=batch_input_ids, attention_mask=batch_attention_mask)
-                all_logits.append(outputs.logits)  # logits, shape (B, T, V)
-
-            # Concatenate logits along the batch dimension
-            logits = torch.cat(all_logits, dim=0)  # (total_B, T, V)
-
-            # Now apply log_softmax on concatenated logits
-            log_probs = F.log_softmax(logits, dim=-1)  # (total_B, T, V)
-                    
             outputs = self.codebook.model(input_ids=input_ids, attention_mask=attention_mask)
             log_probs = F.log_softmax(outputs.logits, dim=-1)  # (B, T, V)
-            
+   
             target_ids = input_ids[:, 1:]
             log_probs = log_probs[:, :-1, :]
             token_log_probs = log_probs.gather(dim=2, index=target_ids.unsqueeze(-1)).squeeze(-1)
@@ -139,7 +124,6 @@ class Tokenizer(nn.Module):
         
         coef_1 = torch.exp(per_token_logps - old_per_token_logps)
         coef_2 = torch.clamp(coef_1, 1 - self.epsilon, 1 + self.epsilon)
-        print(coef_1)
 
         ######## Reinforced policies ########
         per_token_loss1 = coef_1.squeeze(-1) * advantages.unsqueeze(1) # self.beamsize,T,1

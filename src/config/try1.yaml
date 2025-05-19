@@ -14,7 +14,7 @@ dataset_speech:
 
   min_duration: 32000
   max_duration: 160000
-  batch_size: &batch_size_value 2
+  batch_size: &batch_size_value 4
 
 dataset_txt:
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train.wrd"
@@ -32,24 +32,24 @@ encoder:
   frozen_layers: ["11"]
 
 downsample:
-  kernel_size: &kernel_size_value 5
+  kernel_size: &kernel_size_value 11
   stride: &stride_value 1
-  groups: &groups_value 16
+  groups: &groups_value 64
 
 train:
   seed: 42123
 
-  epsilon: 0.2
-  temp: 2
-  groups: 64
+  epsilon: 0.5
+  temp: 1
+  groups: 32
   iters: 2
 
-  lr: 0.0001
-  grad_clip: 10.0
+  lr: 0.00001
+  grad_clip: 1.0
   
   epochs: 10
   freeze_epochs: 1
-  accumulation_steps: 8
+  accumulation_steps: 2
 
   resume_checkpoint: False
   resume_path: "checkpoints/step_10000.pth"

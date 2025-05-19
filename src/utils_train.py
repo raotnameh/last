@@ -6,6 +6,7 @@ from torch.nn.utils.rnn import pad_sequence
 from tqdm.auto import tqdm
 
 from jiwer import wer, cer
+import torch.cuda.amp
 
 # norm 
 def get_grad_norm(model):
@@ -40,15 +41,18 @@ def train(
     
     
     accumulation_steps = config['train']['accumulation_steps']  # Get accumulation steps, default to 1 if not provided.
-    if accumulation_steps > 1:
-        logging.info(f"Using gradient accumulation with {accumulation_steps} steps.")
+    logging.info(f"Using gradient accumulation with {accumulation_steps} steps.")
 
-    
+    # Initialize GradScaler for mixed precision
+    scaler = torch.cuda.amp.GradScaler()
+
+
     # torch compile
     for m in models: torch.compile(models[m])
         
     for epoch in range(1, epochs):
-        for m in models: models[m].train()
+        models["encoder"].eval()
+        models["downsample"].train()
         
         for step, batch in enumerate(train_speech_loader, start=1):
             
@@ -60,28 +64,28 @@ def train(
             iter = 0
             while iter < config['train']['iters']:
                 iter +=1
-            
-                # ===== Encoder =====
-                with torch.no_grad():
-                    enc_out, padding_mask  = models['encoder'](waveforms, padding_masks)  # [B, T//320, C], [B, T // 320, C] 
-                    mask = ~padding_mask # 0 for masked positions.
-                    mask = mask.float().unsqueeze(-1)
+                with torch.cuda.amp.autocast():
+                    # ===== Encoder =====
+                    with torch.no_grad():
+                        enc_out, padding_mask  = models['encoder'](waveforms, padding_masks)  # [B, T//320, C], [B, T // 320, C] 
+                        mask = ~padding_mask # 0 for masked positions.
+                        mask = mask.float().unsqueeze(-1)
+                        
+                    # ===== Downsample =====
+                    down_out = models['downsample'](enc_out, mask) # [B, T, codebook_dim]
                     
-                # ===== Downsample =====
-                down_out = models['downsample'](enc_out, mask) # [B, T, codebook_dim]
+                    # ===== Tokenizer =====
+                    smoothness_loss, commitment_loss, reinforce_loss, top = models['tokenizer'](
+                        down_out, 
+                        mask,
+                        writer,
+                        step,
+                        iter,
+                    )
+                    
+                    # Loss calculation      
+                    total_loss = reinforce_loss
                 
-                # ===== Tokenizer =====
-                smoothness_loss, commitment_loss, reinforce_loss, top = models['tokenizer'](
-                    down_out, 
-                    mask,
-                    writer,
-                    step,
-                    iter,
-                )
-                
-                # Loss calculation      
-                total_loss = reinforce_loss
-            
                 if torch.isnan(total_loss) or torch.isinf(total_loss):
                     logging.warning(f"Skipping step {step} due to NaN/Inf in total_loss")
                     optimizer.zero_grad()
@@ -91,7 +95,7 @@ def train(
                 else: 
                     # Scale the loss, and accumulate over accumulation steps
                     total_loss = total_loss / accumulation_steps # Divide loss by accumulation steps.
-                    total_loss.backward()    
+                    scaler.scale(total_loss).backward() # Change here    
                     
                 if step % config['logging']['step'] == 0:  
                     cer_pred, wer_pred = compute_wer(txt, top)
@@ -111,17 +115,20 @@ def train(
                     writer.add_scalar('grad_norm/downsample', get_grad_norm(models['downsample']), step)
                 
                 if (step % accumulation_steps == 0): # Only do the following every accumulation_steps                                
+                    if scaler:
+                        scaler.unscale_(optimizer)  # Unscale gradients before clipping
                     # Gradient clipping
                     max_grad_norm = config['train']['grad_clip']
                     torch.nn.utils.clip_grad_norm_(models['encoder'].parameters(), max_grad_norm)
                     torch.nn.utils.clip_grad_norm_(models['downsample'].parameters(), max_grad_norm)
 
-                    # Optimizer and scheduler step
-                    optimizer.step()
+                    # Optimizer and 
+                    scaler.step(optimizer) # Change here
+                    scaler.update()
+                    # Scheduler step
                     scheduler.step()
                     # Zero gradients after the step
                     optimizer.zero_grad()
-                
             
 
     checkpoint_path = f"{save_dir}/checkpoints/step_{step:06d}.pt"
