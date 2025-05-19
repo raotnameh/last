@@ -48,12 +48,13 @@ def train(
 
     # torch compile
     for m in models: torch.compile(models[m])
-        
+    
+    step = 1
     for epoch in range(1, epochs):
         models["encoder"].eval()
         models["downsample"].train()
         
-        for step, batch in enumerate(train_speech_loader, start=1):
+        for batch in train_speech_loader:
             
             # ===== Speech Data =====
             waveforms, padding_masks, dur, paths, txt = batch
@@ -128,6 +129,8 @@ def train(
                     scheduler.step()
                     # Zero gradients after the step
                     optimizer.zero_grad()
+                    
+                    step += 1
             
 
     checkpoint_path = f"{save_dir}/checkpoints/step_{step:06d}.pt"
