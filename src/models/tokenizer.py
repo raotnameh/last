@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import os
 
 from torch.nn.utils.rnn import pad_sequence
+import random
 
 import numpy as np
 from pyctcdecode import build_ctcdecoder
@@ -51,8 +52,8 @@ class Tokenizer(nn.Module):
         glogits = logits.detach().cpu().numpy() # b,t,v # group logits
         lengths = mask.sum(dim=1).to(dtype=torch.int32).cpu()  # b,
         logits_list = [glogits[b, :lengths[b], :] for b in range(B)]
-        with multiprocessing.get_context("fork").Pool(processes=128) as pool: out_list = self.decoder.decode_batch(pool, logits_list, beam_width=self.beam_size)    
-
+        with multiprocessing.get_context("fork").Pool(processes=16) as pool: 
+            out_list = self.decoder.decode_batch(pool, logits_list, beam_width=self.beam_size)    
         ######## Advantage for each path decoded text. ########
         top, sentences, groups = [], [], [] #  b*groups , different no of groups for each seq in the batch.
         for t in out_list: 
@@ -137,7 +138,6 @@ class Tokenizer(nn.Module):
 
         return loss, top
         
-
     def forward(self, z, mask, writer=None, step=1, iter=1):
         """
         z (torch.Tensor): b,t,c
@@ -153,9 +153,23 @@ class Tokenizer(nn.Module):
         z_flat = z.contiguous().view(-1, c) # (b * t, c)
 
         d = self.dist(z_flat, e) # (b*t, vocab_size)
+        
+        n_steps = 100000
+        target = 0.001
+        step_size = (target - self.temp) / (n_steps - 1)
+        prob = random.random()
+        if prob < 0.9:
+            try: 
+                temp = [self.temp + step_size * i for i in range(n_steps)][step]
+            except: 
+                temp = target
+        elif prob < .95: 
+            temp = 0.0001
+        else: 
+            temp = 1000
+        
         # converting distance to probs
-        log_probs = torch.nn.functional.log_softmax( -d.view(b, t, -1) / (self.temp/step), dim=-1) # shape: (b, t, vocab_size)
-        log_probs = log_probs * mask + (1 - mask) * (-1e9)
+        log_probs = torch.nn.functional.log_softmax( -d.view(b, t, -1) / temp, dim=-1) # shape: (b, t, vocab_size)
         reinforce_loss, top = self.decode(log_probs, mask.squeeze(-1), iter)
         
 

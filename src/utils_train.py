@@ -7,6 +7,8 @@ from tqdm.auto import tqdm
 
 from jiwer import wer, cer
 import torch.cuda.amp
+import copy
+
 
 # norm 
 def get_grad_norm(model):
@@ -53,6 +55,13 @@ def train(
     for epoch in range(1, epochs):
         models["encoder"].eval()
         models["downsample"].train()
+        
+        # models_copy["encoder"] = copy.deepcopy(models["encoder"])
+        # models_copy["encoder"].eval()  # Maintain original mode
+
+        # # Deep copy the downsample and preserve train mode
+        # models_copy["downsample"] = copy.deepcopy(models["downsample"])
+        # models_copy["downsample"].train()  # Maintain original mode
         
         for batch in train_speech_loader:
             
@@ -103,11 +112,14 @@ def train(
                     logging.info(f"Training loss ---- epoch - step - loss - CER - WER: {epoch} - {step} - {total_loss} - {cer_pred} - {wer_pred}")                
                     logging.info(F"True txt: {txt[0]}")
                     logging.info(F"Pred txt: {top[0]}")
-        
+
+                    # logging error rates
+                    writer.add_scalar('error/cer', cer_pred, step)
+                    writer.add_scalar('error/wer', wer_pred, step)
                     # logging losses
                     writer.add_scalar('loss/loss', total_loss, step)
-                    writer.add_scalar('generator_loss/commit_loss', commitment_loss, step)
-                    writer.add_scalar('generator_loss/smooth_loss', smoothness_loss, step)
+                    writer.add_scalar('loss/commit_loss', commitment_loss, step)
+                    writer.add_scalar('loss/smooth_loss', smoothness_loss, step)
                     # logging lr 
                     writer.add_scalar('learning_rate/encoder', scheduler.get_last_lr()[0], step)
                     # loggin norm

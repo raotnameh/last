@@ -126,7 +126,7 @@ def setup_models(config, vocab):
         groups=config['downsample']['groups'], 
         )
     
-    models['tokenizer'] = Tokenizer(config, models['codebook'], config["train"]["groups"])
+    models['tokenizer'] = Tokenizer(config, models['codebook'], config["train"]["groups"], config["train"]["temp"], config["train"]["epsilon"])
     
     logging.info(f"Size of codebook: {models['codebook'].embedding.weight.shape[0]} x {models['codebook'].embedding.weight.shape[1]}")
     logging.info(models['encoder'])
