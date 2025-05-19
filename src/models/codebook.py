@@ -2,8 +2,6 @@ import torch
 import torch.nn as nn
 
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from sklearn.decomposition import PCA
-import numpy as np 
 import torch.nn.functional as F
 
 from torch.nn.utils.rnn import pad_sequence
@@ -22,9 +20,14 @@ class Codebook(nn.Module):
         # Initialize the model and tokenizer 
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForCausalLM.from_pretrained(model_name)
+        
+        self.model.eval()
         # Freeze LLM parameters
         for param in self.model.parameters():
             param.requires_grad = False
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+            
         # Get the vocab_ids from the tokenizer: 
         vocab_list = list(vocab)
         vocab_list[0] = f"{self.tokenizer.eos_token}"
@@ -69,18 +72,6 @@ class Codebook(nn.Module):
     def forward(self, x): # x: (b,t) tensor
         return self.embedding(x) # (b,t,c)
     
-    def subvocab_probs_from_logits(self, logits): 
-        """
-        logits:   [B, T, V] raw output logits from the model
-        subp: [B, T, K] where subp[b,t,i] = P(token=vocab_list[i] | context)
-        """
-        
-        # gather the K logits at each position
-        B, T, V = logits.shape
-        idx = self.vocab_ids.view(1, 1, -1).expand(B, T, -1).to(logits.device)  # [B, T, K]
-        sub_logits = logits.gather(dim=-1, index=idx)    # [B, T, K]
-
-        return sub_logits # B,T,K
     
     def lmscoring(self, target, inputs_embeds, mask):
         """

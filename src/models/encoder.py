@@ -51,15 +51,11 @@ class Encoder(torch.nn.Module):
             "ret_conv": False,
         }
                       
-        features, x, padding_mask = self.model.extract_features(**w2v_args)
+        _, x, padding_mask = self.model.extract_features(**w2v_args)
         
-        return {
-            "cnn_out": features,  # B x T x C
-            "encoder_out": x,  # B x T x C 
-            "padding_mask": padding_mask,  # B x T
-        }
-
-
+        return x, padding_mask  # B x T x C ,  B x T
+        
+        
 class Downsample(torch.nn.Module):
     def __init__(self, input_dim=768, output_dim=256, kernel_size=9, stride=2, groups=1):
         super().__init__()
@@ -71,12 +67,14 @@ class Downsample(torch.nn.Module):
         
     def forward(self, x, mask): # B x T x C
         
-        x = x * mask
         x = self.norm(x)
+        x = x * mask
         
         x = x.transpose(1, 2)
         x = self.conv(x)
         x = x.transpose(1, 2)
+        
+        x = x * mask
         
         return x # B x T x C 
     

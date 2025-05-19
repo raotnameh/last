@@ -6,60 +6,218 @@ import os
 
 from torch.nn.utils.rnn import pad_sequence
 
+import numpy as np
+from pyctcdecode import build_ctcdecoder
+import multiprocessing
 
-class ReinforceGrad(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, x, advantage):
-        # Save advantage for backward; it should already be baseline-adjusted
-        ctx.save_for_backward(advantage)
-        return x  # identity on the forward pass
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        # Retrieve saved advantage (shape b, t, c)
-        (advantage,) = ctx.saved_tensors
-        # Detach so we don't backprop into the advantage calculation
-        adv = advantage.detach()
-        # Scale the incoming gradient by the advantage
-        return grad_output * adv, None  # no gradient w.r.t. advantage
-
-# # Usage in your model:
-# z = your_layer(x)                           # -> (b, t, c)
-# # `advantage` must be shape (b, t, c), computed beforehand
-# z_reinforced = ReinforceGrad.apply(z, advantage)
-# # proceed with the rest of your network…
-
-# advantage = self.rl_loss_from_logits()
-# cur_z_q = ReinforceGrad.apply(cur_z_q, advantage)
-    
-    
-class FirstTimeStepWithBroadcastGrad(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, x):
-        # x: (t, c)
-        ctx.save_for_backward(x)
-        return x[0:1, :]  # (1, c)
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        x, = ctx.saved_tensors
-        t, c = x.shape
-        # Broadcast grad_output (1, c) -> (t, c)
-        grad_input = grad_output.expand(t, -1)
-        return grad_input
-    
+# Tokenizer module that tokenizes the speech encoder output by finding the closest codebook
 class Tokenizer(nn.Module):
-    def __init__(self, config, vocab, rot=True, beams=1):
+    def __init__(self, config, codebook, groups=2, temp=1,epsilon=0.5):
         super(Tokenizer, self).__init__()
-        '''
-        Tokenizer module that tokenizes the speech encoder output by finding the closest codebook
-        '''
-
-        self.beams = beams
-        self.vocab = vocab[1:] # remove the padding token
-        self.rot = rot
+        # temperature > 1.0: makes the distribution softer (more uniform).
+        # temperature < 1.0: makes the distribution sharper (more confident).
+        # temperature == 1.0: no change.
+        
+        self.epsilon = epsilon
+        self.temp = temp
+        self.codebook = codebook
+        torch.compile(self.codebook.model)
+        self.beam_size = groups
+        self.vocab = codebook.vocab[1:] # remove the padding token
         self.save_dir = config['logging']['dir']
         os.makedirs(f"{self.save_dir}/plots/", exist_ok=True)
+        self.decoder = decoder = build_ctcdecoder(["_" if x == "?" else x for x in self.vocab])
+        
+        self.old_logits = None
+    
+
+    def decode(self, logits, mask, iter=1):
+        """
+        # Args:
+            # logits: logit matrix of token log probabilities. [b,t,v]
+            # mask: [b,t]
+            # beam_width: maximum number of beams at each step in decoding
+            # beam_prune_logp: beams that are much worse than best beam will be pruned
+            # token_min_logp: tokens below this logp are skipped unless they are argmax of frame
+
+        # Returns:
+            # List of beams of type OutputBeam with various meta information
+
+        """
+
+        device = logits.device
+        # Constructing groups for GRPO
+        B,T,V = logits.shape
+        glogits = logits.detach().cpu().numpy() # b,t,v # group logits
+        lengths = mask.sum(dim=1).to(dtype=torch.int32).cpu()  # b,
+        logits_list = [glogits[b, :lengths[b], :] for b in range(B)]
+        with multiprocessing.get_context("fork").Pool(processes=32) as pool: out_list = self.decoder.decode_batch(pool, logits_list, beam_width=self.beam_size)    
+
+        ######## Advantage for each path decoded text. ########
+        top, sentences, groups = [], [], [] #  b*groups , different no of groups for each seq in the batch.
+        for t in out_list: 
+            groups.append(len(t))
+            top.append(t[0].text)
+            for i in t: sentences.append(i.text) 
+        # to get the start and end indices for each group
+        start, indices = 0, []
+        for g in groups:
+            end = start + g
+            indices.append((start, end))
+            start = end
+        
+        # Get the rewards using a LLM as Judge. 
+        with torch.no_grad():
+            inputs = self.codebook.tokenizer(sentences, return_tensors="pt", padding=True)
+            input_ids = inputs["input_ids"].to(device)
+            attention_mask = inputs["attention_mask"].to(device) # 0 for padding
+            
+            batch_size = 16
+            all_logits = []
+            for i in range(0, input_ids.size(0), batch_size):
+                batch_input_ids = input_ids[i:i+batch_size]
+                batch_attention_mask = attention_mask[i:i+batch_size]
+
+                outputs = self.codebook.model(input_ids=batch_input_ids, attention_mask=batch_attention_mask)
+                all_logits.append(outputs.logits)  # logits, shape (B, T, V)
+
+            # Concatenate logits along the batch dimension
+            logits = torch.cat(all_logits, dim=0)  # (total_B, T, V)
+
+            # Now apply log_softmax on concatenated logits
+            log_probs = F.log_softmax(logits, dim=-1)  # (total_B, T, V)
+                    
+            outputs = self.codebook.model(input_ids=input_ids, attention_mask=attention_mask)
+            log_probs = F.log_softmax(outputs.logits, dim=-1)  # (B, T, V)
+            
+            target_ids = input_ids[:, 1:]
+            log_probs = log_probs[:, :-1, :]
+            token_log_probs = log_probs.gather(dim=2, index=target_ids.unsqueeze(-1)).squeeze(-1)
+            target_mask = attention_mask[:, 1:]
+            token_log_probs = token_log_probs * target_mask
+            
+        rewards = token_log_probs.sum(dim=1) # per-sentence sum of log-probs shape: (B,)
+        
+        ######## Predicted indices for each path. ########
+        pred_ind = [torch.tensor(i.full_path, dtype=torch.long) for t in out_list for i in t] # list of tensors of shape T,
+        pred_ind_padded = pad_sequence(pred_ind, batch_first=True, padding_value=0).unsqueeze(-1).to(device) # B*self.beamsize,T,1
+        
+        lengths = [len(seq) for seq in pred_ind]
+        max_len = pred_ind_padded.size(1)
+        pred_ind_mask = torch.zeros(pred_ind_padded.size(0), max_len, dtype=torch.int, device=device) # B*self.beamsize,T
+        for i, length in enumerate(lengths): 
+            pred_ind_mask[i, :length] = 1  # mark valid tokens with 1
+
+        
+        # policy probailites for each path
+        per_token_logps, old_per_token_logps, advantages = [], [], []
+        if iter == 1: self.old_logits = logits.detach()
+        for b,(s,e) in enumerate(indices): 
+            # normalize to zero mean, unit std the grouped rewards
+            group_rewards = rewards[s:e]
+            group_advantage = (group_rewards - group_rewards.mean()) / ( group_rewards.std(unbiased=False) + 1e-8 ) # self.beamsize,
+            advantages.append(group_advantage)
+            
+            indices = pred_ind_padded[s:e,:,:]
+            policy_log_prob = torch.gather( 
+                                    logits[b,:,:].unsqueeze(0).expand(indices.shape[0],-1,-1),
+                                    dim=2,
+                                    index=indices)  # self.beamsize,T,1
+            per_token_logps.append(policy_log_prob)
+            
+            if iter > 1: 
+                old_policy_log_prob = torch.gather( 
+                                        self.old_logits[b,:,:].unsqueeze(0).expand(indices.shape[0],-1,-1),
+                                        dim=2,
+                                        index=indices)  # self.beamsize,T,1
+                old_per_token_logps.append(old_policy_log_prob)
+        
+        advantages = torch.cat(advantages, dim=0)
+        per_token_logps = torch.cat(per_token_logps, dim=0)
+        if iter <= 1: old_per_token_logps = per_token_logps.detach()
+        else: old_per_token_logps = torch.cat(old_per_token_logps, dim=0)
+        
+        coef_1 = torch.exp(per_token_logps - old_per_token_logps)
+        coef_2 = torch.clamp(coef_1, 1 - self.epsilon, 1 + self.epsilon)
+        print(coef_1)
+
+        ######## Reinforced policies ########
+        per_token_loss1 = coef_1.squeeze(-1) * advantages.unsqueeze(1) # self.beamsize,T,1
+        per_token_loss2 = coef_2.squeeze(-1) * advantages.unsqueeze(1)
+        
+        per_token_loss = -torch.min(per_token_loss1, per_token_loss2)
+        
+        loss = ((per_token_loss * pred_ind_mask).sum(-1) / pred_ind_mask.sum(-1).clamp(min=1.0)).mean()
+        # loss = ((per_token_loss * pred_ind_mask).sum(-1)).mean()
+        # loss = (per_token_loss * pred_ind_mask).sum()
+
+        return loss, top
+        
+
+    def forward(self, z, mask, writer=None, step=1, iter=1):
+        """
+        z (torch.Tensor): b,t,c
+        codebook (nn.Module): A module with a weight attribute of shape (vocab_size, embed_dim).
+        mask (torch.Tensor): Mask of shape (batch, time, 1) with 1s for valid positions and 0s for padding.
+        """  
+        
+        e = self.codebook.embedding.weight.clone().detach() # (vocab_size+1, embed_dim) 
+        e = e[1:,:] # remove the padding idx (vocab_size, embed_dim)       
+        
+        b, t, c = z.shape
+        z = F.normalize(z, dim=-1) # normlaize
+        z_flat = z.contiguous().view(-1, c) # (b * t, c)
+
+        d = self.dist(z_flat, e) # (b*t, vocab_size)
+        # converting distance to probs
+        log_probs = torch.nn.functional.log_softmax( -d.view(b, t, -1) / (self.temp/step), dim=-1) # shape: (b, t, vocab_size)
+        log_probs = log_probs * mask + (1 - mask) * (-1e9)
+        reinforce_loss, top = self.decode(log_probs, mask.squeeze(-1), iter)
+        
+
+        # Quantized
+        min_encoding_indices = torch.argmin(d, dim=1).unsqueeze(1) # (b * t, 1)
+        min_encodings = torch.zeros(min_encoding_indices.shape[0], e.shape[0], device=z.device)  # (b * t, vocab_size)
+        min_encodings.scatter_(1, min_encoding_indices, 1)  # (b * t, vocab_size)
+        # 5. Quantized latents via direct indexing
+        z_q = torch.matmul(min_encodings, e).view(b,t,c) * mask # (batch, time, channels) 
+        # Losses
+        commitment_loss, smoothness_loss = self.loss(z, z_q, mask)
+        # Angle between the z and z_q
+        if writer and step % 1000 == 0:
+            theta = torch.sum(z_flat * z_q.contiguous().view(-1, c), dim=1, keepdim=True) * mask.view(-1,1) # (batch*time, 1)
+            
+            writer.add_scalar('tokenizer/theta_mean', theta.mean().item(), step)
+            writer.add_scalar('tokenizer/theta_std', theta.std().item(), step)
+            writer.add_scalar('tokenizer/theta_max', theta.max().item(), step)
+            writer.add_scalar('tokenizer/theta_min', theta.min().item(), step)
+            
+        self.codebook_usage(min_encodings, mask.contiguous().view(-1, 1), step)
+        
+        return smoothness_loss, commitment_loss, reinforce_loss, top # smoothness_loss, commitment_loss, reinforce_loss
+    
+    
+    def dist(self, z_flat, e):
+        # distances from z to codebooks e_j (z - e)^2 = z^2 + e^2 - 2 e * z
+        d = (torch.sum(z_flat**2, dim=1, keepdim=True) \
+            - 2 * z_flat @ e.t() \
+                + torch.sum(e**2, dim=1, keepdim=True).t() 
+        ) # (b*t, vocab_size)
+        
+        return d
+    
+    
+    def loss(self, z, z_q, mask): 
+        # commitment loss;  MSE loss between z and z_q ignoring padding positions
+        commitment_loss = F.mse_loss(z, z_q.detach(), reduction='none') * mask # btc
+        valid_count = mask.sum() * z.shape[-1] # Total number of valid (non-masked) elements
+        commitment_loss = commitment_loss.sum() / valid_count 
+        
+        # 9. Smoothness loss
+        smoothness_loss = F.mse_loss(z[:, :-1, :], z[:, 1:, :], reduction='none') * mask[:, 1:, :] 
+        smoothness_loss = smoothness_loss.sum() / valid_count 
+    
+        return commitment_loss, smoothness_loss
     
     def codebook_usage(self, min_encodings, mask, step):
         if step % 10 == 0:
@@ -84,180 +242,34 @@ class Tokenizer(nn.Module):
         return x - 2*torch.bmm(torch.bmm(x, w.unsqueeze(-1)), w.unsqueeze(1)) + 2*torch.bmm( torch.bmm(x, u.unsqueeze(-1).detach()), q.unsqueeze(1).detach())
     
           
-    def forward(self, z, codebook, mask, writer=None, step=1, skip_non_speech=False):
-        """
-        z (torch.Tensor): b,t,c
-        codebook (nn.Module): A module with a weight attribute of shape (vocab_size, embed_dim).
-        mask (torch.Tensor): Mask of shape (batch, time, 1) with 1s for valid positions and 0s for padding.
-        """  
-        
-        # use for reward modelling. 
-        student_prob = z.clone()
-        
-        z = F.normalize(z, dim=-1)
-        
-        # 1. Prepare codebook embeddings (detach to avoid training update)
-        e = codebook.embedding.weight.clone().detach() # (vocab_size+1, embed_dim) 
-        e = e[1:,:] # remove the padding embedding from the codebook # (vocab_size, embed_dim)       
-        # 2. Flatten z for distance computation: (b*t, c)
-        b, t, c = z.shape
-        z_flat = z.contiguous().view(-1, c) # (batch * time, channels==embed_dim)
-
-        # 3. distances from z to codebooks e_j (z - e)^2 = z^2 + e^2 - 2 e * z
-        d = (torch.sum(z_flat**2, dim=1, keepdim=True) \
-            - 2 * z_flat @ e.t() \
-                + torch.sum(e**2, dim=1, keepdim=True).t() 
-        ) # (b*t, vocab_size) (10*1000, 29)
-        
-        # 3.1 converting distance to probs
-        # log_probs = torch.nn.functional.log_softmax(-d, dim=1)  # shape: (b*t, vocab_size)
-        # topk_log_probs, topk_indices = torch.topk(log_probs, k=self.beams, dim=1)  # both shape: (b*t, 5) beam is 5
-        # # greedy_indices = topk_indices[:,:1]  # shape: (b * t,)
-        # top_z_q = []
-        # for beam in range(topk_indices.shape[1]): 
-        #     cur_min_encoding_indices = topk_indices[:,beam].unsqueeze(1) # (b * t, 1)
-        #     cur_min_encodings = torch.zeros(cur_min_encoding_indices.shape[0], e.shape[0], device=z.device)  # (b * t, vocab_size)
-        #     cur_min_encodings.scatter_(1, cur_min_encoding_indices, 1)  # (b * t, vocab_size)
-        #     # 5. Quantized latents via direct indexing
-        #     cur_z_q = torch.matmul(cur_min_encodings, e).view(b,t,c) # (batch, time, channels) 
-        #     top_z_q.append( cur_z_q)
           
-        # 4. find closest encodings
-        min_encoding_indices = torch.argmin(d, dim=1).unsqueeze(1) # (b * t, 1)
-        min_encodings = torch.zeros(min_encoding_indices.shape[0], e.shape[0], device=z.device)  # (b * t, vocab_size)
-        min_encodings.scatter_(1, min_encoding_indices, 1)  # (b * t, vocab_size)
-        # 5. Quantized latents via direct indexing
-        z_q = torch.matmul(min_encodings, e).view(b,t,c) # (batch, time, channels) 
-        
-        
-        # Angle between the z and z_q
-        x = z_flat # (batch*time, channels)
-        quantized = z_q.contiguous().view(-1, c) # (batch*time, channels)
-        theta = torch.sum(x * quantized, dim=1) # (batch*time)
-        theta_mask = theta > 0.5 # (batch*time) # Limitation of the roation trick. It avoids the rotation trick when the angle is too small. which results in opposite direction of gradeints for codebook  and  encoder output.
-        theta_mask = theta_mask.float().unsqueeze(1) # (batch*time, 1)
-        # count of theta_mask of value 1 
-        if writer and step % 1000 == 0:
-            writer.add_scalar('tokenizer/theta_mean', theta.mean().item(), step)
-            writer.add_scalar('tokenizer/theta_std', theta.std().item(), step)
-            writer.add_scalar('tokenizer/theta_max', theta.max().item(), step)
-            writer.add_scalar('tokenizer/theta_min', theta.min().item(), step)
-            writer.add_scalar('tokenizer/theta_mask_mean', theta_mask.sum().item(), step)
-        
-        # # 6. Apply rotation trick on already normalized vectors           
-        # r_z_q = self.get_very_efficient_rotation(x , quantized, x.unsqueeze(1)).squeeze() 
-        # # 7. Straight-through estimator and mask padding
-        # s_z_q = z_flat + (quantized - z_flat).detach() # btc  
-        
-        # z_q = theta_mask * r_z_q + (1 - theta_mask) * s_z_q # btc   
-        # z_q = z_q.contiguous().view(b, t, c) # (batch, time, channels)
-        # z_q = z_q * mask
-        
-        # 7. Straight-through estimator and mask padding
-        z_q = z_flat + (quantized - z_flat).detach() # b*t,c  
-        z_q = z_q.contiguous().view(b, t, c) # (batch, time, channels)
-        z_q = z_q * mask
-        
-        # 8. commitment loss;  MSE loss between z and z_q ignoring padding positions
-        commitment_loss = F.mse_loss(z, z_q.detach(), reduction='none') * mask # btc
-        valid_count = mask.sum() * z.shape[-1] # Total number of valid (non-masked) elements
-        commitment_loss = commitment_loss.sum() / valid_count 
-        
-        # 9. Smoothness loss
-        smoothness_loss = F.mse_loss(z[:, :-1, :], z[:, 1:, :], reduction='none') * mask[:, 1:, :] 
-        smoothness_loss = smoothness_loss.sum() / valid_count 
-        
-        # 10. Discriminator codebooks without repeated indices #####
-        encodings = min_encoding_indices.view(z.shape[0], z.shape[1]) # ( batch, time ) # (B, T)
-        n_student_probs, n_z_q, n_mask, selected_encodings_list, selected_encodings_repeated_list = self.remove_consecutive_repeated_indices( encodings, mask.squeeze(-1), z_q.clone(), student_prob, skip_non_speech) # randomly pick one index from each group of consecutive repeating elements # shape (B,T) and also returns the mask 
-
-        # codebook usage Distribution
-        self.codebook_usage(min_encodings, mask.contiguous().view(-1, 1), step)
-
-        return n_student_probs, smoothness_loss, commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list, selected_encodings_repeated_list # commitment_loss, z_q, n_z_q, n_mask, selected_encodings_list<=
-
-
-    def remove_consecutive_repeated_indices(self, min_encoding_indices, mask, z_q, student_prob, skip_non_speech=False):
-
-        B, T, C = z_q.shape
-        
-        selected_encodings_list = []
-        selected_encodings_repeated_list = []
-        n_z_qs = []
-        n_student_probs = []
-        
-        max_len = 0
-        
-        masks_tensor = torch.zeros((B, T), dtype=torch.float, device=mask.device)
-        
-        for b in range(B):
-            indices = min_encoding_indices[b]    # (T,)
-            mask_b = mask[b]                     # (T,)
-            z_q_b = z_q[b]                       # (T, C)
-            # student_prob_b = student_prob[b] 
-
-            # how many valid frames until first zero in mask
-            valid_len = int(mask_b.sum())
-
-            # crop to valid region
-            indices = indices[:valid_len]
-            z_q_b = z_q_b[:valid_len]
-            # student_prob_b = student_prob_b[:valid_len]
-            
-            # collapse runs of identical indices
-            unique_vals, counts = torch.unique_consecutive(indices, return_counts=True)
-            ends  = torch.cumsum(counts, dim=0)
-            starts = torch.cat((torch.tensor([0], device=ends.device), ends[:-1]))
-            lengths = ends - starts
-
-            selected_encodings = []
-            selected_encodings_repeated = []
-            n_z_q = []
-            # n_student_prob = []
-            
-            # iterate segments (far fewer than T if many repeats)
-            for v, s, e, length in zip(unique_vals, starts, ends, lengths):
-                # record each frame’s encoding+1
-                selected_encodings_repeated.extend([v + 1] * length) # +1 to avoid padding token
-                
-                if v == 28 and skip_non_speech: continue # skip non-speech runs
-                
-                # mark the last frame of this segment
-                selected_encodings.append(v + 1) # +1 to avoid padding token
-
-                segment = z_q_b[s:e]  # shape (length, C)
-                n_z_q.append( FirstTimeStepWithBroadcastGrad.apply(segment) )
-                
-                # student_segment = student_prob_b[s:e]
-                # n_student_prob.append( FirstTimeStepWithBroadcastGrad.apply(student_segment) )
-                
-            # append per-batch results
-            selected_encodings_list.append(selected_encodings)
-            selected_encodings_repeated_list.append(selected_encodings_repeated)
-            try:
-                n_z_qs.append(torch.cat(n_z_q, dim=0))  # (num_segs, C)
-                # n_student_probs.append(torch.cat(n_student_prob, dim=0))  # (num_segs, C)
-            except: 
-                print(n_z_q)
-                n_z_qs.append(torch.zeros((1, C), device=z_q.device, dtype=z_q.dtype))
-                # n_student_probs.append(torch.zeros((1, C), device=z_q.device, dtype=z_q.dtype))
-            
-            # build mask and track max length
-            L = len(selected_encodings)
-            masks_tensor[b, :L] = 1.0
-            max_len = max(max_len, L)
-        
-        # finalize masks and pad n_z_qs
-        masks = masks_tensor[:, :max_len].unsqueeze(-1)  # (B, max_len, 1)
-        n_z_qs = pad_sequence(n_z_qs, batch_first=True)  # (B, max_len, C)
-        n_z_qs *= masks
-           
-        # n_student_probs = pad_sequence(n_student_probs, batch_first=True)
-        # n_student_probs *= masks
-        n_student_probs = n_z_qs
           
-        return n_student_probs, n_z_qs, masks, selected_encodings_list, selected_encodings_repeated_list    # shape (B, max_len, channels), mask shape (B, max_len, 1), list of selected encodings
-    
-        
-        
-        
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          
+          

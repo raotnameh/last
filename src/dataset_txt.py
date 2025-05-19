@@ -21,7 +21,6 @@ class Dataset_txt(Dataset):
         # creating the vocab.
         self.vocab = self.build_vocab(texts)
         logging.info(f"Done building VOCAB")
-        self.save_histogram(texts)
         
         self.texts = texts
         self.texts = sorted(self.texts, key=len)
@@ -31,66 +30,8 @@ class Dataset_txt(Dataset):
         
         logging.info(f"Vocab Size: {len(self.vocab)}")
         logging.info(f"Vocab: {self.vocab}")
-        logging.info(f"-p- is for padding and -?- is for silence")
+        logging.info(f"-p- is for padding and -?- is for non speech")
         
-    def save_histogram(self, texts):
-        import os
-        if os.path.exists('REAL_codebook_usage_distribution.png'): 
-            logging.warning("Histogram already exists. Skipping save.")
-            return 
-        
-        texts = self.add_question_marks(texts)
-
-        logging.info(f"Saving histogram of the REAL text data.")
-        char_counts = Counter("".join(texts))  # Example output: [('a', 2), ('d', 1)]
-        char_counts = dict(char_counts)
-        print(f"char_counts: {char_counts}")
-        c = [char_counts[v] for v in self.vocab if v not in ["p"]]  # Exclude padding and silence tokens
-        c = np.array(c, dtype=np.float32)
-        c /= c.sum()  # Normalize the counts to get probabilities
-        
-        self.prior = c # save the counts as prior for kl loss.
-        
-        # Plotting the histogram
-        plt.figure(figsize=(10, 6))
-        plt.bar(self.vocab[1:], c, color='blue', alpha=0.7)
-        plt.xlabel('Codebook Entry (Char)')
-        plt.ylabel('Probability')
-        plt.title('Codebook Usage Distribution')
-        plt.grid(axis='y')
-        plt.savefig('REAL_codebook_usage_distribution.png', bbox_inches='tight')
-        
-        
-    def add_question_marks(self, texts=[]):
-        logging.info(f"Preprocessing the text data by adding silence tokens.")
-        
-        modified_texts = []
-        for sentence in tqdm(texts):
-            modified_sentence = ['?']# Add question marks at start 
-            previous_char = None
-            for char in sentence:
-                # if  char == previous_char insert a question mark
-                if previous_char == char:
-                    modified_sentence.append("?")
-                
-                modified_sentence.append(char)
-    
-                # Randomly insert question marks with 0.25 probability
-                if random.random() < 0.25 and modified_sentence[-1] != '?':
-                    modified_sentence.append("?")
-                
-                previous_char = char
-                    
-            if modified_sentence[-1] != '?': 
-                modified_sentence.append("?")  # Add a question mark at the end
-            modified_texts.append("".join(modified_sentence))
-        logging.info(f"Preprocessing done.")
-        logging.info(f"Modified text sample")
-        logging.info(f"{random.choice(modified_texts)}")
-        logging.info(f"{random.choice(modified_texts)}")
-        
-        return  modified_texts
-
     def build_vocab(self, texts):
         """
         Creates a sorted list of unique characters with special tokens.
@@ -115,32 +56,9 @@ class Dataset_txt(Dataset):
     def __getitem__(self, idx):
         text = self.texts[idx]
         
-        if self.skip_non_speech:
-            input_ids = self.encode(text)
-            return input_ids
-        
-        result = ["?"]
-        prev_char = ""
-
-        for char in text:
-            if char == prev_char:
-                result.append("?")
-            result.append(char)
-
-            # Slightly more efficient: only check random if not already '?'
-            if result[-1] != "?" and random.random() < 0.25:
-                result.append("?")
-
-            prev_char = char
-
-        # Ensure it ends with a question mark
-        if result[-1] != "?":
-            result.append("?")
-
-        modified_text = "".join(result)
-        input_ids = self.encode(modified_text)
+        input_ids = self.encode(text)
         return input_ids
-        
+    
     def collate_fn(self, batch):
         inp = [item for item in batch]
         pad_token_id = self.char_to_idx['p']

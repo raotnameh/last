@@ -8,7 +8,6 @@ from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_sequence
 
-from models.gtruth import Gtruth
 from tqdm import tqdm
 
 

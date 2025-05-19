@@ -26,12 +26,8 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 from dataset_speech import Dataset_speech
 from dataset_txt import Dataset_txt
 from models.codebook import Codebook
-from models.decoder.decoder import Decoder, Upsample
-from models.discriminator import Discriminator
 from models.encoder import Encoder, Downsample
 from models.tokenizer import Tokenizer
-from models.gtruth import Gtruth
-from loss import Loss
 
 from utils_train import * 
 
@@ -120,7 +116,6 @@ def setup_models(config, vocab):
     models = {
         'codebook': Codebook(vocab, config['codebook']['model_name']),
         'encoder': Encoder(config['encoder']['ckpt_path']),
-        'gtruth': Gtruth(), # Always non trainable
     }
     
     models["downsample"] = Downsample(
@@ -131,34 +126,13 @@ def setup_models(config, vocab):
         groups=config['downsample']['groups'], 
         )
     
-    models['tokenizer'] = Tokenizer(config,vocab=models['codebook'].vocab)
-    
-    models['upsample'] = Upsample(
-        input_dim=models['codebook'].embedding.weight.shape[1],
-        output_dim=config["decoder"]["transformer"]["decoder_hidden"],
-        kernel_size=config['upsample']['kernel_size'],
-        stride=config['upsample']['stride'],
-        groups=config['upsample']['groups'],
-        
-        )
- 
-    models['decoder'] = Decoder(config['decoder'])
-    
-    models['discriminator'] = Discriminator(
-        in_channels=models['codebook'].embedding.weight.shape[1], 
-        hidden_dim=config['discriminator']['hidden_dim'], 
-        num_layers=config['discriminator']['num_layers'], 
-        kernel_size=config['discriminator']['kernel_size'],
-        )
+    models['tokenizer'] = Tokenizer(config, models['codebook'], config["train"]["groups"])
     
     logging.info(f"Size of codebook: {models['codebook'].embedding.weight.shape[0]} x {models['codebook'].embedding.weight.shape[1]}")
     logging.info(models['encoder'])
     logging.info(models['downsample'])
     logging.info(models['codebook'])
     logging.info(models['tokenizer'])
-    logging.info(models['upsample'])
-    logging.info(models['decoder'])
-    logging.info(models['discriminator'])
     
     # Log model parameters
     total_params = 0
@@ -189,8 +163,10 @@ def configure_training_mode(models, config):
             param.requires_grad = False
         else:
             param.requires_grad = True
-        
-        logging.info(f"Trainable parameter: {name} - {param.requires_grad}")
+    
+    for name, param in models['encoder'].named_parameters():
+        param.requires_grad = False
+        if param.requires_grad: logging.info(f"Trainable parameter: {name} - {param.requires_grad}")
             
     # Log trainable parameters
     total_params = 0
@@ -204,34 +180,17 @@ def configure_training_mode(models, config):
 
 
 # step :- Prepare the optimizer
-def configure_optimizers(models, config):
+def configure_optimizers(models, config, dataloader):
     """Initialize optimizers for different model components using AdamW."""
 
-    optimizers = {
-        'enc': optim.AdamW(
-            [p for p in models['encoder'].parameters() if p.requires_grad],
-            lr=config['train']['lr_enc'],
-            betas=(0.5, 0.999),
-        ),
-        'down': optim.AdamW(
-            [p for p in models['downsample'].parameters() if p.requires_grad],
-            lr=config['train']['lr_down'],
-            betas=(0.5, 0.999),
-        ),
-        'dec': optim.AdamW(
-            [p for p in models['upsample'].parameters() if p.requires_grad] +
-            [p for p in models['decoder'].parameters() if p.requires_grad],
-            lr=config['train']['lr_dec'],
-            betas=(0.5, 0.999),
-        ),
-        'disc': optim.AdamW(
-            [p for p in models['discriminator'].parameters() if p.requires_grad],
-            lr=config['train']['lr_disc'],
-            betas=(0.5, 0.999),
-        )
-    }
-     
-    
+    optimizer = optim.AdamW(
+            [p for p in models['encoder'].parameters() if p.requires_grad] + [p for p in models['downsample'].parameters() if p.requires_grad],
+            lr=config['train']['lr'],
+            betas=(0.9, 0.99),
+            weight_decay=0.1, 
+    )   
+        
+
     def tri_stage_scheduler(optimizer, total_steps, phase_ratio=[0.03, 0.9, 0.07], low=1e-2):
         """
         Tri-stage LR scheduler that applies:
@@ -260,21 +219,17 @@ def configure_optimizers(models, config):
 
     
     phase_ratio = config['lr_scheduler']['phase_ratio']
-    total_steps = config['train']['num_steps']
+    total_steps = config['train']['epochs'] * len(dataloader)
+    logging.info(f"Total number of steps: {total_steps}")
     
-    schedulers = {
-        'enc': tri_stage_scheduler(optimizers['enc'], total_steps, phase_ratio),
-        'down': tri_stage_scheduler(optimizers['down'], total_steps, phase_ratio),
-        'dec': tri_stage_scheduler(optimizers['dec'], total_steps, phase_ratio),
-        'disc': tri_stage_scheduler(optimizers['disc'], total_steps, phase_ratio),
-    }
+    scheduler = tri_stage_scheduler(optimizer, total_steps, phase_ratio)
     
-    return optimizers, schedulers
+    return optimizer, scheduler
     
 
-def load_checkpoint(checkpoint_path, models, optimizers, schedulers, device):
+def load_checkpoint(checkpoint_path, models, optimizers, schedulers):
     """Load model and optimizer states from checkpoint."""
-    checkpoint = torch.load(checkpoint_path, map_location=device)
+    checkpoint = torch.load(checkpoint_path, map_location="cpu")
     
     # Load model states
     for name, model in models.items():
@@ -295,12 +250,6 @@ def load_checkpoint(checkpoint_path, models, optimizers, schedulers, device):
         if name in checkpoint['schedulers']:
             scheduler.load_state_dict(checkpoint['schedulers'][name])
 
-    # Return additional info
-    return {
-        'step': checkpoint['step'],
-        'num_steps': checkpoint['num_steps'],
-        'config': checkpoint['config']
-    }
 
 def main():
     args = parse_args()
@@ -340,7 +289,7 @@ def main():
     logging.info(f"Config after command-line overrides: {config}")
     
     # Initialize datasets and models
-    train_speech_loader, text_dataset, text_loader, vocab = initialize_datasets(config, split='train', shuffle=True, bsz = config['dataset_speech']['batch_size'])
+    train_speech_loader, _, _, vocab = initialize_datasets(config, split='train', shuffle=True, bsz = config['dataset_speech']['batch_size'])
     val_speech_loader = initialize_datasets(config, split='val', shuffle=False, bsz = config['dataset_speech']['batch_size'])
     test_speech_loader = initialize_datasets(config, split='test', shuffle=False, bsz = config['dataset_speech']['batch_size'])
     
@@ -356,9 +305,8 @@ def main():
     for name in models:
         models[name].to(device)
 
-    # Initialize optimizers and loss
-    optimizers, schedulers = configure_optimizers(models, config)
-    loss_module = Loss(config)
+    # Initialize optimizers
+    optimizer, scheduler = configure_optimizers(models, config, train_speech_loader)
     
     # root dir for saving 
     save_dir = config['logging']['dir']
@@ -367,43 +315,24 @@ def main():
     writer = SummaryWriter(log_dir=config['logging']['dir'])
     
     # Resume training if checkpoint specified
-    start_step = 1
     if config['train']['resume_checkpoint']:
-        checkpoint_info = load_checkpoint(
+        load_checkpoint(
             config['train']['checkpoint_path'],
             models,
-            optimizers,
-            schedulers,
-            device
+            optimizer,
+            scheduler,
         )
-        start_step = checkpoint_info['step'] + 1
-        logging.info(f"Resuming training from step {start_step}")
     
-    
-    if config['eval']['eval']:
-        eval(
-            models=models,
-            speech_loader=speech_loader[1],
-            loss_module=loss_module,
-            config=config,
-            device=device,
-        )
-        
-    else: 
-        train(
-            models=models,
-            optimizers=optimizers,
-            schedulers=schedulers,
-            speech_loader=speech_loader,
-            text_loader=text_loader,
-            text_dataset=text_dataset,
-            loss_module=loss_module,
-            config=config,
-            device=device,
-            writer=writer,
-            start_step=start_step,  # Add this
-            save_dir=save_dir,
-        )
+    train(
+        models=models,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        speech_loader=speech_loader,
+        config=config,
+        device=device,
+        writer=writer,
+        save_dir=save_dir,
+    )
 
     writer.close()
 
