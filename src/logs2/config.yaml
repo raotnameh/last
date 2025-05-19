@@ -3,14 +3,14 @@ checkpoint:
 codebook:
   model_name: meta-llama/Llama-3.2-1B
 dataset_speech:
-  batch_size: 4
+  batch_size: 16
   max_duration: 160000
   min_duration: 32000
   test_path: /raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/test.tsv
   train_path: /raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/train.tsv
   val_path: /raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/val.tsv
 dataset_txt:
-  batch_size: 4
+  batch_size: 16
   path: /raid/home/rajivratn/hemant_rajivratn/last/data/txt/train.wrd
   skip_non_speech: true
 device: cuda
@@ -32,14 +32,14 @@ lr_scheduler:
   - 0.0
   - 0.99
 train:
-  accumulation_steps: 2
+  accumulation_steps: 1
   epochs: 10
-  epsilon: 0.5
+  epsilon: 0.2
   freeze_epochs: 1
   grad_clip: 1.0
-  groups: 32
-  iters: 2
-  lr: 1.0e-05
+  groups: 8
+  iters: 5
+  lr: 0.0001
   resume_checkpoint: false
   resume_path: checkpoints/step_10000.pth
   seed: 42123

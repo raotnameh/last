@@ -39,7 +39,6 @@ def train(
     freeze_epochs = config['train']["freeze_epochs"]
     epochs = config['train']["epochs"]
     
-    
     accumulation_steps = config['train']['accumulation_steps']  # Get accumulation steps, default to 1 if not provided.
     logging.info(f"Using gradient accumulation with {accumulation_steps} steps.")
 
