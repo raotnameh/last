@@ -31,35 +31,31 @@ class Tokenizer(nn.Module):
         
         self.old_logits = None
     
-
     def decode(self, logits, mask, iter=1):
         """
         # Args:
             # logits: logit matrix of token log probabilities. [b,t,v]
             # mask: [b,t]
             # beam_width: maximum number of beams at each step in decoding
-            # beam_prune_logp: beams that are much worse than best beam will be pruned
-            # token_min_logp: tokens below this logp are skipped unless they are argmax of frame
-
         # Returns:
             # List of beams of type OutputBeam with various meta information
 
         """
-
         device = logits.device
         # Constructing groups for GRPO
         B,T,V = logits.shape
         glogits = logits.detach().cpu().numpy() # b,t,v # group logits
         lengths = mask.sum(dim=1).to(dtype=torch.int32).cpu()  # b,
         logits_list = [glogits[b, :lengths[b], :] for b in range(B)]
-        with multiprocessing.get_context("fork").Pool(processes=16) as pool: 
-            out_list = self.decoder.decode_batch(pool, logits_list, beam_width=self.beam_size)    
+        with multiprocessing.get_context("fork").Pool(processes=32) as pool: 
+            out_list = self.decoder.decode_batch(pool, logits_list, beam_width=self.beam_size)   
         ######## Advantage for each path decoded text. ########
         top, sentences, groups = [], [], [] #  b*groups , different no of groups for each seq in the batch.
         for t in out_list: 
             groups.append(len(t))
             top.append(t[0].text)
-            for i in t: sentences.append(i.text) 
+            for i in t: sentences.append(i.text)
+    
         # to get the start and end indices for each group
         start, indices = 0, []
         for g in groups:
@@ -83,7 +79,7 @@ class Tokenizer(nn.Module):
             token_log_probs = token_log_probs * target_mask
             
         rewards = token_log_probs.sum(dim=1) # per-sentence sum of log-probs shape: (B,)
-        
+
         ######## Predicted indices for each path. ########
         pred_ind = [torch.tensor(i.full_path, dtype=torch.long) for t in out_list for i in t] # list of tensors of shape T,
         pred_ind_padded = pad_sequence(pred_ind, batch_first=True, padding_value=0).unsqueeze(-1).to(device) # B*self.beamsize,T,1
@@ -154,24 +150,9 @@ class Tokenizer(nn.Module):
 
         d = self.dist(z_flat, e) # (b*t, vocab_size)
         
-        n_steps = 100000
-        target = 0.001
-        step_size = (target - self.temp) / (n_steps - 1)
-        prob = random.random()
-        if prob < 0.9:
-            try: 
-                temp = [self.temp + step_size * i for i in range(n_steps)][step]
-            except: 
-                temp = target
-        elif prob < .95: 
-            temp = 0.0001
-        else: 
-            temp = 1000
-        
         # converting distance to probs
-        log_probs = torch.nn.functional.log_softmax( -d.view(b, t, -1) / temp, dim=-1) # shape: (b, t, vocab_size)
+        log_probs = torch.nn.functional.log_softmax( -d.view(b, t, -1) / self.temp, dim=-1) # shape: (b, t, vocab_size)
         reinforce_loss, top = self.decode(log_probs, mask.squeeze(-1), iter)
-        
 
         # Quantized
         min_encoding_indices = torch.argmin(d, dim=1).unsqueeze(1) # (b * t, 1)
@@ -234,40 +215,4 @@ class Tokenizer(nn.Module):
             plt.savefig(os.path.join(f'{self.save_dir}/plots', f'codebook_usage_distribution_{step}.png'), bbox_inches='tight')
             plt.close()
    
-    @staticmethod
-    def get_very_efficient_rotation( u, q, x):
-        w = F.normalize(u + q, dim=1).detach()
-        return x - 2*torch.bmm(torch.bmm(x, w.unsqueeze(-1)), w.unsqueeze(1)) + 2*torch.bmm( torch.bmm(x, u.unsqueeze(-1).detach()), q.unsqueeze(1).detach())
     
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          
-          

@@ -112,6 +112,8 @@ def train(
                     logging.info(f"Training loss ---- epoch - step - loss - CER - WER: {epoch} - {step} - {total_loss} - {cer_pred} - {wer_pred}")                
                     logging.info(F"True txt: {txt[0]}")
                     logging.info(F"Pred txt: {top[0]}")
+                    logging.info(F"Pred txt: {len(txt[0].split()) / dur[0]} - {dur[0]}")
+                    
 
                     # logging error rates
                     writer.add_scalar('error/cer', cer_pred, step)
@@ -142,7 +144,7 @@ def train(
                     # Zero gradients after the step
                     optimizer.zero_grad()
                     
-                    step += 1
+                step += 1
             
 
     checkpoint_path = f"{save_dir}/checkpoints/step_{step:06d}.pt"
