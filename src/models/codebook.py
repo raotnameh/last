@@ -64,33 +64,13 @@ class Codebook(nn.Module):
             max_val = embedding.weight.data[i].max().item()
             logging.info(f"{char}\t{mean:.4f}\t{std:.4f}\t{min_val:.4f}\t{max_val:.4f}")
         
-
         # Remove the model and tokenizer
-        # del self.model
-        # del self.tokenizer
+        del self.model
+        del self.tokenizer
         
     def forward(self, x): # x: (b,t) tensor
         return self.embedding(x) # (b,t,c)
     
-    
-    def lmscoring(self, target, inputs_embeds, mask):
-        """
-        Args:
-            target: [batch, seq_len] tensor of token ids
-            inputs_embeds: [batch, seq_len, dim] tensor of input embeddings
-            mask: [batch, seq_len] binary mask (1 for real tokens, 0 for padding tokens)
-        Returns:
-            logits
-            perplexity: scalar reward. lower perplexity means higher fluency. Perplexity amplifies small differences in likelihood — sharper gradient between “okay” and “bad” generations. Perplexity will sharply punish the incoherence — because the cumulative mismatch to a fluent sequence blows up exponentially. Perplexity harshly penalizes the outputs because it reflects how unlikely they are under a real language model.
-        """
-    
-        mask = mask.float()
-        outputs = self.model(inputs_embeds=inputs_embeds, mask=mask)
-
-        logits = outputs.logits       # [B, T, V]
-        sub_logits = self.subvocab_probs_from_logits(logits)
-        
-        return sub_logits
     
 
 if __name__ == "__main__":

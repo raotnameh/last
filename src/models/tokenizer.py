@@ -5,11 +5,12 @@ import matplotlib.pyplot as plt
 import os
 
 from torch.nn.utils.rnn import pad_sequence
+
+from utils import *
 import random
 
-import numpy as np
-from pyctcdecode import build_ctcdecoder
-import multiprocessing
+import re
+import torch
 
 # Tokenizer module that tokenizes the speech encoder output by finding the closest codebook
 class Tokenizer(nn.Module):
@@ -19,120 +20,188 @@ class Tokenizer(nn.Module):
         # temperature < 1.0: makes the distribution sharper (more confident).
         # temperature == 1.0: no change.
         
+        self.codebook = codebook
+        
         self.epsilon = epsilon
         self.temp = temp
-        self.codebook = codebook
-        torch.compile(self.codebook.model)
         self.beam_size = groups
+        
         self.vocab = codebook.vocab[1:] # remove the padding token
+        self.idx2char = {i:c for i,c in enumerate(self.vocab)}
+        
         self.save_dir = config['logging']['dir']
         os.makedirs(f"{self.save_dir}/plots/", exist_ok=True)
-        self.decoder = decoder = build_ctcdecoder(["_" if x == "?" else x for x in self.vocab])
         
         self.old_logits = None
+        
+        self.scorer = Scorer()
     
-    def decode(self, logits, mask, iter=1):
+    def decode(self, log_probs, mask, iter=1):
         """
-        # Args:
-            # logits: logit matrix of token log probabilities. [b,t,v]
-            # mask: [b,t]
-            # beam_width: maximum number of beams at each step in decoding
-        # Returns:
-            # List of beams of type OutputBeam with various meta information
+        Args:
+            log_probs: Tensor of shape [B, T, V]
+            mask: Tensor of shape [B, T]
+        Returns:
+            loss: scalar tensor
+            top_sent: list of best sentence strings per batch
+        """
+        B, T, V = log_probs.shape
+        device = log_probs.device
 
-        """
-        device = logits.device
-        # Constructing groups for GRPO
-        B,T,V = logits.shape
-        glogits = logits.detach().cpu().numpy() # b,t,v # group logits
-        lengths = mask.sum(dim=1).to(dtype=torch.int32).cpu()  # b,
-        logits_list = [glogits[b, :lengths[b], :] for b in range(B)]
-        with multiprocessing.get_context("fork").Pool(processes=32) as pool: 
-            out_list = self.decoder.decode_batch(pool, logits_list, beam_width=self.beam_size)   
-        ######## Advantage for each path decoded text. ########
-        top, sentences, groups = [], [], [] #  b*groups , different no of groups for each seq in the batch.
-        for t in out_list: 
-            groups.append(len(t))
-            top.append(t[0].text)
-            for i in t: sentences.append(i.text)
+        # Precompile regex to remove blanks and collapse repeats
+        blank_char = re.escape('?')  # adjust if blank differs
+        remove_blanks = re.compile(blank_char)
+        collapse_repeats = re.compile(r'(.)\1+')
+
+        def merge_string(s: str) -> str:
+            # remove blank symbols then collapse repeats
+            s = remove_blanks.sub('', s)
+            return collapse_repeats.sub(r'\1', s)
+
+        lengths = mask.sum(dim=1).long()  # [B]
+        loss = 0.0
+        top_sent = []
+
+        for b in range(B):
+            valid_len = lengths[b].item()
+            g_log_prob = log_probs[b, :valid_len, :].unsqueeze(0)  # [1, T', V]
+
+            # Beam search
+            sequences, _ = beam_search(g_log_prob, self.beam_size)  # [1, beams, T']
+            beams = sequences.size(1)
+
+            # Sample indices and select sequences
+            sample_idxs = torch.randint(0, beams, (32,), device=device)
+            sampled_seqs = sequences[0, sample_idxs]  # [32, T']
+
+            # Convert token sequences to strings using regex merge
+            sentences = []
+            for seq in sampled_seqs:
+                chars = [self.idx2char[i] for i in seq.tolist()]
+                raw = ''.join(chars)
+                sentences.append(merge_string(raw))
+            top_sent.append(sentences[0])
+
+            # Compute advantages
+            advantages = self.scorer.step(sentences).to(device)  # [32]
+
+            # Gather per-token log-probs
+            seq_idx = sampled_seqs.unsqueeze(-1)  # [32, T', 1]
+            per_token_logps = torch.gather(
+                g_log_prob.expand(32, -1, -1), 2, seq_idx
+            ).squeeze(-1)  # [32, T']
+
+            old_logps = per_token_logps.detach()
+            coef = torch.exp(per_token_logps - old_logps)
+
+            per_token_loss = -coef * advantages.unsqueeze(1)  # [32, T']
+            loss += per_token_loss.mean()
+
+        loss /= B
+        return loss, top_sent
+
+    # def decode(self, log_probs, mask, iter=1):
+    #     """
+    #     Args:
+    #         log_probs: Tensor of shape [B, T, V]
+    #         mask: Tensor of shape [B, T]
+    #     Returns:
+    #         loss: scalar tensor
+    #         top_sent: list of best sentence strings per batch
+    #     """
+    #     B, T, V = log_probs.shape
+    #     device = log_probs.device
+
+    #     lengths = mask.sum(dim=1).long()  # [B]
+    #     loss = 0.0
+    #     top_sent = []
+
+    #     for b in range(B):
+    #         valid_len = lengths[b].item()   # now a Python int, safe for slicing
+    #         g_log_prob = log_probs[b, :valid_len, :].unsqueeze(0)  # [1, T', V]
+
+    #         # Beam search: [1, beams, T']
+    #         sequences, _ = beam_search(g_log_prob, self.beam_size)
+            
+    #         # Sample 32 hypotheses
+    #         sample_idxs = torch.randint(0, sequences.size(1), (32,))
+    #         sampled_seqs = sequences[0, sample_idxs]  # [32, T']
+
+    #         # Convert token sequences to strings
+    #         sentences = [ctc_merge_string(''.join(self.idx2char[i] for i in row)) for row in sampled_seqs.tolist()]
+    #         top_sent.append(sentences[0])
+
+    #         # Score each sentence: [32]
+    #         advantages = self.scorer.step(sentences).to(device)  # [32]
+            
+    #         # Recompute per-token log probs for sampled sequences
+    #         # Prepare for gather: [1, T', V] and [32, T']
+    #         seq_idx = sampled_seqs.unsqueeze(-1)  # [32, T', 1]
+    #         per_token_logps = torch.gather(g_log_prob.expand(32, -1, -1), 2, seq_idx).squeeze(-1)  # [32, T']
+
+    #         # Baseline logprobs (detached)
+    #         old_logps = per_token_logps.detach()
+    #         coef = torch.exp(per_token_logps - old_logps)
+
+    #         # Loss: negative reward times the coefficient
+    #         per_token_loss = -coef * advantages.unsqueeze(1)  # [32, T']
+    #         loss += per_token_loss.mean()
+
+    #     loss /= B
+    #     return loss, top_sent
+
     
-        # to get the start and end indices for each group
-        start, indices = 0, []
-        for g in groups:
-            end = start + g
-            indices.append((start, end))
-            start = end
-        
-        # Get the rewards using a LLM as Judge. 
-        with torch.no_grad(): 
-            inputs = self.codebook.tokenizer(sentences, return_tensors="pt", padding=True)
-            input_ids = inputs["input_ids"].to(device)
-            attention_mask = inputs["attention_mask"].to(device) # 0 for padding
-            
-            outputs = self.codebook.model(input_ids=input_ids, attention_mask=attention_mask)
-            log_probs = F.log_softmax(outputs.logits, dim=-1)  # (B, T, V)
-   
-            target_ids = input_ids[:, 1:]
-            log_probs = log_probs[:, :-1, :]
-            token_log_probs = log_probs.gather(dim=2, index=target_ids.unsqueeze(-1)).squeeze(-1)
-            target_mask = attention_mask[:, 1:]
-            token_log_probs = token_log_probs * target_mask
-            
-        rewards = token_log_probs.sum(dim=1) # per-sentence sum of log-probs shape: (B,)
+    # def decode(self, log_probs, mask, iter=1):
+    #     """
+    #     # Args:
+    #         # log probabilities. [b,t,v]
+    #         # mask: [b,t]
+    #     # Returns:
+    #         # List of beams of type OutputBeam with various meta information
 
-        ######## Predicted indices for each path. ########
-        pred_ind = [torch.tensor(i.full_path, dtype=torch.long) for t in out_list for i in t] # list of tensors of shape T,
-        pred_ind_padded = pad_sequence(pred_ind, batch_first=True, padding_value=0).unsqueeze(-1).to(device) # B*self.beamsize,T,1
+    #     """
+    #     B,T,V = log_probs.shape
+    #     device = log_probs.device
         
-        lengths = [len(seq) for seq in pred_ind]
-        max_len = pred_ind_padded.size(1)
-        pred_ind_mask = torch.zeros(pred_ind_padded.size(0), max_len, dtype=torch.int, device=device) # B*self.beamsize,T
-        for i, length in enumerate(lengths): 
-            pred_ind_mask[i, :length] = 1  # mark valid tokens with 1
-
+    #     #### NEED TO MAKE SURE THAT BEAM SEARCH IS NOT BEING APPLIED ON MASKED INDICES
+    #     ############ ONE WAY IS DO EVERYTHONG BATCHWISE.ALSO EASY TO GET HE GROUPING AND WCEYRTOGN  AND TO OGNORE MASKING
         
-        # policy probailites for each path
-        per_token_logps, old_per_token_logps, advantages = [], [], []
-        if iter == 1: self.old_logits = logits.detach()
-        for b,(s,e) in enumerate(indices): 
-            # normalize to zero mean, unit std the grouped rewards
-            group_rewards = rewards[s:e]
-            group_advantage = (group_rewards - group_rewards.mean()) / ( group_rewards.std(unbiased=False) + 1e-8 ) # self.beamsize,
-            advantages.append(group_advantage)
+    #     g_log_probs= log_probs.clone().detach() # b,t,v # group logprob
+    #     lengths = mask.sum(dim=1).to(dtype=torch.int32)  # b,
+    #     g_log_probs_list = [g_log_probs[b,:lengths[b],:].unsqueeze(0) for b in range(B)] # bsz=1
+        
+    #     loss = 0.0
+    #     top_sent = []
+    #     for g_log_prob in g_log_probs_list:    
             
-            indices = pred_ind_padded[s:e,:,:]
-            policy_log_prob = torch.gather( 
-                                    logits[b,:,:].unsqueeze(0).expand(indices.shape[0],-1,-1),
-                                    dim=2,
-                                    index=indices)  # self.beamsize,T,1
-            per_token_logps.append(policy_log_prob)
+    #         # Perform beam search
+    #         sequences, _ = beam_search(g_log_prob, self.beam_size) #  1,beamsize,seq_len,  # 1, beamsize,
+    #         # To get different sequences. better and worse. 
+    #         samples = random.choices(range(sequences.shape[1]), k=32)
+    #         sequences = sequences[:,samples,:]  # 1, samples, seq_len
+
+    #         # Possible sentences to score.
+    #         rows = sequences[0].cpu().tolist() # beam,T
+    #         sentences = [ctc_merge_string( ''.join(self.idx2char[i] for i in row) ) for row in rows] # 1 * beam ,
+    #         top_sent.append(sentences[0])
+    #         # print(sentences)
             
-            if iter > 1: 
-                old_policy_log_prob = torch.gather( 
-                                        self.old_logits[b,:,:].unsqueeze(0).expand(indices.shape[0],-1,-1),
-                                        dim=2,
-                                        index=indices)  # self.beamsize,T,1
-                old_per_token_logps.append(old_policy_log_prob)
+    #         # Scorer
+    #         advantages = self.scorer.step(sentences).unsqueeze(-1).to(device) # samples,1
+            
+    #         per_token_logps = torch.gather(log_probs, 2, sequences.transpose(1,2)).transpose(1,2).squeeze(0) # samples, T
+    #         old_per_token_logps = per_token_logps.detach()
         
-        advantages = torch.cat(advantages, dim=0)
-        per_token_logps = torch.cat(per_token_logps, dim=0)
-        if iter <= 1: old_per_token_logps = per_token_logps.detach()
-        else: old_per_token_logps = torch.cat(old_per_token_logps, dim=0)
-        
-        coef_1 = torch.exp(per_token_logps - old_per_token_logps)
-        coef_2 = torch.clamp(coef_1, 1 - self.epsilon, 1 + self.epsilon)
+    #         coef_1 = torch.exp(per_token_logps - old_per_token_logps) # samples, T
 
-        ######## Reinforced policies ########
-        per_token_loss1 = coef_1.squeeze(-1) * advantages.unsqueeze(1) # self.beamsize,T,1
-        per_token_loss2 = coef_2.squeeze(-1) * advantages.unsqueeze(1)
+    #         per_token_loss = -coef_1 * advantages # samples, T
+            
+    #         loss += per_token_loss.mean() # ()
+            
+    #     loss /= B # mean by all the abtch and atheir groups
         
-        per_token_loss = -torch.min(per_token_loss1, per_token_loss2)
-        
-        loss = ((per_token_loss * pred_ind_mask).sum(-1) / pred_ind_mask.sum(-1).clamp(min=1.0)).mean()
-        # loss = ((per_token_loss * pred_ind_mask).sum(-1)).mean()
-        # loss = (per_token_loss * pred_ind_mask).sum()
-
-        return loss, top
+    
+    #     return loss, top_sent
         
     def forward(self, z, mask, writer=None, step=1, iter=1):
         """
