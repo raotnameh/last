@@ -33,11 +33,11 @@ lr_scheduler:
   - 0.9
 train:
   accumulation_steps: 1
-  epochs: 100
+  epochs: 10
   epsilon: 0.2
   freeze_epochs: 1
-  grad_clip: 1.0
-  groups: 512
+  grad_clip: 10.0
+  groups: 64
   iters: 2
   lr: 5.0e-05
   resume_checkpoint: false
