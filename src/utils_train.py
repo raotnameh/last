@@ -4,7 +4,7 @@ import os
 from jiwer import wer, cer
 
 import matplotlib.pyplot as plt
-import time
+
 
 # norm 
 def get_grad_norm(model):
@@ -78,11 +78,7 @@ def train(
             total_loss.backward()
                 
             if step % config['logging']['step'] == 0:  
-                cer_pred, wer_pred = compute_wer(txt, top)
-                
-                logging.info(f"step: {step} ----- Reinforce_loss/commitment_loss: {reinforce_loss}/{commitment_loss} ----- CER/WER: {cer_pred}/{wer_pred}")                
-                logging.info(F"True txt: {txt[0]}")
-                logging.info(F"Pred txt: {top[0]}")
+                logging.info(f"TRAINING ----- step: {step} ----- Reinforce_loss/commitment_loss: {reinforce_loss}/{commitment_loss} ----- CER/WER: {cer_pred}/{wer_pred}")
                 
                 # Plot
                 plt.figure(figsize=(10, 6))
@@ -94,10 +90,7 @@ def train(
                 
                 plt.savefig(os.path.join(f'{save_dir}/plots', f'codebook_usage_distribution_{step}.png'), bbox_inches='tight')
                 plt.close()
-    
-                # logging error rates
-                writer.add_scalar('error/cer', cer_pred, step)
-                writer.add_scalar('error/wer', wer_pred, step)
+                
                 # logging losses
                 writer.add_scalar('loss/loss', total_loss, step)
                 writer.add_scalar('loss/commit_loss', commitment_loss, step)
@@ -122,16 +115,52 @@ def train(
                 
             step += 1
             
+        # eval
+        with torch.no_grad():
+            models["downsample"].eval()
+            
+            pred, real = [], []
+            for batch in val_speech_loader:
+                # ===== Speech Data =====
+                waveforms, padding_masks, dur, paths, txt = batch
+                waveforms = waveforms.to(device) # [B, T]
+                padding_masks = padding_masks.to(device) # [B, T] true for masked, false for not masked means [False, False, ..., True, True]
 
-    checkpoint_path = f"{save_dir}/checkpoints/step_{step:06d}.pt"
-    torch.save({
-        'step': step,
-        'models': {k: v.state_dict() for k, v in models.items()},
-        'optimizers': optimizer.state_dict(), # Save optimizer state dict
-        'schedulers': scheduler.state_dict(), # Save scheduler state dict
-        'config': config
-    }, checkpoint_path)
-    logging.info(f"Saved checkpoint to {checkpoint_path}")
+                # ===== Encoder =====
+                enc_out, padding_mask  = models['encoder'](waveforms, padding_masks)  # [B, T//320, C], [B, T // 320, C] 
+                mask = ~padding_mask # 0 for masked positions.
+                mask = mask.float().unsqueeze(-1)
+                
+                # ===== Downsample =====
+                down_out = models['downsample'](enc_out, mask) # [B, T, codebook_dim]
+                
+                # ===== Tokenizer =====
+                smoothness_loss, commitment_loss, reinforce_loss, top, vocab, e_mean_np = models['tokenizer'](
+                    down_out, 
+                    mask,
+                    writer,
+                    step,
+                )
+                
+                real.extend(txt)
+                pred.extend(top)
+
+            cer_pred, wer_pred = compute_wer(real, pred)
+        
+            # logging error rates
+            logging.info(f"VALIDATION ----- step: {step} ----- Reinforce_loss/commitment_loss: {reinforce_loss}/{commitment_loss} ----- CER/WER: {cer_pred}/{wer_pred}")                
+            writer.add_scalar('error/cer', cer_pred, step)
+            writer.add_scalar('error/wer', wer_pred, step)
+            
+        checkpoint_path = f"{save_dir}/checkpoints/step_{step:06d}.pt"
+        torch.save({
+            'step': step,
+            'models': {k: v.state_dict() for k, v in models.items()},
+            'optimizers': optimizer.state_dict(), # Save optimizer state dict
+            'schedulers': scheduler.state_dict(), # Save scheduler state dict
+            'config': config
+        }, checkpoint_path)
+        logging.info(f"Saved checkpoint to {checkpoint_path}")
 
 def compute_wer(real_transcripts, pred_transcripts):
     wer_pred = wer(real_transcripts, pred_transcripts)

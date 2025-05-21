@@ -87,9 +87,9 @@ class Scorer:
         return rewards
 
     def char_to_word_ratio(self):
-        lens = np.array([len(s) for s in self.sentences])
+        char_lens = np.array([len(s) for s in self.sentences])
         word_counts = np.array([len(s.split(" ")) + 1 for s in self.sentences])
-        cur = lens / word_counts
+        cur = char_lens / word_counts
         reward = -np.abs(self.avg_char - cur)
 
         reward = torch.tensor(reward)
@@ -124,7 +124,7 @@ class Scorer:
             chars = ''.join(s)
             char_counts = Counter(chars)
             total_chars = sum(char_counts.values())
-            reward[i] = sum(-abs(char_counts[c] / total_chars - self.char_probs[c]) for c in char_counts if c in self.char_probs)
+            reward[i] = sum(-abs(char_counts[c] / total_chars - self.char_probs[c]) for c in char_counts) / total_chars
 
         reward = torch.tensor(reward)
         std = reward.std(unbiased=False)

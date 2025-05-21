@@ -13,8 +13,8 @@ dataset_speech:
   test_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/test.tsv"
 
   min_duration: 32000
-  max_duration: 160000
-  batch_size: &batch_size_value 8
+  max_duration: 80000
+  batch_size: &batch_size_value 64
 
 dataset_txt:
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train.wrd"
@@ -38,10 +38,10 @@ downsample:
 train:
   seed: 42123
 
-  temp: 10.0
-  groups: 64 # this is the beam size.
+  temp: 5.0
+  groups: 512 # this is the beam size.
 
-  lr: 0.00005
+  lr: 0.0001
   grad_clip: 1.0
   
   steps: 100000
