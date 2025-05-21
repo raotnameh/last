@@ -4,7 +4,7 @@ import os
 from jiwer import wer, cer
 
 import matplotlib.pyplot as plt
-
+import time
 
 # norm 
 def get_grad_norm(model):
@@ -45,11 +45,13 @@ def train(
     models["encoder"].eval()
     optimizer.zero_grad()  
     
+    
     step = 1
     while step <= steps:
         models["downsample"].train()
     
         for batch in train_speech_loader:
+            # start = time.time()
             # ===== Speech Data =====
             waveforms, padding_masks, dur, paths, txt = batch
             waveforms = waveforms.to(device) # [B, T]
@@ -71,14 +73,18 @@ def train(
                 writer,
                 step,
             )
+            # end = time.time()
+            # print(f"{end - start:.4f} seconds")
+            
             
             total_loss = reinforce_loss + commitment_loss 
-
+            
             total_loss = total_loss / accumulation_steps
             total_loss.backward()
                 
             if step % config['logging']['step'] == 0:  
-                logging.info(f"TRAINING ----- step: {step} ----- Reinforce_loss/commitment_loss: {reinforce_loss}/{commitment_loss} ----- CER/WER: {cer_pred}/{wer_pred}")
+                logging.info(f"TRAINING ----- step: {step} ----- Reinforce_loss/commitment_loss: {reinforce_loss}/{commitment_loss}")
+                logging.info(f"Predicted text: {top[0]}")
                 
                 # Plot
                 plt.figure(figsize=(10, 6))

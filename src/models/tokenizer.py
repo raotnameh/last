@@ -4,13 +4,14 @@ import torch.nn.functional as F
 from utils import *
 
 import re
+import multiprocessing as mp
 
 
 # Precompile regex to remove blanks and collapse repeats
 blank_char = re.escape('?')  # adjust if blank differs
 remove_blanks = re.compile(blank_char)
 collapse_repeats = re.compile(r'(.)\1+')
-
+    
 # Tokenizer module that tokenizes the speech encoder output by finding the closest codebook
 class Tokenizer(nn.Module):
     def __init__(self, config, codebook, groups=2, temp=1):
@@ -25,14 +26,12 @@ class Tokenizer(nn.Module):
         self.beam_size = groups
         
         self.vocab = np.array(codebook.vocab[1:]) # remove the padding token
-        
-        
-        self.old_logits = None
-        
+
         self.scorer = Scorer()
     
     # Convert token sequences to strings using regex merge
     def decode_string(self,arr):
+        
         return [
             collapse_repeats.sub(r'\1',
                     remove_blanks.sub('',
@@ -65,13 +64,13 @@ class Tokenizer(nn.Module):
             sequences, _ = beam_search(g_log_prob, self.beam_size)  # [1, beams, T']
 
             # Sample indices and select sequences
-            random_beam_size = min(16, self.beam_size)
+            random_beam_size = min(8, self.beam_size)
             sample_idxs = torch.randint(0, self.beam_size, (random_beam_size,), device=device)
             sampled_seqs = sequences[0, sample_idxs]  # [random_beam_size, T']
-            
+
             sentences = self.decode_string(sampled_seqs.cpu())
             top_sent.append(sentences[0])
-            
+
             # Compute advantages
             advantages_list = self.scorer.step(sentences).to(device)  # tensor[sentances,num_rewards]
             advantages = advantages_list.mean(dim=1)
@@ -80,12 +79,10 @@ class Tokenizer(nn.Module):
                 for reward_count  in range(advantages_list.shape[1]): 
                     a = advantages_list[:,reward_count]
                     writer.add_scalar(f'advantages-min/{reward_count}', a.min().item(), step-1)
-                    writer.add_scalar(f'advantages-mean/{reward_count}', a.mean().item(), step)
                     writer.add_scalar(f'advantages-max/{reward_count}', a.max().item(), step+1)
     
-                writer.add_scalar(f'advantages/total-advantage', advantages.min().item(), step-1)
-                writer.add_scalar(f'advantages/total-advantage', advantages.mean().item(), step)
-                writer.add_scalar(f'advantages/total-advantage', advantages.max().item(), step+1)
+                writer.add_scalar(f'total-advantage/min', advantages.min().item(), step-1)
+                writer.add_scalar(f'total-advantage/max', advantages.max().item(), step+1)
                    
             # Gather per-token log-probs
             seq_idx = sampled_seqs.unsqueeze(-1)  # [random_beam_size, T', 1]
