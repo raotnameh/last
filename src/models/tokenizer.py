@@ -1,35 +1,45 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-import os
-
-from torch.nn.utils.rnn import pad_sequence
-
 from utils import *
 
 import re
-import torch
+
+
+# Precompile regex to remove blanks and collapse repeats
+blank_char = re.escape('?')  # adjust if blank differs
+remove_blanks = re.compile(blank_char)
+collapse_repeats = re.compile(r'(.)\1+')
 
 # Tokenizer module that tokenizes the speech encoder output by finding the closest codebook
 class Tokenizer(nn.Module):
-    def __init__(self, config, codebook, groups=2, temp=1,epsilon=0.5):
+    def __init__(self, config, codebook, groups=2, temp=1):
         super(Tokenizer, self).__init__()
         # temperature > 1.0: makes the distribution softer (more uniform).
         # temperature < 1.0: makes the distribution sharper (more confident).
         # temperature == 1.0: no change.
         
         self.codebook = codebook
-        
-        self.epsilon = epsilon
+        self.config = config
         self.temp = temp
         self.beam_size = groups
         
-        self.vocab = codebook.vocab[1:] # remove the padding token
+        self.vocab = np.array(codebook.vocab[1:]) # remove the padding token
+        
         
         self.old_logits = None
         
         self.scorer = Scorer()
+    
+    # Convert token sequences to strings using regex merge
+    def decode_string(self,arr):
+        return [
+            collapse_repeats.sub(r'\1',
+                    remove_blanks.sub('',
+                        ''.join(self.vocab[row])
+                        )) 
+                            for row in arr
+            ]
     
     def decode(self, log_probs, mask, step, writer):
         """
@@ -42,17 +52,7 @@ class Tokenizer(nn.Module):
         """
         B, T, V = log_probs.shape
         device = log_probs.device
-
-        # Precompile regex to remove blanks and collapse repeats
-        blank_char = re.escape('?')  # adjust if blank differs
-        remove_blanks = re.compile(blank_char)
-        collapse_repeats = re.compile(r'(.)\1+')
-
-        def merge_string(s: str) -> str:
-            # remove blank symbols then collapse repeats
-            s = remove_blanks.sub('', s)
-            return collapse_repeats.sub(r'\1', s)
-
+        
         lengths = mask.sum(dim=1).long()  # [B]
         loss = 0.0
         top_sent = []
@@ -63,45 +63,42 @@ class Tokenizer(nn.Module):
 
             # Beam search
             sequences, _ = beam_search(g_log_prob, self.beam_size)  # [1, beams, T']
-            beams = sequences.size(1)
 
             # Sample indices and select sequences
-            sample_idxs = torch.randint(0, beams, (32,), device=device)
-            sampled_seqs = sequences[0, sample_idxs]  # [32, T']
-
-            # Convert token sequences to strings using regex merge
-            def decode_one(seq):
-                chars = [self.vocab[i] for i in seq]
-                raw = ''.join(chars)
-                return merge_string(raw)
+            random_beam_size = min(8, self.beam_size)
+            sample_idxs = torch.randint(0, self.beam_size, (random_beam_size,), device=device)
+            sampled_seqs = sequences[0, sample_idxs]  # [random_beam_size, T']
             
-            sentences = [decode_one(seq) for seq in sampled_seqs]
+            sentences = self.decode_string(sampled_seqs.cpu())
             top_sent.append(sentences[0])
-
+            
             # Compute advantages
-            advantages_list = self.scorer.step(sentences)  # [no of reward functions]
-            advantages = sum(advantages_list).to(device) 
-            # advantages /= len(advantages_list)
-            if step % 10 == 0:
-                for rc, a in enumerate(advantages_list): 
-                    writer.add_scalar(f'advantages/advantage-{rc}', a.min().item(), step-1)
-                    writer.add_scalar(f'advantages/advantage-{rc}', a.mean().item(), step)
-                    writer.add_scalar(f'advantages/advantage-{rc}', a.max().item(), step+1)
-        
+            advantages_list = self.scorer.step(sentences).to(device)  # tensor[sentances,num_rewards]
+            advantages = advantages_list.mean(dim=1)
+            
+            if step % self.config['logging']['step']== 0:
+                for reward_count  in range(advantages_list.shape[1]): 
+                    a = advantages_list[:,reward_count]
+                    writer.add_scalar(f'advantages-min/{reward_count}', a.min().item(), step-1)
+                    writer.add_scalar(f'advantages-mean/{reward_count}', a.mean().item(), step)
+                    writer.add_scalar(f'advantages-max/{reward_count}', a.max().item(), step+1)
+    
                 writer.add_scalar(f'advantages/total-advantage', advantages.min().item(), step-1)
                 writer.add_scalar(f'advantages/total-advantage', advantages.mean().item(), step)
                 writer.add_scalar(f'advantages/total-advantage', advantages.max().item(), step+1)
                    
             # Gather per-token log-probs
-            seq_idx = sampled_seqs.unsqueeze(-1)  # [32, T', 1]
+            seq_idx = sampled_seqs.unsqueeze(-1)  # [random_beam_size, T', 1]
             per_token_logps = torch.gather(
-                g_log_prob.expand(32, -1, -1), 2, seq_idx
-            ).squeeze(-1)  # [32, T']
+                g_log_prob.expand(random_beam_size, -1, -1),
+                2,
+                seq_idx
+            ).squeeze(-1)  # [random_beam_size, T']
 
             old_logps = per_token_logps.detach()
             coef = torch.exp(per_token_logps - old_logps)
 
-            per_token_loss = -coef * advantages.unsqueeze(1)  # [32, T']
+            per_token_loss = -coef * advantages.unsqueeze(1)  # [random_beam_size, T']
             loss += per_token_loss.mean()
 
         loss /= B
@@ -136,7 +133,7 @@ class Tokenizer(nn.Module):
         # Losses
         commitment_loss, smoothness_loss = self.loss(z, z_q, mask)
         # Angle between the z and z_q
-        if step % 1000 == 0:
+        if step % self.config['logging']['step'] == 0:
             theta = torch.sum(z_flat * z_q.contiguous().view(-1, c), dim=1, keepdim=True) * mask.view(-1,1) # (batch*time, 1)
             
             writer.add_scalar('tokenizer/theta_mean', theta.mean().item(), step)

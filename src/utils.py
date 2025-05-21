@@ -69,85 +69,63 @@ class Scorer:
             
             # ratio of words to char 
             self.avg_wrd = sum( [ len(sent.split(" "))/len(sent) for sent in out] )
-            self.avg_char /= len(out)
+            self.avg_wrd /= len(out)
             
             logging.info(f"avg ration of charcters to words in a seq: {self.avg_char}")
+            logging.info(f"avg ration of charcters to words in a seq: {self.avg_wrd}")
             
             
-    @torch._dynamo.disable
     def step(self, sentences):
         self.sentences = sentences
+        rewards = torch.stack([
+                    self.seen(),                  # shape: [num_sentences]
+                    self.unigram_char(),
+                    self.char_to_word_ratio(),
+                    self.word_to_char_ratio(),
+                ], dim=1)  # stack along new dimension → shape becomes [num_sentences, 4]
         
+        return rewards
+
+    def char_to_word_ratio(self):
+        lens = np.array([len(s) for s in self.sentences])
+        word_counts = np.array([len(s.split(" ")) + 1 for s in self.sentences])
+        cur = lens / word_counts
+        reward = -np.abs(self.avg_char - cur)
+
+        reward = torch.tensor(reward)
+        std = reward.std(unbiased=False)
+        return torch.zeros_like(reward) if std == 0 else (reward - reward.mean()) / std
         
-        return [
-            self.seen(),
-            self.unigram_char(),
-            self.char_to_word_ratio(),
-            self.word_to_char_ratio(),
-            
-        ]
+    def word_to_char_ratio(self):
+        word_counts = np.array([len(s.split(" ")) for s in self.sentences])
+        char_lens = np.array([len(s) + 1 for s in self.sentences])
+        cur = word_counts / char_lens
+        reward = -np.abs(self.avg_wrd - cur)
+
+        reward = torch.tensor(reward)
+        std = reward.std(unbiased=False)
+        return torch.zeros_like(reward) if std == 0 else (reward - reward.mean()) / std
         
-    def char_to_word_ratio(self,):
-        reward = np.array([0.0]*len(self.sentences))
-        
-        for i, s in enumerate(self.sentences):
-            cur = len(s) / (len(s.split(" "))+1)
-            reward[i] = -abs( self.avg_char - cur )
+    def seen(self):
+        reward = np.array([
+            sum(w in self.unique_words for w in s.split()) / (len(s.split()) + 1)
+            for s in self.sentences
+        ])
         
         reward = torch.tensor(reward)
-        mean, std = reward.mean(), reward.std(unbiased=False)
-        if std == 0: return torch.zeros_like(reward)  # or leave as-is
-        else: return (reward - mean) / std
-        
-    def word_to_char_ratio(self,):
-        reward = np.array([0.0]*len(self.sentences))
-        
-        for i, s in enumerate(self.sentences):
-            cur = len(s.split(" ")) / (len(s)+1) 
-            reward[i] = -abs( self.avg_char - cur )
-        
-        reward = torch.tensor(reward)
-        mean, std = reward.mean(), reward.std(unbiased=False)
-        if std == 0: return torch.zeros_like(reward)  # or leave as-is
-        else: return (reward - mean) / std
-        
-    def seen(self,):
-        reward = np.array([0.0]*len(self.sentences))
-        
-        for i, s in enumerate(self.sentences):
-            words = s.split()
-            # Count how many words are not in unique_words set
-            reward[i] = -sum(1 for w in words if w not in self.unique_words) / (len(words)+1)
-  
-        reward = torch.tensor(reward)
-        mean, std = reward.mean(), reward.std(unbiased=False)
-        if std == 0: return torch.zeros_like(reward)  # or leave as-is
-        else: return (reward - mean) / std
+        std = reward.std(unbiased=False)
+        return torch.zeros_like(reward) if std == 0 else (reward - reward.mean()) / std
+
     
-    def unigram_char(self,):
-        reward = np.array([0.0]*len(self.sentences))
+    def unigram_char(self):
+        reward = np.zeros(len(self.sentences))
         
         for i, s in enumerate(self.sentences):
-            char_counts = Counter( ''.join(s) )
-            char_probs = {char: count / sum(char_counts.values()) for char, count in char_counts.items()} # Probs
-            
-            su = 0
-            for char in char_probs.keys():
-                su += -abs(char_probs[char] - self.char_probs[char])            
-            reward[i] = su
-            
+            chars = ''.join(s)
+            char_counts = Counter(chars)
+            total_chars = sum(char_counts.values())
+            reward[i] = sum(-abs(char_counts[c] / total_chars - self.char_probs[c]) for c in char_counts if c in self.char_probs)
+
         reward = torch.tensor(reward)
-        mean, std = reward.mean(), reward.std(unbiased=False)
-        if std == 0: return torch.zeros_like(reward)  # or leave as-is
-        else: return (reward - mean) / std
-        
-            
-            
-            
-            
-        
-        
-        
-        
-        
-    
+        std = reward.std(unbiased=False)
+        return torch.zeros_like(reward) if std == 0 else (reward - reward.mean()) / std

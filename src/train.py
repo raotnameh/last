@@ -126,7 +126,7 @@ def setup_models(config, vocab):
         groups=config['downsample']['groups'], 
         )
     
-    models['tokenizer'] = Tokenizer(config, models['codebook'], config["train"]["groups"], config["train"]["temp"], config["train"]["epsilon"])
+    models['tokenizer'] = Tokenizer(config, models['codebook'], config["train"]["groups"], config["train"]["temp"])
     
     logging.info(f"Size of codebook: {models['codebook'].embedding.weight.shape[0]} x {models['codebook'].embedding.weight.shape[1]}")
     logging.info(models['encoder'])
@@ -219,7 +219,7 @@ def configure_optimizers(models, config, dataloader):
 
     
     phase_ratio = config['lr_scheduler']['phase_ratio']
-    total_steps = config['train']['epochs'] * len(dataloader)
+    total_steps = config['train']['steps']
     logging.info(f"Total number of steps: {total_steps}")
     
     scheduler = tri_stage_scheduler(optimizer, total_steps, phase_ratio)

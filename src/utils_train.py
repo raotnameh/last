@@ -4,7 +4,7 @@ import os
 from jiwer import wer, cer
 
 import matplotlib.pyplot as plt
-
+import time
 
 # norm 
 def get_grad_norm(model):
@@ -35,24 +35,18 @@ def train(
     val_speech_loader = speech_loader[1]
     
     freeze_epochs = config['train']["freeze_epochs"]
-    epochs = config['train']["epochs"]
+    steps = config['train']["steps"]
     
     os.makedirs(f"{save_dir}/plots/", exist_ok=True)
         
-    
     accumulation_steps = config['train']['accumulation_steps']  # Get accumulation steps, default to 1 if not provided.
     logging.info(f"Using gradient accumulation with {accumulation_steps} steps.")
 
-    # # torch compile
-    # for k in list(models): models[k] = torch.compile(models[k])
-
-    torch.backends.cudnn.enabled = True 
-    # torch.backends.cudnn.benchmark = True
-    
+    models["encoder"].eval()
     optimizer.zero_grad()  
+    
     step = 1
-    for epoch in range(1, epochs+1):
-        models["encoder"].eval()
+    while step <= steps:
         models["downsample"].train()
     
         for batch in train_speech_loader:
@@ -60,7 +54,7 @@ def train(
             waveforms, padding_masks, dur, paths, txt = batch
             waveforms = waveforms.to(device) # [B, T]
             padding_masks = padding_masks.to(device) # [B, T] true for masked, false for not masked means [False, False, ..., True, True]
-        
+
             # ===== Encoder =====
             with torch.no_grad():
                 enc_out, padding_mask  = models['encoder'](waveforms, padding_masks)  # [B, T//320, C], [B, T // 320, C] 
@@ -78,23 +72,15 @@ def train(
                 step,
             )
             
-            # Loss calculation      
-            total_loss = reinforce_loss
-        
-            if torch.isnan(total_loss) or torch.isinf(total_loss):
-                logging.warning(f"Skipping step {step} due to NaN/Inf in total_loss")
-                optimizer.zero_grad()
-                scheduler.step() 
-                continue
+            total_loss = reinforce_loss + commitment_loss 
 
-            # Scale the loss, and accumulate over accumulation steps
-            total_loss = total_loss / accumulation_steps # Divide loss by accumulation steps.
+            total_loss = total_loss / accumulation_steps
             total_loss.backward()
                 
             if step % config['logging']['step'] == 0:  
                 cer_pred, wer_pred = compute_wer(txt, top)
                 
-                logging.info(f"Training loss ---- epoch - step - loss - CER - WER: {epoch} - {step} - {total_loss} - {cer_pred} - {wer_pred}")                
+                logging.info(f"step: {step} ----- Reinforce_loss/commitment_loss: {reinforce_loss}/{commitment_loss} ----- CER/WER: {cer_pred}/{wer_pred}")                
                 logging.info(F"True txt: {txt[0]}")
                 logging.info(F"Pred txt: {top[0]}")
                 
@@ -135,12 +121,11 @@ def train(
                 optimizer.zero_grad()
                 
             step += 1
-        
+            
 
     checkpoint_path = f"{save_dir}/checkpoints/step_{step:06d}.pt"
     torch.save({
         'step': step,
-        'epoch': epoch,
         'models': {k: v.state_dict() for k, v in models.items()},
         'optimizers': optimizer.state_dict(), # Save optimizer state dict
         'schedulers': scheduler.state_dict(), # Save scheduler state dict
@@ -151,4 +136,4 @@ def train(
 def compute_wer(real_transcripts, pred_transcripts):
     wer_pred = wer(real_transcripts, pred_transcripts)
     cer_pred = cer(real_transcripts, pred_transcripts)
-    return cer_pred, wer_pred
+    return round(cer_pred, 2), round(wer_pred, 2)
