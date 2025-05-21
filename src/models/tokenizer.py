@@ -64,7 +64,7 @@ class Tokenizer(nn.Module):
             sequences, _ = beam_search(g_log_prob, self.beam_size)  # [1, beams, T']
 
             # Sample indices and select sequences
-            random_beam_size = min(8, self.beam_size)
+            random_beam_size = min(16, self.beam_size)
             sample_idxs = torch.randint(0, self.beam_size, (random_beam_size,), device=device)
             sampled_seqs = sequences[0, sample_idxs]  # [random_beam_size, T']
 

@@ -99,6 +99,7 @@ def train(
                 
                 # logging losses
                 writer.add_scalar('loss/loss', total_loss, step)
+                writer.add_scalar('loss/reinforce_loss', reinforce_loss, step)
                 writer.add_scalar('loss/commit_loss', commitment_loss, step)
                 writer.add_scalar('loss/smooth_loss', smoothness_loss, step)
                 # logging lr 
@@ -157,6 +158,10 @@ def train(
             logging.info(f"VALIDATION ----- step: {step} ----- Reinforce_loss/commitment_loss: {reinforce_loss}/{commitment_loss} ----- CER/WER: {cer_pred}/{wer_pred}")                
             writer.add_scalar('error/cer', cer_pred, step)
             writer.add_scalar('error/wer', wer_pred, step)
+            writer.add_scalar('val_loss/loss', total_loss, step)
+            writer.add_scalar('val_loss/reinforce_loss', reinforce_loss, step)
+            writer.add_scalar('val_loss/commit_loss', commitment_loss, step)
+            writer.add_scalar('val_loss/smooth_loss', smoothness_loss, step)
             
         checkpoint_path = f"{save_dir}/checkpoints/step_{step:06d}.pt"
         torch.save({
