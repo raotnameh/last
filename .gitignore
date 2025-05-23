@@ -4,6 +4,7 @@
 *.safetensors
 events.*
 *.gz
+*.txt
 
 # Ignore Python cache files
 __pycache__/

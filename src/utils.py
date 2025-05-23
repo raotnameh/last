@@ -51,60 +51,88 @@ def beam_search(log_probs: torch.Tensor, beam_size: int):
 class Scorer:
     
     def __init__(self) -> None:
+        @staticmethod
+        def get_unigram_char_probs(sentences):
+            # Flatten to a list of characters
+            chars = [char for sentence in sentences for char in sentence.strip()]
+            
+            # Count frequency of each character
+            char_counts = Counter(chars)
+            total_chars = sum(char_counts.values())
+
+            # Convert to probabilities
+            char_probs = {char: count / total_chars for char, count in char_counts.items()}
+            
+            return char_probs, chars
+
+
         with open("/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train.wrd", "r") as f:
             out = f.readlines()
+        out = [i for i in out if len(i.strip()) > 0]
 
-            # uniq word list
-            words_list = [word for x in out for word in x.strip().split(" ")]
-            self.unique_words = set(words_list)
-            
-            # uniq char count
-            all_text = ''.join(x.strip() for x in out) # Flatten to one long string of all characters
-            char_counts = Counter(all_text) # Count characters
-            self.char_probs = {char: count / sum(char_counts.values()) for char, count in char_counts.items()} # Probs
-            
-            # ratio of character to words for a sentence
-            self.avg_char = sum( [ len(sent)/len(sent.split(" ")) for sent in out] )
-            self.avg_char /= len(out)
-            
-            # ratio of words to char 
-            self.avg_wrd = sum( [ len(sent.split(" "))/len(sent) for sent in out] )
-            self.avg_wrd /= len(out)
-            
-            logging.info(f"avg ration of charcters to words in a seq: {self.avg_char}")
-            logging.info(f"avg ration of charcters to words in a seq: {self.avg_wrd}")
-            
+        # uniq word list
+        words_list = [word for x in out for word in x.strip().split()]
+        self.unique_words = set(words_list)
+        
+        # uniq char probs
+        self.char_probs = get_unigram_char_probs()
+        
+        # ratio of character to words for a sentence
+        self.avg_char = sum( [ len(sent)/len(sent.split()) for sent in out] )
+        self.avg_char /= len(out)
+        
+        # ratio of words to char 
+        self.avg_wrd = sum( [ len(sent.split())/len(sent) for sent in out] )
+        self.avg_wrd /= len(out)
+        
+        logging.info(f"avg ratio of charcters to words in a seq: {self.avg_char}")
+        logging.info(f"avg ratio of words to charcters in a seq: {self.avg_wrd}")
+
+    def _std_norm(self, arr):
+        t = torch.tensor(arr, dtype=torch.float32)
+        std = t.std(unbiased=False)
+        if std == 0:
+            return torch.zeros_like(t)
+        return (t - t.mean()) / std
             
     def step(self, sentences):
         self.sentences = sentences
         rewards = torch.stack([
-                    self.seen(),                  # shape: [num_sentences]
                     self.unigram_char(),
-                    self.char_to_word_ratio(),
-                    self.word_to_char_ratio(),
+                    self.seen(),
+                    self.diversity_of_words(),
+                    self.avg_word_length(),
+                    
+                    # self.char_to_word_ratio(),
+                    # self.word_to_char_ratio(),
+                    
                 ], dim=1)  # stack along new dimension → shape becomes [num_sentences, 4]
         
         return rewards
-
+    
+    def diversity_of_words(self):
+        reward = []
+        for s in self.sentences:
+            words = s.split()
+            reward.append(len(set(words)) / (len(words)+1) )
+        return self._std_norm(reward)
+        
+        
     def char_to_word_ratio(self):
         char_lens = np.array([len(s) for s in self.sentences])
-        word_counts = np.array([len(s.split(" ")) + 1 for s in self.sentences])
+        word_counts = np.array([len(s.split()) + 1 for s in self.sentences])
         cur = char_lens / word_counts
         reward = -np.abs(self.avg_char - cur)
 
-        reward = torch.tensor(reward)
-        std = reward.std(unbiased=False)
-        return torch.zeros_like(reward) if std == 0 else (reward - reward.mean()) / std
+        return self._std_norm(reward)
         
     def word_to_char_ratio(self):
-        word_counts = np.array([len(s.split(" ")) for s in self.sentences])
+        word_counts = np.array([len(s.split()) for s in self.sentences])
         char_lens = np.array([len(s) + 1 for s in self.sentences])
         cur = word_counts / char_lens
         reward = -np.abs(self.avg_wrd - cur)
 
-        reward = torch.tensor(reward)
-        std = reward.std(unbiased=False)
-        return torch.zeros_like(reward) if std == 0 else (reward - reward.mean()) / std
+        return self._std_norm(reward)
         
     def seen(self):
         reward = np.array([
@@ -112,10 +140,16 @@ class Scorer:
             for s in self.sentences
         ])
         
-        reward = torch.tensor(reward)
-        std = reward.std(unbiased=False)
-        return torch.zeros_like(reward) if std == 0 else (reward - reward.mean()) / std
+        return self._std_norm(reward)
 
+    def avg_word_length(self):
+        # reward sentences whose mean word length is near typical (e.g. 4–7 chars)
+        reward = []
+        for s in self.sentences:
+            words = s.split()
+            mean_len = np.mean([len(w) for w in words]) if words else 0
+            reward.append(-abs(mean_len - 5.5))  # peak at ~5.5 chars/word
+        return self._std_norm(reward)
     
     def unigram_char(self):
         reward = np.zeros(len(self.sentences))
@@ -123,9 +157,7 @@ class Scorer:
         for i, s in enumerate(self.sentences):
             chars = ''.join(s)
             char_counts = Counter(chars)
-            total_chars = sum(char_counts.values())
-            reward[i] = sum(-abs(char_counts[c] / total_chars - self.char_probs[c]) for c in char_counts) / total_chars
+            total_chars = len(chars)
+            reward[i] = sum(-abs(char_counts[c] / total_chars - self.char_probs[c]) for c in char_counts) / len(char_counts)
 
-        reward = torch.tensor(reward)
-        std = reward.std(unbiased=False)
-        return torch.zeros_like(reward) if std == 0 else (reward - reward.mean()) / std
+        return self._std_norm(reward)

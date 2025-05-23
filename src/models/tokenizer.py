@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from utils import *
 
 import re
-import multiprocessing as mp
+import torch.multiprocessing as mp
 
 
 # Precompile regex to remove blanks and collapse repeats
@@ -12,6 +12,8 @@ blank_char = re.escape('?')  # adjust if blank differs
 remove_blanks = re.compile(blank_char)
 collapse_repeats = re.compile(r'(.)\1+')
     
+
+
 # Tokenizer module that tokenizes the speech encoder output by finding the closest codebook
 class Tokenizer(nn.Module):
     def __init__(self, config, codebook, groups=2, temp=1):
@@ -60,12 +62,15 @@ class Tokenizer(nn.Module):
             valid_len = lengths[b]
             g_log_prob = log_probs[b, :valid_len, :].unsqueeze(0)  # [1, T', V]
 
+
+        
             # Beam search
             sequences, _ = beam_search(g_log_prob, self.beam_size)  # [1, beams, T']
 
             # Sample indices and select sequences
             random_beam_size = min(16, self.beam_size)
-            sample_idxs = torch.randint(0, self.beam_size, (random_beam_size,), device=device)
+            sample_idxs = torch.randint(1, self.beam_size-1, (random_beam_size,), device=device)
+            sample_idxs[0], sample_idxs[-1] = 0, self.beam_size-1
             sampled_seqs = sequences[0, sample_idxs]  # [random_beam_size, T']
 
             sentences = self.decode_string(sampled_seqs.cpu())
@@ -73,7 +78,7 @@ class Tokenizer(nn.Module):
 
             # Compute advantages
             advantages_list = self.scorer.step(sentences).to(device)  # tensor[sentances,num_rewards]
-            advantages = advantages_list.mean(dim=1)
+            advantages = advantages_list.sum(dim=1)
             
             if step % self.config['logging']['step']== 0:
                 for reward_count  in range(advantages_list.shape[1]): 

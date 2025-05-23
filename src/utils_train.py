@@ -77,7 +77,7 @@ def train(
             # print(f"{end - start:.4f} seconds")
             
             
-            total_loss = reinforce_loss + commitment_loss 
+            total_loss = reinforce_loss 
             
             total_loss = total_loss / accumulation_steps
             total_loss.backward()
