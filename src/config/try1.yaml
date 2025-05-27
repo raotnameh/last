@@ -25,9 +25,9 @@ train:
   seed: 42123
 
   temp: 1.0
-  groups: 512 # this is the beam size.
+  groups: 128 # this is the beam size.
 
-  lr: 0.00005
+  lr: 0.00001
   grad_clip: 1.0
   
   steps: 100000
@@ -50,6 +50,6 @@ encoder:
   frozen_layers: ["11"]
 
 downsample:
-  kernel_size: 3
+  kernel_size: 1
   stride: 1
   groups: 32 # do not touch it is downsample

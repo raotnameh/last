@@ -51,20 +51,6 @@ def beam_search(log_probs: torch.Tensor, beam_size: int):
 class Scorer:
     
     def __init__(self) -> None:
-        @staticmethod
-        def get_unigram_char_probs(sentences):
-            # Flatten to a list of characters
-            chars = [char for sentence in sentences for char in sentence.strip()]
-            
-            # Count frequency of each character
-            char_counts = Counter(chars)
-            total_chars = sum(char_counts.values())
-
-            # Convert to probabilities
-            char_probs = {char: count / total_chars for char, count in char_counts.items()}
-            
-            return char_probs, chars
-
 
         with open("/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train.wrd", "r") as f:
             out = f.readlines()
@@ -73,9 +59,7 @@ class Scorer:
         # uniq word list
         words_list = [word for x in out for word in x.strip().split()]
         self.unique_words = set(words_list)
-        
-        # uniq char probs
-        self.char_probs = get_unigram_char_probs()
+
         
         # ratio of character to words for a sentence
         self.avg_char = sum( [ len(sent)/len(sent.split()) for sent in out] )
@@ -98,7 +82,7 @@ class Scorer:
     def step(self, sentences):
         self.sentences = sentences
         rewards = torch.stack([
-                    self.unigram_char(),
+                    # self.unigram_char(),
                     self.seen(),
                     self.diversity_of_words(),
                     self.avg_word_length(),
@@ -116,7 +100,6 @@ class Scorer:
             words = s.split()
             reward.append(len(set(words)) / (len(words)+1) )
         return self._std_norm(reward)
-        
         
     def char_to_word_ratio(self):
         char_lens = np.array([len(s) for s in self.sentences])

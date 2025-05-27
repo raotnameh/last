@@ -3,15 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from utils import *
 
-import re
-import torch.multiprocessing as mp
-
-
-# Precompile regex to remove blanks and collapse repeats
-blank_char = re.escape('?')  # adjust if blank differs
-remove_blanks = re.compile(blank_char)
-collapse_repeats = re.compile(r'(.)\1+')
-    
+import time
+from typing import List
 
 
 # Tokenizer module that tokenizes the speech encoder output by finding the closest codebook
@@ -28,19 +21,22 @@ class Tokenizer(nn.Module):
         self.beam_size = groups
         
         self.vocab = np.array(codebook.vocab[1:]) # remove the padding token
+        self.blank_index = len(self.vocab) - 1
 
         self.scorer = Scorer()
     
-    # Convert token sequences to strings using regex merge
-    def decode_string(self,arr):
+
+    def decode_seq(self, x, random_beam_size):  
+        # Step 1: Create mask to keep first element and non-duplicates
+        mask = np.ones_like(x, dtype=bool)
+        mask[:, 1:] = x[:, 1:] != x[:, :-1]
+        # Step 2: Remove a specific index (e.g., self.blank_index)
+        mask &= x != self.blank_index  # Elementwise AND
+
+        filtered = [ ''.join( self.vocab[ x[i][mask[i]] ] ) for i in range(random_beam_size) ]
         
-        return [
-            collapse_repeats.sub(r'\1',
-                    remove_blanks.sub('',
-                        ''.join(self.vocab[row])
-                        )) 
-                            for row in arr
-            ]
+        return filtered
+    
     
     def decode(self, log_probs, mask, step, writer):
         """
@@ -59,21 +55,16 @@ class Tokenizer(nn.Module):
         top_sent = []
 
         for b in range(B):
+            
             valid_len = lengths[b]
             g_log_prob = log_probs[b, :valid_len, :].unsqueeze(0)  # [1, T', V]
-
-
         
             # Beam search
             sequences, _ = beam_search(g_log_prob, self.beam_size)  # [1, beams, T']
-
-            # Sample indices and select sequences
-            random_beam_size = min(16, self.beam_size)
-            sample_idxs = torch.randint(1, self.beam_size-1, (random_beam_size,), device=device)
-            sample_idxs[0], sample_idxs[-1] = 0, self.beam_size-1
-            sampled_seqs = sequences[0, sample_idxs]  # [random_beam_size, T']
-
-            sentences = self.decode_string(sampled_seqs.cpu())
+            sequences = sequences.squeeze(0)  # [beams, T']
+            
+            # Convert sequences to strings
+            sentences = self.decode_seq(sequences.cpu().numpy(), self.beam_size)
             top_sent.append(sentences[0])
 
             # Compute advantages
@@ -90,17 +81,17 @@ class Tokenizer(nn.Module):
                 writer.add_scalar(f'total-advantage/max', advantages.max().item(), step+1)
                    
             # Gather per-token log-probs
-            seq_idx = sampled_seqs.unsqueeze(-1)  # [random_beam_size, T', 1]
+            seq_idx = sequences.unsqueeze(-1)  # [self.beam_size, T', 1]
             per_token_logps = torch.gather(
-                g_log_prob.expand(random_beam_size, -1, -1),
+                g_log_prob.expand(self.beam_size, -1, -1),
                 2,
                 seq_idx
-            ).squeeze(-1)  # [random_beam_size, T']
+            ).squeeze(-1)  # [self.beam_size, T']
 
             old_logps = per_token_logps.detach()
             coef = torch.exp(per_token_logps - old_logps)
 
-            per_token_loss = -coef * advantages.unsqueeze(1)  # [random_beam_size, T']
+            per_token_loss = -coef * advantages.unsqueeze(1)  # [self.beam_size, T']
             loss += per_token_loss.mean()
 
         loss /= B
@@ -117,45 +108,44 @@ class Tokenizer(nn.Module):
         e = e[1:,:] # remove the padding idx (vocab_size, embed_dim)       
         
         b, t, c = z.shape
-        z = F.normalize(z, dim=-1) # normlaize
         z_flat = z.contiguous().view(-1, c) # (b * t, c)
-
-        d = self.dist(z_flat, e) # (b*t, vocab_size)
         
-        # converting distance to probs
-        log_probs = torch.nn.functional.log_softmax( -d.view(b, t, -1) / self.temp, dim=-1) # shape: (b, t, vocab_size)
+        log_probs, z_q, one_hot = self.sim(z_flat, e) 
+        log_probs = log_probs.view(b, t, -1) # (b, t, vocab_size)
+        
+        # Reinforce loss
         reinforce_loss, top = self.decode(log_probs, mask.squeeze(-1), step, writer)
 
-        # Quantized
-        min_encoding_indices = torch.argmin(d, dim=1).unsqueeze(1) # (b * t, 1)
-        min_encodings = torch.zeros(min_encoding_indices.shape[0], e.shape[0], device=z.device)  # (b * t, vocab_size)
-        min_encodings.scatter_(1, min_encoding_indices, 1)  # (b * t, vocab_size)
-        # 5. Quantized latents via direct indexing
-        z_q = torch.matmul(min_encodings, e).view(b,t,c) * mask # (batch, time, channels) 
-        # Losses
-        commitment_loss, smoothness_loss = self.loss(z, z_q, mask)
+        # Quantized 
+        commitment_loss, smoothness_loss = self.loss(z, z_q.view(b,t,c), mask) # losses
         # Angle between the z and z_q
         if step % self.config['logging']['step'] == 0:
-            theta = torch.sum(z_flat * z_q.contiguous().view(-1, c), dim=1, keepdim=True) * mask.view(-1,1) # (batch*time, 1)
             
+            theta = torch.sum(z_flat * z_q, dim=1, keepdim=True) * mask.view(-1,1) # (batch*time, 1)
             writer.add_scalar('tokenizer/theta_mean', theta.mean().item(), step)
             writer.add_scalar('tokenizer/theta_std', theta.std().item(), step)
             writer.add_scalar('tokenizer/theta_max', theta.max().item(), step)
             writer.add_scalar('tokenizer/theta_min', theta.min().item(), step)
             
-        e_mean_np = self.codebook_usage(min_encodings, mask.contiguous().view(-1, 1), step)
+        # Calculate codebook usage 
+        e_mean_np = self.codebook_usage(one_hot, mask.view(-1, 1))
         
-        return smoothness_loss, commitment_loss, reinforce_loss, top, self.vocab, e_mean_np # smoothness_loss, commitment_loss, reinforce_loss
+        return smoothness_loss, commitment_loss, reinforce_loss, top, self.vocab, e_mean_np 
+
     
-    
-    def dist(self, z_flat, e):
-        # distances from z to codebooks e_j (z - e)^2 = z^2 + e^2 - 2 e * z
-        d = (torch.sum(z_flat**2, dim=1, keepdim=True) \
-            - 2 * z_flat @ e.t() \
-                + torch.sum(e**2, dim=1, keepdim=True).t() 
-        ) # (b*t, vocab_size)
+    def sim(self, z_flat, e):
+        # cosine similarity between z and codebooks e_j
+        cos_sim = torch.matmul(z_flat, e.t()) # (b*t, vocab_size)
+        # converting distance to probs
+        logprobs = F.log_softmax(cos_sim / self.temp, dim=1)  # (b * t, vocab_size)
         
-        return d
+        # Find the index of the max log probability for each token
+        indices = torch.argmax(logprobs, dim=1) # (b * t,)
+        one_hot = F.one_hot(indices, num_classes=logprobs.shape[1]).float() # (b * t, vocab_size)
+        # Quantized latents via direct indexing
+        z_q = torch.matmul(one_hot, e)# (b * t, embed_dim)
+        
+        return logprobs, z_q.contiguous(), one_hot
     
     
     def loss(self, z, z_q, mask): 
@@ -170,9 +160,10 @@ class Tokenizer(nn.Module):
     
         return commitment_loss, smoothness_loss
     
-    def codebook_usage(self, min_encodings, mask, step):
-        # prob for each character
-        mask_bool = (mask == 1).squeeze(1)  # shape: (B,), True where we keep
-        valid_encodings = min_encodings[mask_bool]  # shape: (B', C)
-        e_mean_np = valid_encodings.mean(dim=0).cpu().numpy()
-        return e_mean_np
+    def codebook_usage(self, one_hot, mask):
+        # prob for each characters
+        one_hot *= mask  # (B * T, V), zero out masked positions
+        prob = one_hot.sum(dim=0) / mask.sum()  # (V,) probabilities of each codebook token
+        # Normalize the probabilities
+        prob = prob / prob.sum()
+        return prob.cpu().numpy()

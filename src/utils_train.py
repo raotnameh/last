@@ -51,7 +51,7 @@ def train(
         models["downsample"].train()
     
         for batch in train_speech_loader:
-            # start = time.time()
+            start = time.time()
             # ===== Speech Data =====
             waveforms, padding_masks, dur, paths, txt = batch
             waveforms = waveforms.to(device) # [B, T]
@@ -60,9 +60,9 @@ def train(
             # ===== Encoder =====
             with torch.no_grad():
                 enc_out, padding_mask  = models['encoder'](waveforms, padding_masks)  # [B, T//320, C], [B, T // 320, C] 
-                mask = ~padding_mask # 0 for masked positions.
-                mask = mask.float().unsqueeze(-1)
-                
+            mask = ~padding_mask # 0 for masked positions.
+            mask = mask.float().unsqueeze(-1) # [B, T//320, 1]
+            
             # ===== Downsample =====
             down_out = models['downsample'](enc_out, mask) # [B, T, codebook_dim]
             
@@ -73,14 +73,12 @@ def train(
                 writer,
                 step,
             )
-            # end = time.time()
-            # print(f"{end - start:.4f} seconds")
-            
-            
+            print("Time taken for forward and backward pass: ", time.time() - start)
             total_loss = reinforce_loss 
             
             total_loss = total_loss / accumulation_steps
             total_loss.backward()
+            
                 
             if step % config['logging']['step'] == 0:  
                 logging.info(f"TRAINING ----- step: {step} ----- Reinforce_loss/commitment_loss: {reinforce_loss}/{commitment_loss}")
