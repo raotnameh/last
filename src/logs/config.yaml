@@ -35,7 +35,7 @@ train:
   accumulation_steps: 1
   freeze_epochs: 1
   grad_clip: 1.0
-  groups: 128
+  groups: 16
   lr: 1.0e-05
   resume_checkpoint: false
   resume_path: checkpoints/step_10000.pth

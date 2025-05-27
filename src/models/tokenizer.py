@@ -3,9 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from utils import *
 
-import time
-from typing import List
-
 
 # Tokenizer module that tokenizes the speech encoder output by finding the closest codebook
 class Tokenizer(nn.Module):
@@ -163,7 +160,5 @@ class Tokenizer(nn.Module):
     def codebook_usage(self, one_hot, mask):
         # prob for each characters
         one_hot *= mask  # (B * T, V), zero out masked positions
-        prob = one_hot.sum(dim=0) / mask.sum()  # (V,) probabilities of each codebook token
-        # Normalize the probabilities
-        prob = prob / prob.sum()
+        prob = one_hot.sum(dim=0) / mask.sum()  # (V,) probabilities of each codebook tokenr
         return prob.cpu().numpy()
