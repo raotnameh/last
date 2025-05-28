@@ -6,6 +6,8 @@ from jiwer import wer, cer
 import matplotlib.pyplot as plt
 import time
 
+
+
 # norm 
 def get_grad_norm(model):
     total_norm = 0.0
@@ -14,6 +16,12 @@ def get_grad_norm(model):
             param_norm = p.grad.data.norm(2)  # L2 norm
             total_norm += param_norm.item() ** 2
     return total_norm ** 0.5
+
+def compute_wer(real_transcripts, pred_transcripts):
+    wer_pred = wer(real_transcripts, pred_transcripts)
+    cer_pred = cer(real_transcripts, pred_transcripts)
+    return round(cer_pred, 2), round(wer_pred, 2)
+
 
 def train(
     models, 
@@ -44,8 +52,7 @@ def train(
 
     models["encoder"].eval()
     optimizer.zero_grad()  
-    
-    
+        
     step = 1
     while step <= steps:
         models["downsample"].train()
@@ -56,37 +63,31 @@ def train(
             waveforms, padding_masks, dur, paths, txt = batch
             waveforms = waveforms.to(device) # [B, T]
             padding_masks = padding_masks.to(device) # [B, T] true for masked, false for not masked means [False, False, ..., True, True]
-
+            
             # ===== Encoder =====
             with torch.no_grad():
                 enc_out, padding_mask  = models['encoder'](waveforms, padding_masks)  # [B, T//320, C], [B, T // 320, C] 
             mask = ~padding_mask # 0 for masked positions.
             mask = mask.float().unsqueeze(-1) # [B, T//320, 1]
-            
             # ===== Downsample =====
             down_out = models['downsample'](enc_out, mask) # [B, T, codebook_dim]
-            
             # ===== Tokenizer =====
-            smoothness_loss, commitment_loss, reinforce_loss, top, vocab, e_mean_np = models['tokenizer'](
-                down_out, 
-                mask,
-                writer,
-                step,
-            )
-            print("Time taken for forward and backward pass: ", time.time() - start)
-            total_loss = reinforce_loss 
+            smoothness_loss, commitment_loss, reinforce_loss, top, vocab, e_mean_np = models['tokenizer'](down_out, mask, writer, step)
             
+            # print("Time taken for forward and backward pass: ", time.time() - start)
+            # ===== Loss Backward ====
+            total_loss = reinforce_loss 
             total_loss = total_loss / accumulation_steps
             total_loss.backward()
             
-                
+            # ===== Logging =====
             if step % config['logging']['step'] == 0:  
                 logging.info(f"TRAINING ----- step: {step} ----- Reinforce_loss/commitment_loss: {reinforce_loss}/{commitment_loss}")
                 logging.info(f"Predicted text: {top[0]}")
                 
                 # Plot
                 plt.figure(figsize=(10, 6))
-                plt.bar(vocab, e_mean_np, color='blue', alpha=0.7)
+                plt.bar(vocab, e_mean_np.cpu().numpy(), color='blue', alpha=0.7)
                 plt.xlabel('Codebook Entry (Char)')
                 plt.ylabel('Probability')
                 plt.title('Codebook Usage Distribution')
@@ -130,23 +131,15 @@ def train(
                 waveforms, padding_masks, dur, paths, txt = batch
                 waveforms = waveforms.to(device) # [B, T]
                 padding_masks = padding_masks.to(device) # [B, T] true for masked, false for not masked means [False, False, ..., True, True]
-
                 # ===== Encoder =====
                 enc_out, padding_mask  = models['encoder'](waveforms, padding_masks)  # [B, T//320, C], [B, T // 320, C] 
                 mask = ~padding_mask # 0 for masked positions.
                 mask = mask.float().unsqueeze(-1)
-                
                 # ===== Downsample =====
-                down_out = models['downsample'](enc_out, mask) # [B, T, codebook_dim]
-                
+                down_out = models['downsample'](enc_out, mask) # [B, T, codebook_dim]    
                 # ===== Tokenizer =====
-                smoothness_loss, commitment_loss, reinforce_loss, top, vocab, e_mean_np = models['tokenizer'](
-                    down_out, 
-                    mask,
-                    writer,
-                    step,
-                )
-                
+                smoothness_loss, commitment_loss, reinforce_loss, top, vocab, e_mean_np = models['tokenizer']( down_out, mask, writer, step)
+            
                 real.extend(txt)
                 pred.extend(top)
 
@@ -170,8 +163,3 @@ def train(
             'config': config
         }, checkpoint_path)
         logging.info(f"Saved checkpoint to {checkpoint_path}")
-
-def compute_wer(real_transcripts, pred_transcripts):
-    wer_pred = wer(real_transcripts, pred_transcripts)
-    cer_pred = cer(real_transcripts, pred_transcripts)
-    return round(cer_pred, 2), round(wer_pred, 2)

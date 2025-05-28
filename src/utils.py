@@ -4,7 +4,200 @@ from collections import Counter
 from math import log
 from tqdm.auto import tqdm
 import logging
+import math
+from transformers import GPT2LMHeadModel, GPT2Tokenizer
 
+
+
+class Scorer:
+
+    def __init__(self) -> None:
+        '''
+        The goal of the scorer is: 
+            1. Teach syntax (valid characters, word lengths).
+            2. Build vocabulary (valid words, diversity).
+            3. Develop semantics (fluency, alignment with speech).
+        Skipping phases would be like expecting a child to write essays before learning the alphabet.
+
+        Practical Example
+        Imagine training a model to transcribe speech:
+            Phase 1: Reward outputs like th3 qu1ck br0wn (valid characters, plausible lengths).
+            Phase 2: Reward the quck brown fox (real words, no repeats).
+            Phase 3: Reward the quick brown fox (fluent, matches audio content).
+        Without this progression, the model might never escape the "gibberish basin."
+        
+        
+
+        '''
+
+        with open("/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train.wrd", "r") as f:
+            sentences = f.readlines()
+        sentences = [s for s in sentences if len(s) > 0]
+            
+        # uniq word list
+        self.vocab = set(
+            [word for sentence in sentences for word in sentence.split()]
+        )
+        
+        # unigram character count to compute probabilities
+        self.char_counter = Counter(
+            [char for sentence in sentences for char in sentence]
+        )
+        self.unigram_char_prob = {
+            char: count / sum(self.char_counter.values())
+            for char, count in self.char_counter.items()
+        }
+
+        logging.info(f"----------Unigram character probabilities: {self.unigram_char_prob}----------")
+        
+        # lm fluency llm
+        self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+        self.tokenizer.pad_token = self.tokenizer.eos_token
+        self.lm = GPT2LMHeadModel.from_pretrained("gpt2").cuda()
+        for param in self.lm.parameters():
+            param.requires_grad = False
+        self.lm.eval()
+        self.loss_fct = torch.nn.CrossEntropyLoss(reduction='none')
+    
+    
+    def step(self, sentences):
+        self.sentences = sentences
+        funcs = [
+            
+                # character level rewards
+                self.unigram_character_reward,
+                self.length_reward,
+                
+                # word level rewards
+                # self.diversity_of_words,
+                # self.seen,
+                
+                # Sentence level rewards
+                # self.lm_fluency_reward,
+                
+                ]
+        
+        rewards_dict = {func.__name__: func() for func in funcs}
+
+        return rewards_dict
+    
+    def lm_fluency_reward(self):
+        with torch.no_grad():
+            inputs = self.tokenizer(self.sentences, padding=True, truncation=True, return_tensors="pt").to(self.lm.device)
+            input_ids = inputs["input_ids"]
+        
+            outputs = self.lm(input_ids=input_ids)
+            logits = outputs.logits
+            # Shift logits and labels for next-token prediction
+            shift_logits = logits[:, :-1, :].contiguous()  # (batch_size, seq_len-1, vocab_size)
+            shift_labels = input_ids[:, 1:].contiguous()   # (batch_size, seq_len-1)
+
+            losses = self.loss_fct(
+                shift_logits.view(-1, shift_logits.size(-1)),
+                shift_labels.view(-1)
+            )  # (batch_size * (seq_len - 1))
+
+            # Reshape to (batch_size, seq_len - 1)
+            losses = losses.view(shift_labels.size())
+            # Average loss per sentence (mean over tokens)
+            sentence_losses = losses.mean(dim=1)
+
+            # Return negative loss per sentence (reward style)
+            return self._std_norm( [-loss for loss in sentence_losses] )
+
+    
+    def unigram_character_reward(self):
+        """
+        Reward sentences based on the KL divergence from a unigram distribution.
+        For example, a sentence that matches the unigram distribution of the training set will get a higher score.
+        lower kl is better. OR. higher -kl is better.
+        """
+        eps = 1e-6
+        rewards = []
+        for sentence in self.sentences:
+            C = Counter(sentence)
+            L = max(1, len(sentence))
+            # Q: empirical distribution from sentence
+            P_emp = {ch: C[ch] / L for ch in C}
+            # P: ground truth unigram distribution
+            kl = 0.0
+            
+            for ch, p in self.unigram_char_prob.items():
+                q = P_emp.get(ch, eps)  # prediction
+                kl += p * math.log((p + eps) / (q + eps))
+
+            rewards.append(-kl)  # higher = better (closer to true unigram)
+
+        return self._std_norm(rewards)
+    
+    def length_reward(self):
+        '''
+        Reward sentences based on their length.
+        Penalize sentences that are too short (3) or too long(8).
+        '''
+        
+        rewards = []
+        for sentence in self.sentences:
+            # Token length reward
+            words = sentence.split()
+            valid_lengths = [1 for word in words if 2<=len(word)<=8]
+            rewards.append(sum(valid_lengths))
+            
+        return self._std_norm(rewards)
+
+    def diversity_of_words(self):
+        '''
+        Reward sentences that use a diverse set of words.
+        For example, a sentence with 10 words and 5 unique words would get a higher score than one with 10 words and only 2 unique words.
+        '''
+        reward = [ 
+                  len(set(sentence.split())) / (len(sentence.split())+1) 
+                  for sentence in self.sentences
+                ]
+        return self._std_norm(reward)
+        
+    def seen(self):
+        '''
+        Reward sentences that use words seen in the VOACB set.
+        For example, a sentence with 10 words that are all in the VOACB set would get a higher score than one with 10 words, only 2 of which are in the VOACB set.
+        '''
+        reward = [
+                  sum(w in self.vocab for w in sentence.split()) / (len(sentence.split()) + 1) 
+                  for sentence in self.sentences
+                ]
+        return self._std_norm(reward)
+    
+    
+    def _std_norm(self, arr):
+        t = torch.tensor(arr, dtype=torch.float32)
+        std = t.std(unbiased=False)
+        if std == 0:
+            return torch.zeros_like(t)
+        return (t - t.mean()) / std
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
 @torch.jit.script
 def beam_search(log_probs: torch.Tensor, beam_size: int):
     """
@@ -45,102 +238,6 @@ def beam_search(log_probs: torch.Tensor, beam_size: int):
         # Update the scores
         scores = topk_flat_scores
 
-    return sequences, scores.unsqueeze(-1)
+    return sequences
+    # return sequences, scores.unsqueeze(-1)
 
-
-class Scorer:
-    
-    def __init__(self) -> None:
-
-        with open("/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train.wrd", "r") as f:
-            out = f.readlines()
-        out = [i for i in out if len(i.strip()) > 0]
-
-        # uniq word list
-        words_list = [word for x in out for word in x.strip().split()]
-        self.unique_words = set(words_list)
-
-        
-        # ratio of character to words for a sentence
-        self.avg_char = sum( [ len(sent)/len(sent.split()) for sent in out] )
-        self.avg_char /= len(out)
-        
-        # ratio of words to char 
-        self.avg_wrd = sum( [ len(sent.split())/len(sent) for sent in out] )
-        self.avg_wrd /= len(out)
-        
-        logging.info(f"avg ratio of charcters to words in a seq: {self.avg_char}")
-        logging.info(f"avg ratio of words to charcters in a seq: {self.avg_wrd}")
-
-    def _std_norm(self, arr):
-        t = torch.tensor(arr, dtype=torch.float32)
-        std = t.std(unbiased=False)
-        if std == 0:
-            return torch.zeros_like(t)
-        return (t - t.mean()) / std
-            
-    def step(self, sentences):
-        self.sentences = sentences
-        rewards = torch.stack([
-                    # self.unigram_char(),
-                    self.seen(),
-                    self.diversity_of_words(),
-                    self.avg_word_length(),
-                    
-                    # self.char_to_word_ratio(),
-                    # self.word_to_char_ratio(),
-                    
-                ], dim=1)  # stack along new dimension → shape becomes [num_sentences, 4]
-        
-        return rewards
-    
-    def diversity_of_words(self):
-        reward = []
-        for s in self.sentences:
-            words = s.split()
-            reward.append(len(set(words)) / (len(words)+1) )
-        return self._std_norm(reward)
-        
-    def char_to_word_ratio(self):
-        char_lens = np.array([len(s) for s in self.sentences])
-        word_counts = np.array([len(s.split()) + 1 for s in self.sentences])
-        cur = char_lens / word_counts
-        reward = -np.abs(self.avg_char - cur)
-
-        return self._std_norm(reward)
-        
-    def word_to_char_ratio(self):
-        word_counts = np.array([len(s.split()) for s in self.sentences])
-        char_lens = np.array([len(s) + 1 for s in self.sentences])
-        cur = word_counts / char_lens
-        reward = -np.abs(self.avg_wrd - cur)
-
-        return self._std_norm(reward)
-        
-    def seen(self):
-        reward = np.array([
-            sum(w in self.unique_words for w in s.split()) / (len(s.split()) + 1)
-            for s in self.sentences
-        ])
-        
-        return self._std_norm(reward)
-
-    def avg_word_length(self):
-        # reward sentences whose mean word length is near typical (e.g. 4–7 chars)
-        reward = []
-        for s in self.sentences:
-            words = s.split()
-            mean_len = np.mean([len(w) for w in words]) if words else 0
-            reward.append(-abs(mean_len - 5.5))  # peak at ~5.5 chars/word
-        return self._std_norm(reward)
-    
-    def unigram_char(self):
-        reward = np.zeros(len(self.sentences))
-        
-        for i, s in enumerate(self.sentences):
-            chars = ''.join(s)
-            char_counts = Counter(chars)
-            total_chars = len(chars)
-            reward[i] = sum(-abs(char_counts[c] / total_chars - self.char_probs[c]) for c in char_counts) / len(char_counts)
-
-        return self._std_norm(reward)

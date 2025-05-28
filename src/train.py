@@ -8,6 +8,9 @@ import sys
 import matplotlib
 from datetime import datetime
 import yaml
+import random
+from torch.utils.data import Sampler
+
 
 import torch
 import torch.optim as optim
@@ -75,7 +78,6 @@ def configure_logging(dir='logs/'):
 # step :- Prepare the dataset.
 def initialize_datasets(config, split='train', shuffle=True, bsz=1):
     """Initialize and configure speech/text datasets with samplers."""
-       
     # step 1 :- Prepare the speech dataset.
     speech_dataset = Dataset_speech(
         input_manifest=config['dataset_speech'][f'{split}_path'],
@@ -90,6 +92,33 @@ def initialize_datasets(config, split='train', shuffle=True, bsz=1):
         collate_fn=speech_dataset.collate_fn,
         num_workers=4
     )
+
+    # class BatchOrderSampler(Sampler):
+    #     def __init__(self, dataset, batch_size):
+    #         self.dataset = dataset
+    #         self.batch_size = batch_size
+    #         self.num_samples = len(dataset)
+    #         self.num_batches = (self.num_samples + batch_size - 1) // batch_size
+
+    #     def __iter__(self):
+    #         batch_indices = list(range(self.num_batches))
+    #         random.shuffle(batch_indices)
+
+    #         for batch_idx in batch_indices:
+    #             start = batch_idx * self.batch_size
+    #             end = min(start + self.batch_size, self.num_samples)
+    #             # Yield a list of indices as one batch (not individual indices)
+    #             yield list(range(start, end))
+
+    #     def __len__(self):
+    #         return self.num_batches
+    # batch_sampler = BatchOrderSampler(speech_dataset, batch_size=bsz)
+    # speech_loader = DataLoader(
+    #             speech_dataset,
+    #             batch_sampler=batch_sampler,   # no shuffle, no batch_size here
+    #             collate_fn=speech_dataset.collate_fn,
+    #             num_workers=4,
+    #         )
     
     logging.info(f"Number of batches in {split} speech dataset: {len(speech_loader)}")
     
@@ -167,7 +196,7 @@ def configure_training_mode(models, config):
     for name, param in models['encoder'].named_parameters():
         param.requires_grad = False
         if param.requires_grad: logging.info(f"Trainable parameter: {name} - {param.requires_grad}")
-            
+    
     # Log trainable parameters
     total_params = 0
     for name, model in models.items():
@@ -187,7 +216,7 @@ def configure_optimizers(models, config, dataloader):
             [p for p in models['encoder'].parameters() if p.requires_grad] + [p for p in models['downsample'].parameters() if p.requires_grad],
             lr=config['train']['lr'],
             betas=(0.9, 0.99),
-            weight_decay=0.1, 
+            weight_decay=0.01, 
     )   
         
 

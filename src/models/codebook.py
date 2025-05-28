@@ -13,20 +13,18 @@ class Codebook(nn.Module):
     def __init__(self, vocab, model_name="meta-llama/Llama-3.2-1B"):
         # delhf_RANShbaEpoCwKRyPekLxAlfEeeJNzVOnWxdel
         super(Codebook, self).__init__()
-        
+    
         self.vocab = vocab
         self.model_name = model_name
         
         # Initialize the model and tokenizer 
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForCausalLM.from_pretrained(model_name)
-        
         self.model.eval()
         # Freeze LLM parameters
         for param in self.model.parameters():
             param.requires_grad = False
-        if self.tokenizer.pad_token is None:
-            self.tokenizer.pad_token = self.tokenizer.eos_token
+        self.tokenizer.pad_token = self.tokenizer.eos_token
             
         # Get the vocab_ids from the tokenizer: 
         vocab_list = list(vocab)
