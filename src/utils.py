@@ -6,7 +6,7 @@ from tqdm.auto import tqdm
 import logging
 import math
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
-
+import kenlm
 
 
 class Scorer:
@@ -58,7 +58,10 @@ class Scorer:
             param.requires_grad = False
         self.lm.eval()
         self.loss_fct = torch.nn.CrossEntropyLoss(reduction='none')
-    
+
+        
+        # Load the model (binary format loads faster)
+        self.charlm = kenlm.Model('/raid/home/rajivratn/hemant_rajivratn/grpo/charlm_5gram.arpa')
     
     def step(self, sentences):
         self.sentences = sentences
@@ -66,11 +69,12 @@ class Scorer:
             
                 # character level rewards
                 self.unigram_character_reward,
-                self.length_reward,
+                self.charngram,
                 
                 # word level rewards
+                self.length_reward,
+                self.seen,
                 # self.diversity_of_words,
-                # self.seen,
                 
                 # Sentence level rewards
                 # self.lm_fluency_reward,
@@ -81,30 +85,19 @@ class Scorer:
 
         return rewards_dict
     
-    def lm_fluency_reward(self):
-        with torch.no_grad():
-            inputs = self.tokenizer(self.sentences, padding=True, truncation=True, return_tensors="pt").to(self.lm.device)
-            input_ids = inputs["input_ids"]
-        
-            outputs = self.lm(input_ids=input_ids)
-            logits = outputs.logits
-            # Shift logits and labels for next-token prediction
-            shift_logits = logits[:, :-1, :].contiguous()  # (batch_size, seq_len-1, vocab_size)
-            shift_labels = input_ids[:, 1:].contiguous()   # (batch_size, seq_len-1)
-
-            losses = self.loss_fct(
-                shift_logits.view(-1, shift_logits.size(-1)),
-                shift_labels.view(-1)
-            )  # (batch_size * (seq_len - 1))
-
-            # Reshape to (batch_size, seq_len - 1)
-            losses = losses.view(shift_labels.size())
-            # Average loss per sentence (mean over tokens)
-            sentence_losses = losses.mean(dim=1)
-
-            # Return negative loss per sentence (reward style)
-            return self._std_norm( [-loss for loss in sentence_losses] )
-
+    def charngram(self,):
+        '''
+        For each sentence:
+        - Replace spaces with "|" and Separate each character by spaces (for char-level scoring) and Compute log10 score.
+        '''
+        rewards = []
+        for sentence in self.sentences:
+            processed = " ".join( sentence.replace(" ", "|") )
+            score = self.charlm.score(processed) # Get log10 probability score from the model
+            # perplexity = 10 ** (-score / len(processed)) # Compute perplexity: 10^(-score / length_in_chars)
+            score /= len(processed)
+            rewards.append(score)
+        return self._std_norm(rewards) 
     
     def unigram_character_reward(self):
         """
@@ -132,16 +125,13 @@ class Scorer:
     
     def length_reward(self):
         '''
-        Reward sentences based on their length.
-        Penalize sentences that are too short (3) or too long(8).
-        '''
-        
+        Penalize sentences containing words that are too short (<2 chars) or too long (>8 chars).
+        '''    
         rewards = []
         for sentence in self.sentences:
-            # Token length reward
             words = sentence.split()
-            valid_lengths = [1 for word in words if 2<=len(word)<=8]
-            rewards.append(sum(valid_lengths))
+            penalty = sum(1 if 2 <= len(word) <= 8 else -1 for word in words )
+            rewards.append(penalty)
             
         return self._std_norm(rewards)
 
@@ -151,20 +141,19 @@ class Scorer:
         For example, a sentence with 10 words and 5 unique words would get a higher score than one with 10 words and only 2 unique words.
         '''
         reward = [ 
-                  len(set(sentence.split())) / (len(sentence.split())+1) 
+                  len(set(sentence.split())) / (len(sentence.split())+1)
                   for sentence in self.sentences
                 ]
         return self._std_norm(reward)
         
     def seen(self):
         '''
-        Reward sentences that use words seen in the VOACB set.
-        For example, a sentence with 10 words that are all in the VOACB set would get a higher score than one with 10 words, only 2 of which are in the VOACB set.
+        Reward words in the vocab with +1, penalize OOV words with -1.
         '''
         reward = [
-                  sum(w in self.vocab for w in sentence.split()) / (len(sentence.split()) + 1) 
-                  for sentence in self.sentences
-                ]
+            sum(1 if w in self.vocab else -1 for w in sentence.split())
+            for sentence in self.sentences
+        ]
         return self._std_norm(reward)
     
     
@@ -174,6 +163,31 @@ class Scorer:
         if std == 0:
             return torch.zeros_like(t)
         return (t - t.mean()) / std
+    
+    def lm_fluency_reward(self):
+        with torch.no_grad():
+            inputs = self.tokenizer(self.sentences, padding=True, truncation=True, return_tensors="pt").to(self.lm.device)
+            input_ids = inputs["input_ids"]
+        
+            outputs = self.lm(input_ids=input_ids)
+            logits = outputs.logits
+            # Shift logits and labels for next-token prediction
+            shift_logits = logits[:, :-1, :].contiguous()  # (batch_size, seq_len-1, vocab_size)
+            shift_labels = input_ids[:, 1:].contiguous()   # (batch_size, seq_len-1)
+
+            losses = self.loss_fct(
+                shift_logits.view(-1, shift_logits.size(-1)),
+                shift_labels.view(-1)
+            )  # (batch_size * (seq_len - 1))
+
+            # Reshape to (batch_size, seq_len - 1)
+            losses = losses.view(shift_labels.size())
+            # Average loss per sentence (mean over tokens)
+            sentence_losses = losses.mean(dim=1)
+
+            # Return negative loss per sentence (reward style)
+            return self._std_norm( [-loss for loss in sentence_losses] )
+
     
     
     

@@ -60,7 +60,7 @@ class Tokenizer(nn.Module):
                 greedy_decoding.append(sentences[0])
                 # Compute advantages
                 rewards_dict = self.scorer.step(sentences)  # tensor[sentences,num_rewards]
-                advantages = torch.stack( list(rewards_dict.values()), dim=1 ).sum(dim=1).to(device) # [sentences,] sum over all rewards
+                advantages = torch.stack( list(rewards_dict.values()), dim=1 ).sum(dim=1).to(device) # [sentences,] mean over all rewards
             
             # Gather per-token log-probs
             per_token_logps = torch.gather(
