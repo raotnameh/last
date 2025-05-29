@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from utils import *
 from typing import Tuple
-
+from torch.nn.utils.rnn import pad_sequence
 
 # Tokenizer module that tokenizes the speech encoder output by finding the closest codebook
 class Tokenizer(nn.Module):
@@ -44,11 +44,12 @@ class Tokenizer(nn.Module):
         """
         B, T, V = log_probs.shape
         device = log_probs.device
-        g_log_probs = log_probs.clone().detach()
+        g_log_probs = log_probs.detach()
         
         lengths = mask.sum(dim=1).long()  # [B]
         loss = 0.0
-        greedy_decoding = []
+        top_ind = []
+        top_seq = []
 
         for b in range(B):
             with torch.no_grad():
@@ -57,7 +58,8 @@ class Tokenizer(nn.Module):
                 sequences = beam_search(g_log_prob, self.beam_size).squeeze(0)  # [beams, T']
                 # Convert sequences to strings
                 sentences = self.decode_seq(sequences.cpu().numpy(), self.beam_size)
-                greedy_decoding.append(sentences[0])
+                top_ind.append(sequences[0])
+                top_seq.append(sentences[0])
                 # Compute advantages
                 rewards_dict = self.scorer.step(sentences)  # tensor[sentences,num_rewards]
                 advantages = torch.stack( list(rewards_dict.values()), dim=1 ).sum(dim=1).to(device) # [sentences,] mean over all rewards
@@ -84,15 +86,15 @@ class Tokenizer(nn.Module):
             writer.add_scalar(f'total-advantage/min', advantages.min().item(), step-1)
             writer.add_scalar(f'total-advantage/max', advantages.max().item(), step+1)
         
-        return loss, greedy_decoding
+        return loss, top_ind, top_seq
     
     
-    def forward(self, z, mask, writer=None, step=1):
+    def forward(self, z, mask, writer=None, step=1, teacher=False):
         """
         z (torch.Tensor): b,t,c
         codebook (nn.Module): A module with a weight attribute of shape (vocab_size, c).
         mask (torch.Tensor): Mask of shape (batch, time, 1) with 1s for valid positions and 0s for padding.
-        """  
+        """
         
         e = self.codebook.embedding.weight.clone().detach() # (vocab_size+1, c) 
         e = e[1:,:] # remove the padding idx (vocab_size, c)       
@@ -100,8 +102,14 @@ class Tokenizer(nn.Module):
         b, t, c = z.shape
         z_flat = z.contiguous().view(-1, c) # (b * t, c)
         
-        log_probs, z_q, one_hot = self.sim(z_flat, e) 
-        log_probs = log_probs.view(b, t, -1) # (b, t, vocab_size)
+        log_probs = self.sim(z_flat, e).view(b, t, -1) # (b, t, vocab_size) 
+        if teacher: return log_probs.detach()
+            
+        # Reinforce loss
+        reinforce_loss, top_ind, top_seq  = self.decode(log_probs, mask.squeeze(-1), step, writer)
+        
+        # Quantized 
+        z_q, one_hot = self.indexing(top_ind, e) 
         
         # Calculate codebook usage 
         e_mean_np = self.codebook_usage(one_hot, mask.view(-1, 1)) # (V,) probabilities of each codebook token
@@ -115,26 +123,27 @@ class Tokenizer(nn.Module):
             writer.add_scalar('tokenizer/theta_max', theta.max().item(), step)
             writer.add_scalar('tokenizer/theta_min', theta.min().item(), step)
         
-        # Reinforce loss
-        reinforce_loss, top = self.decode(log_probs, mask.squeeze(-1), step, writer)
-        
-        return smoothness_loss, commitment_loss, reinforce_loss, top, self.vocab, e_mean_np 
+        z_q = z_flat + (z_q - z_flat).detach() # b*t,c  
+        z_q = z_q.contiguous().view(b, t, c) # (batch, time, channels)
+        z_q = z_q * mask
+       
+        return log_probs, z_q, smoothness_loss, commitment_loss, reinforce_loss, top_seq, self.vocab, e_mean_np 
     
-    def sim(self, z_flat: torch.Tensor, e: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        
+    def sim(self, z_flat: torch.Tensor, e: torch.Tensor):
         # cosine similarity between z and codebooks e_j
         cos_sim = torch.matmul(z_flat, e.t()) # (b*t, vocab_size)
         # converting distance to probs
         logprobs = F.log_softmax(cos_sim, dim=1)  # (b * t, vocab_size)
-        
-        # Find the index of the max log probability for each token
-        indices = torch.argmax(logprobs, dim=1) # (b * t,)
-        one_hot = F.one_hot(indices, num_classes=e.shape[0]).float() # (b * t, vocab_size)
+        return logprobs
+    
+    def indexing(self, top_ind, e):
+        top_ind = pad_sequence(top_ind, batch_first=True)  # shape: [batch_size, max_t]
+        top_ind = top_ind.view(-1)
+        one_hot = F.one_hot(top_ind, num_classes=e.shape[0]).float() # (b * t, vocab_size)
         # Quantized latents via direct indexing
         z_q = torch.matmul(one_hot, e)# (b * t, embed_dim)
+        return z_q, one_hot
         
-        return logprobs, z_q, one_hot
-    
     def loss(self, z: torch.Tensor, z_q: torch.Tensor, mask: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
 
         # commitment loss;  MSE loss between z and z_q ignoring padding positions

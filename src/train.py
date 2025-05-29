@@ -31,6 +31,7 @@ from dataset_txt import Dataset_txt
 from models.codebook import Codebook
 from models.encoder import Encoder, Downsample
 from models.tokenizer import Tokenizer
+from models.decoder.decoder import Decoder
 
 from utils_train import * 
 
@@ -145,6 +146,7 @@ def setup_models(config, vocab):
     models = {
         'codebook': Codebook(vocab, config['codebook']['model_name']),
         'encoder': Encoder(config['encoder']['ckpt_path']),
+        'decoder': Decoder(config['decoder'])
     }
     
     models["downsample"] = Downsample(
@@ -184,7 +186,7 @@ def configure_training_mode(models, config):
     count = 0
     for name, param in models['encoder'].named_parameters():
         count += 1
-        if count < 177: # 193,177,161,145,129,113,97,81,65,49,33,17
+        if count < 193: # 193,177,161,145,129,113,97,81,65,49,33,17
             param.requires_grad = False
         elif 'model.layer_norm' in name:
             param.requires_grad = False
@@ -217,9 +219,15 @@ def configure_optimizers(models, config, dataloader):
             lr=config['train']['lr'],
             betas=(0.9, 0.99),
             weight_decay=0.01, 
+    )
+    
+    optimizer_decoder = optim.AdamW(
+            [p for p in models['decoder'].parameters() if p.requires_grad],
+            lr=config['train']['dlr'],
+            betas=(0.9, 0.99),
+            weight_decay=0.01, 
     )   
         
-
     def tri_stage_scheduler(optimizer, total_steps, phase_ratio=[0.03, 0.9, 0.07], low=1e-2):
         """
         Tri-stage LR scheduler that applies:
@@ -252,8 +260,10 @@ def configure_optimizers(models, config, dataloader):
     logging.info(f"Total number of steps: {total_steps}")
     
     scheduler = tri_stage_scheduler(optimizer, total_steps, phase_ratio)
+    scheduler_decoder = tri_stage_scheduler(optimizer_decoder, total_steps, phase_ratio)
     
-    return optimizer, scheduler
+    
+    return optimizer, scheduler, optimizer_decoder, scheduler_decoder
     
 
 def load_checkpoint(checkpoint_path, models, optimizers, schedulers):
@@ -326,16 +336,22 @@ def main():
     
     # Initialize models    
     models = setup_models(config, vocab)
+    models_teacher = setup_models(config, vocab)
     # Training setup
     configure_training_mode(models, config)
+    configure_training_mode(models_teacher, config)
+    
     
     # Determine the device (GPU or CPU)
     device = torch.device(config.get("device"))
     for name in models:
         models[name].to(device)
+        models_teacher[name].to(device)
 
+    del models_teacher['decoder']
+    
     # Initialize optimizers
-    optimizer, scheduler = configure_optimizers(models, config, train_speech_loader)
+    optimizer, scheduler, optimizer_decoder, scheduler_decoder = configure_optimizers(models, config, train_speech_loader)
     
     # root dir for saving 
     save_dir = config['logging']['dir']
@@ -354,8 +370,11 @@ def main():
     
     train(
         models=models,
+        models_teacher = models_teacher,
         optimizer=optimizer,
         scheduler=scheduler,
+        optimizer_decoder=optimizer_decoder,
+        scheduler_decoder=scheduler_decoder,
         speech_loader=speech_loader,
         config=config,
         device=device,

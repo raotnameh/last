@@ -43,6 +43,7 @@ class Scorer:
         self.char_counter = Counter(
             [char for sentence in sentences for char in sentence]
         )
+        
         self.unigram_char_prob = {
             char: count / sum(self.char_counter.values())
             for char, count in self.char_counter.items()
@@ -69,13 +70,12 @@ class Scorer:
             
                 # character level rewards
                 self.unigram_character_reward,
-                self.charngram,
+                # self.charngram,
                 
                 # word level rewards
                 self.length_reward,
                 self.seen,
-                # self.diversity_of_words,
-                
+                          
                 # Sentence level rewards
                 # self.lm_fluency_reward,
                 
@@ -93,10 +93,13 @@ class Scorer:
         rewards = []
         for sentence in self.sentences:
             processed = " ".join( sentence.replace(" ", "|") )
+            
             score = self.charlm.score(processed) # Get log10 probability score from the model
-            # perplexity = 10 ** (-score / len(processed)) # Compute perplexity: 10^(-score / length_in_chars)
-            score /= len(processed)
-            rewards.append(score)
+            # score /= len(processed)
+            # rewards.append(score)
+            
+            perplexity = 10 ** (-score / len(processed)) # Compute perplexity: 10^(-score / length_in_chars)
+            rewards.append(-perplexity)
         return self._std_norm(rewards) 
     
     def unigram_character_reward(self):
@@ -135,27 +138,15 @@ class Scorer:
             
         return self._std_norm(rewards)
 
-    def diversity_of_words(self):
-        '''
-        Reward sentences that use a diverse set of words.
-        For example, a sentence with 10 words and 5 unique words would get a higher score than one with 10 words and only 2 unique words.
-        '''
-        reward = [ 
-                  len(set(sentence.split())) / (len(sentence.split())+1)
-                  for sentence in self.sentences
-                ]
-        return self._std_norm(reward)
-        
     def seen(self):
         '''
         Reward words in the vocab with +1, penalize OOV words with -1.
         '''
         reward = [
-            sum(1 if w in self.vocab else -1 for w in sentence.split())
+            sum(1 if (w in self.vocab and len(w)>=2) else -1 for w in sentence.split())
             for sentence in self.sentences
         ]
         return self._std_norm(reward)
-    
     
     def _std_norm(self, arr):
         t = torch.tensor(arr, dtype=torch.float32)

@@ -7,6 +7,7 @@ import soundfile as sf
 from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_sequence
+import torchaudio
 
 from tqdm import tqdm
 
@@ -45,6 +46,43 @@ class Dataset_speech(Dataset):
     def __len__(self):
         return len(self.paths)
     
+        
+    def mel_spec(self, waveform, sample_rate):
+
+        # Set hop length for 50Hz frame rate
+        target_frame_rate = 50
+        hop_length = int(sample_rate / target_frame_rate)  # 320 if sr=16k
+        n_fft = 1024
+        n_mels = 80
+
+        # Mel-spectrogram transform
+        mel_spec_transform = torchaudio.transforms.MelSpectrogram(
+            sample_rate=sample_rate,
+            n_fft=n_fft,
+            hop_length=hop_length,
+            n_mels=n_mels,
+            power=2.0,
+            center=True,
+        )
+
+        # Compute mel and log-mel
+        mel_spec = mel_spec_transform(waveform)  # (channels, n_mels, time)
+        log_mel_spec = torch.log(mel_spec + 1e-6)
+
+        # print(f"log-mel shape: {log_mel_spec.shape}")
+        # print(f"Each second corresponds to {target_frame_rate} frames")
+        # # Plotting the first channel (if stereo)
+        # plt.figure(figsize=(12, 4))
+        # plt.imshow(log_mel_spec[0].cpu().numpy(), aspect='auto', origin='lower',
+        #         interpolation='none')
+        # plt.colorbar(format='%+2.0f dB')
+        # plt.xlabel('Frames (time)')
+        # plt.ylabel('Mel bins')
+        # plt.title('Log-Mel Spectrogram')
+        # plt.tight_layout()
+        # plt.show()
+        return log_mel_spec.squeeze(0).T # [296, 80]
+
     def __getitem__(self, idx):
         path, duration, txt = self.paths[idx]
         waveform, sample_rate = sf.read(path)
@@ -56,14 +94,16 @@ class Dataset_speech(Dataset):
             max_offset = waveform.size(0) - self.max_duration
             start = torch.randint(0, max_offset + 1, (1,)).item()
             waveform = waveform[start:start + self.max_duration]
-            return waveform, self.max_duration, path, txt # (seq_len), (duration)
+            log_mel_spec = self.mel_spec(waveform.unsqueeze(0), sample_rate)
+            return waveform, self.max_duration, path, txt, log_mel_spec # (seq_len), (duration)
         
-        return waveform, duration, path, txt # (seq_len), (duration)
+        log_mel_spec = self.mel_spec(waveform.unsqueeze(0), sample_rate)
+        return waveform, duration, path, txt, log_mel_spec # (seq_len), (duration)
     
     # collate function to pad the waveforms to the same length wrt the maximum duration
     def collate_fn(self, batches):
         max_dur = max(batch[1] for batch in batches)
-        
+
         waveforms = []
         padding_masks = []
         for batch in batches:
@@ -82,7 +122,9 @@ class Dataset_speech(Dataset):
         paths = [batch[2] for batch in batches]
         txts = [batch[3] for batch in batches]
         
-        return torch.stack(waveforms), torch.stack(padding_masks), dur,  paths, txts # (batch_size, max_dur), (batch_size, max_dur), list of paths, (batch_size, max_dur, 1024)
+        spec = pad_sequence([batch[4] for batch in batches], batch_first=True)  # shape: (batch, max_time, 80)
+        
+        return torch.stack(waveforms), torch.stack(padding_masks), dur,  paths, txts, spec # (batch_size, max_dur), (batch_size, max_dur), list of paths, (batch_size, max_dur, 1024), (batch, max_time, 80)
 
 
 if __name__ == "__main__":

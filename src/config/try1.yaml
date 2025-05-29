@@ -13,8 +13,8 @@ dataset_speech:
   test_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/test.tsv"
 
   min_duration: 32000
-  max_duration: 160000
-  batch_size: &batch_size_value 16
+  max_duration: 80000
+  batch_size: &batch_size_value 32
 
 dataset_txt:
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train.wrd"
@@ -24,9 +24,16 @@ dataset_txt:
 train:
   seed: 42123
 
+  decoder_grad_scale: 0.001
+
+  decoder: True
+  teacher: False
+  beta: 0.04
+
   temp: 1.0
   groups: 128 # this is the beam size.
 
+  dlr: 0.0001
   lr: 0.00005
   grad_clip: 1.0
   
@@ -54,3 +61,19 @@ downsample:
   kernel_size: 5
   stride: 1
   groups: 128 # do not touch it is downsample
+
+
+decoder:
+  speaker:
+    use_s : False
+    speaker_emb_dim: 512
+    
+  transformer:
+    decoder_layer: 4
+    decoder_head: 2
+    decoder_hidden: 256
+    conv_filter_size: 1024
+    conv_kernel_size: [9, 1]
+    decoder_dropout: 0.2
+    dac_hidden: 80
+  max_seq_len: 2048
