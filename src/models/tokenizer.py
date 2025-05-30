@@ -75,8 +75,8 @@ class Tokenizer(nn.Module):
             coef = torch.exp(per_token_logps - old_logps)
 
             per_token_loss = -coef * advantages.unsqueeze(1)  # [self.beam_size, T']
-            loss += per_token_loss.mean()
-        loss /= B
+            loss = loss + per_token_loss.mean()
+        loss = loss / B
         
         if step % self.config['logging']['step']== 0:
             for k,a in rewards_dict.items(): 

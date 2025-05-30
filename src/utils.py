@@ -34,10 +34,6 @@ class Scorer:
             sentences = f.readlines()
         sentences = [s for s in sentences if len(s) > 0]
             
-        # uniq word list
-        self.vocab = set(
-            [word for sentence in sentences for word in sentence.split()]
-        )
         
         # unigram character count to compute probabilities
         self.char_counter = Counter(
@@ -50,6 +46,12 @@ class Scorer:
 
         logging.info(f"----------Unigram character probabilities: {self.unigram_char_prob}----------")
         
+        # Load the char ngram model
+        self.charlm = [kenlm.Model(f'/raid/home/rajivratn/hemant_rajivratn/grpo/ngram/charlm/{i}.arpa') for i in range(2,6)]
+        
+        # Load the word ngram model
+        self.charlm = kenlm.Model(f'/raid/home/rajivratn/hemant_rajivratn/grpo/ngram/wordlm/{i}.arpa') 
+        
         # lm fluency llm
         self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
         self.tokenizer.pad_token = self.tokenizer.eos_token
@@ -60,21 +62,19 @@ class Scorer:
         self.loss_fct = torch.nn.CrossEntropyLoss(reduction='none')
 
         
-        # Load the model (binary format loads faster)
         
-        self.charlm = [kenlm.Model(f'/raid/home/rajivratn/hemant_rajivratn/grpo/ngram/charlm/{i}.arpa') for i in range(2,6)]
     
     def step(self, sentences):
         self.sentences = sentences
         funcs = [
             
                 # character level rewards
-                # self.unigram_character_reward,
+                self.unigram_character_reward,
                 self.charngram,
                                
                 # word level rewards
-                # self.length_reward,
-                          
+                self.length_reward,
+                         
                 # Sentence level rewards
                 # self.lm_fluency_reward,
                 
@@ -130,7 +130,7 @@ class Scorer:
         rewards = []
         for sentence in self.sentences:
             words = sentence.split()
-            penalty = sum(1 if 2 <= len(word) <= 8 else -1 for word in words )
+            penalty = sum(-1 for word in words if len(word) > 8)
             rewards.append(penalty)
             
         return self._std_norm(rewards)

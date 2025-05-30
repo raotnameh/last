@@ -88,14 +88,14 @@ def train(
             # ===== Encoder =====
             with torch.no_grad():
                 enc_out, padding_mask  = models['encoder'](waveforms, padding_masks)  # [B, T//320, C], [B, T // 320, C] 
-                mask = ~padding_mask # 0 for masked positions.
-                mask = mask.float().unsqueeze(-1) # [B, T//320, 1]            
+            mask = ~padding_mask # 0 for masked positions.
+            mask = mask.float().unsqueeze(-1) # [B, T//320, 1]            
             # ===== Downsample =====
             down_out = models['downsample'](enc_out, mask) # [B, T, codebook_dim]
             # ===== Tokenizer =====
             per_token_logps, z_q, smoothness_loss, commitment_loss, reinforce_loss, top, vocab, e_mean_np = models['tokenizer'](down_out, mask, writer, step)
             
-            total_loss = reinforce_loss  # Loss
+            total_loss = reinforce_loss # Loss
             
             
             # ===== Decoder =====
@@ -140,6 +140,9 @@ def train(
             if step % config['logging']['step'] == 0:  
                 logging.info(f"TRAINING ----- step: {step} ----- Reinforce_loss/dec_loss/per_token_kl: {reinforce_loss}/{dec_loss}/{per_token_kl}")
                 logging.info(f"Predicted text: {top[0]}")
+                logging.info(f"Real text: {txt[0]}")
+                logging.info(f"Real text path: {paths[0]}")
+                
                 
                 # Plot
                 plt.figure(figsize=(10, 6))

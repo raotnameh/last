@@ -40,7 +40,7 @@ from utils_train import *
 def parse_args():
     parser = argparse.ArgumentParser(description="Training Script")
     parser.add_argument("-c", "--config", type=str, required=True, help="Path to the config file.")
-    parser.add_argument("-cp", "--checkpoint_path", type=str, default=None, help="Path to a checkpoint to resume training.")
+    parser.add_argument("-cp", "--checkpoint_path", type=str, default=False, help="Path to a checkpoint to resume training.")
     parser.add_argument("-d", "--device", type=str, choices=["cpu", "cuda"], default=None, help="Device to run on (overrides config).")
     parser.add_argument("-l", "--log_dir", type=str, default=None, help="Directory for logs (overrides config).")
     parser.add_argument("-fp16", "--fp16", action="store_true", help="Use mixed precision training.")
@@ -183,22 +183,9 @@ def configure_training_mode(models, config):
     
     # set encoder layers to train false for config layer number
     logging.info("Layer freezing for encoder")
-    count = 0
-    for name, param in models['encoder'].named_parameters():
-        count += 1
-        if count < 193: # 193,177,161,145,129,113,97,81,65,49,33,17
-            param.requires_grad = False
-        elif 'model.layer_norm' in name:
-            param.requires_grad = False
-        elif 'model.encoder.layer_norm' in name:
-            param.requires_grad = False
-        else:
-            param.requires_grad = True
-    
     for name, param in models['encoder'].named_parameters():
         param.requires_grad = False
-        if param.requires_grad: logging.info(f"Trainable parameter: {name} - {param.requires_grad}")
-    
+        
     # Log trainable parameters
     total_params = 0
     for name, model in models.items():
