@@ -40,7 +40,7 @@ from utils_train import *
 def parse_args():
     parser = argparse.ArgumentParser(description="Training Script")
     parser.add_argument("-c", "--config", type=str, required=True, help="Path to the config file.")
-    parser.add_argument("-r", "--resume_checkpoint", type=str, default=None, help="Path to a checkpoint to resume training.")
+    parser.add_argument("-cp", "--checkpoint_path", type=str, default=None, help="Path to a checkpoint to resume training.")
     parser.add_argument("-d", "--device", type=str, choices=["cpu", "cuda"], default=None, help="Device to run on (overrides config).")
     parser.add_argument("-l", "--log_dir", type=str, default=None, help="Directory for logs (overrides config).")
     parser.add_argument("-fp16", "--fp16", action="store_true", help="Use mixed precision training.")
@@ -266,7 +266,7 @@ def configure_optimizers(models, config, dataloader):
     return optimizer, scheduler, optimizer_decoder, scheduler_decoder
     
 
-def load_checkpoint(checkpoint_path, models, optimizers, schedulers):
+def load_checkpoint(checkpoint_path, models, optimizer, scheduler):
     """Load model and optimizer states from checkpoint."""
     checkpoint = torch.load(checkpoint_path, map_location="cpu")
     
@@ -278,24 +278,18 @@ def load_checkpoint(checkpoint_path, models, optimizers, schedulers):
             logging.warning(f"No weights found for {name} in checkpoint")
 
     # Load optimizer states
-    for name, optimizer in optimizers.items():
-        if name in checkpoint['optimizers']:
-            optimizer.load_state_dict(checkpoint['optimizers'][name])
-        else:
-            logging.warning(f"No state found for {name} optimizer")
+    try: optimizer.load_state_dict(checkpoint['optimizers'][name])
+    except: logging.warning(f"No state found for {name} optimizer")
     
     # Load schedulers
-    for name, scheduler in schedulers.items():
-        if name in checkpoint['schedulers']:
-            scheduler.load_state_dict(checkpoint['schedulers'][name])
+    try: scheduler.load_state_dict(checkpoint['schedulers'][name])
+    except: logging.warning(f"No state found for {name} scheduler")
+            
 
 
 def main():
     args = parse_args()
-    if args.resume_checkpoint: 
-        config = torch.load(args.resume_checkpoint)["config"]
-    else:
-        config = load_config(args.config) 
+    config = load_config(args.config) 
         
     
     # Set random seeds
@@ -304,9 +298,8 @@ def main():
     np.random.seed(config['train']['seed'])
     
     # Override config if command-line args are provided
-    if args.resume_checkpoint:
-        config['train']['resume_checkpoint'] = True
-        config['train']['checkpoint_path'] = args.resume_checkpoint
+    if args.checkpoint_path:
+        config['train']['checkpoint_path'] = args.checkpoint_path
     if args.device:
         config['device'] = args.device
     if args.log_dir:
@@ -360,7 +353,7 @@ def main():
     writer = SummaryWriter(log_dir=config['logging']['dir'])
     
     # Resume training if checkpoint specified
-    if config['train']['resume_checkpoint']:
+    if config['train']['checkpoint_path']:
         load_checkpoint(
             config['train']['checkpoint_path'],
             models,

@@ -97,6 +97,7 @@ def train(
             
             total_loss = reinforce_loss  # Loss
             
+            
             # ===== Decoder =====
             dec_loss = 0.0
             if decoder:
@@ -184,47 +185,48 @@ def train(
                 optimizer_decoder.zero_grad()
                 
             step += 1
+            
+            # eval
+            if step % config['checkpoint']['step'] == 0: 
+                logging.info(f"Starting validation")
+                with torch.no_grad():
+                    models["downsample"].eval()
+                    
+                    pred, real = [], []
+                    for batch in tqdm(val_speech_loader):
+                        # ===== Speech Data =====
+                        waveforms, padding_masks, dur, paths, txt, _ = batch
+                        waveforms = waveforms.to(device) # [B, T]
+                        padding_masks = padding_masks.to(device) # [B, T] true for masked, false for not masked means [False, False, ..., True, True]
+                        # ===== Encoder =====
+                        enc_out, padding_mask  = models['encoder'](waveforms, padding_masks)  # [B, T//320, C], [B, T // 320, C] 
+                        mask = ~padding_mask # 0 for masked positions.
+                        mask = mask.float().unsqueeze(-1)
+                        # ===== Downsample =====
+                        down_out = models['downsample'](enc_out, mask) # [B, T, codebook_dim]    
+                        # ===== Tokenizer =====
+                        _, z_q, smoothness_loss, commitment_loss, reinforce_loss, top, vocab, e_mean_np = models['tokenizer']( down_out, mask, writer, step)
+                    
+                        real.extend(txt)
+                        pred.extend(top)
 
-        # eval
-        logging.info(f"Starting validation")
-        with torch.no_grad():
-            models["downsample"].eval()
-            
-            pred, real = [], []
-            for batch in tqdm(val_speech_loader):
-                # ===== Speech Data =====
-                waveforms, padding_masks, dur, paths, txt, _ = batch
-                waveforms = waveforms.to(device) # [B, T]
-                padding_masks = padding_masks.to(device) # [B, T] true for masked, false for not masked means [False, False, ..., True, True]
-                # ===== Encoder =====
-                enc_out, padding_mask  = models['encoder'](waveforms, padding_masks)  # [B, T//320, C], [B, T // 320, C] 
-                mask = ~padding_mask # 0 for masked positions.
-                mask = mask.float().unsqueeze(-1)
-                # ===== Downsample =====
-                down_out = models['downsample'](enc_out, mask) # [B, T, codebook_dim]    
-                # ===== Tokenizer =====
-                _, z_q, smoothness_loss, commitment_loss, reinforce_loss, top, vocab, e_mean_np = models['tokenizer']( down_out, mask, writer, step)
-            
-                real.extend(txt)
-                pred.extend(top)
-
-            cer_pred, wer_pred = compute_wer(real, pred)
-        
-            # logging error rates
-            logging.info(f"VALIDATION ----- step: {step} ----- Reinforce_loss/commitment_loss: {reinforce_loss}/{commitment_loss} ----- CER/WER: {cer_pred}/{wer_pred}")                
-            writer.add_scalar('error/cer', cer_pred, step)
-            writer.add_scalar('error/wer', wer_pred, step)
-            writer.add_scalar('val_loss/loss', total_loss, step)
-            writer.add_scalar('val_loss/reinforce_loss', reinforce_loss, step)
-            writer.add_scalar('val_loss/commit_loss', commitment_loss, step)
-            writer.add_scalar('val_loss/smooth_loss', smoothness_loss, step)
-            
-        checkpoint_path = f"{save_dir}/checkpoints/step_{step:06d}.pt"
-        torch.save({
-            'step': step,
-            'models': {k: v.state_dict() for k, v in models.items()},
-            'optimizers': optimizer.state_dict(), # Save optimizer state dict
-            'schedulers': scheduler.state_dict(), # Save scheduler state dict
-            'config': config
-        }, checkpoint_path)
-        logging.info(f"Saved checkpoint to {checkpoint_path}")
+                    cer_pred, wer_pred = compute_wer(real, pred)
+                
+                    # logging error rates
+                    logging.info(f"VALIDATION ----- step: {step} ----- Reinforce_loss/commitment_loss: {reinforce_loss}/{commitment_loss} ----- CER/WER: {cer_pred}/{wer_pred}")                
+                    writer.add_scalar('error/cer', cer_pred, step)
+                    writer.add_scalar('error/wer', wer_pred, step)
+                    writer.add_scalar('val_loss/loss', total_loss, step)
+                    writer.add_scalar('val_loss/reinforce_loss', reinforce_loss, step)
+                    writer.add_scalar('val_loss/commit_loss', commitment_loss, step)
+                    writer.add_scalar('val_loss/smooth_loss', smoothness_loss, step)
+                
+                checkpoint_path = f"{save_dir}/checkpoints/step_{step:06d}.pt"
+                torch.save({
+                    'step': step,
+                    'models': {k: v.state_dict() for k, v in models.items()},
+                    'optimizers': optimizer.state_dict(), # Save optimizer state dict
+                    'schedulers': scheduler.state_dict(), # Save scheduler state dict
+                    'config': config
+                }, checkpoint_path)
+                logging.info(f"Saved checkpoint to {checkpoint_path}")

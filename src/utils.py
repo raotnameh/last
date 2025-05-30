@@ -43,7 +43,6 @@ class Scorer:
         self.char_counter = Counter(
             [char for sentence in sentences for char in sentence]
         )
-        
         self.unigram_char_prob = {
             char: count / sum(self.char_counter.values())
             for char, count in self.char_counter.items()
@@ -62,19 +61,19 @@ class Scorer:
 
         
         # Load the model (binary format loads faster)
-        self.charlm = kenlm.Model('/raid/home/rajivratn/hemant_rajivratn/grpo/charlm_5gram.arpa')
+        
+        self.charlm = [kenlm.Model(f'/raid/home/rajivratn/hemant_rajivratn/grpo/ngram/charlm/{i}.arpa') for i in range(2,6)]
     
     def step(self, sentences):
         self.sentences = sentences
         funcs = [
             
                 # character level rewards
-                self.unigram_character_reward,
-                # self.charngram,
-                
+                # self.unigram_character_reward,
+                self.charngram,
+                               
                 # word level rewards
-                self.length_reward,
-                self.seen,
+                # self.length_reward,
                           
                 # Sentence level rewards
                 # self.lm_fluency_reward,
@@ -94,12 +93,10 @@ class Scorer:
         for sentence in self.sentences:
             processed = " ".join( sentence.replace(" ", "|") )
             
-            score = self.charlm.score(processed) # Get log10 probability score from the model
-            # score /= len(processed)
-            # rewards.append(score)
+            # Get log10 probability score per token from the model
+            score = [ngram.score(processed, bos=False, eos=False) / len(processed) for ngram in self.charlm]
+            rewards.append(sum(score) / len(score))
             
-            perplexity = 10 ** (-score / len(processed)) # Compute perplexity: 10^(-score / length_in_chars)
-            rewards.append(-perplexity)
         return self._std_norm(rewards) 
     
     def unigram_character_reward(self):
@@ -137,16 +134,6 @@ class Scorer:
             rewards.append(penalty)
             
         return self._std_norm(rewards)
-
-    def seen(self):
-        '''
-        Reward words in the vocab with +1, penalize OOV words with -1.
-        '''
-        reward = [
-            sum(1 if (w in self.vocab and len(w)>=2) else -1 for w in sentence.split())
-            for sentence in self.sentences
-        ]
-        return self._std_norm(reward)
     
     def _std_norm(self, arr):
         t = torch.tensor(arr, dtype=torch.float32)

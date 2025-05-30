@@ -14,7 +14,7 @@ dataset_speech:
 
   min_duration: 32000
   max_duration: 80000
-  batch_size: &batch_size_value 32
+  batch_size: &batch_size_value 8
 
 dataset_txt:
   path: "/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train.wrd"
@@ -31,9 +31,9 @@ train:
   beta: 0.04
 
   temp: 1.0
-  groups: 128 # this is the beam size.
+  groups: 32 # this is the beam size.
 
-  dlr: 0.0001
+  dlr: 0.0005
   lr: 0.00005
   grad_clip: 1.0
   
@@ -41,8 +41,7 @@ train:
   freeze_epochs: 1
   accumulation_steps: 1
 
-  resume_checkpoint: False
-  resume_path: "checkpoints/step_10000.pth"
+  checkpoint_path: None #"/raid/home/rajivratn/hemant_rajivratn/grpo/src/logs_dec/checkpoints/step_052603.pt"
 
 lr_scheduler:
   phase_ratio: [0.01, 0.0, 0.99]
