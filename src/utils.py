@@ -50,7 +50,7 @@ class Scorer:
         self.charlm = [kenlm.Model(f'/raid/home/rajivratn/hemant_rajivratn/grpo/ngram/charlm/{i}.arpa') for i in range(2,6)]
         
         # Load the word ngram model
-        self.charlm = kenlm.Model(f'/raid/home/rajivratn/hemant_rajivratn/grpo/ngram/wordlm/{i}.arpa') 
+        self.wordlm = [kenlm.Model(f'/raid/home/rajivratn/hemant_rajivratn/grpo/ngram/wordlm/{i}.arpa') for i in range(3,5)]
         
         # lm fluency llm
         self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
@@ -71,9 +71,10 @@ class Scorer:
                 # character level rewards
                 self.unigram_character_reward,
                 self.charngram,
-                               
+   
                 # word level rewards
                 self.length_reward,
+                # self.wordngram,
                          
                 # Sentence level rewards
                 # self.lm_fluency_reward,
@@ -95,6 +96,19 @@ class Scorer:
             
             # Get log10 probability score per token from the model
             score = [ngram.score(processed, bos=False, eos=False) / len(processed) for ngram in self.charlm]
+            rewards.append(sum(score) / len(score))
+            
+        return self._std_norm(rewards) 
+
+    def wordngram(self,):
+        '''
+        For each sentence:
+        - Compute log10 score.
+        '''
+        rewards = []
+        for sentence in self.sentences:
+            # Get log10 probability score per token from the model
+            score = [ngram.score(sentence, bos=False, eos=False) / len(sentence.split()) for ngram in self.wordlm]
             rewards.append(sum(score) / len(score))
             
         return self._std_norm(rewards) 
