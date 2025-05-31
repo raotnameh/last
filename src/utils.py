@@ -43,11 +43,18 @@ class Scorer:
             char: count / sum(self.char_counter.values())
             for char, count in self.char_counter.items()
         }
-
-        logging.info(f"----------Unigram character probabilities: {self.unigram_char_prob}----------")
         
-        # # Load the char ngram model
-        # self.charlm = [kenlm.Model(f'/raid/home/rajivratn/hemant_rajivratn/grpo/ngram/charlm/{i}.arpa') for i in range(2,6)]
+        self.unigram_char_prob = dict(
+            sorted(self.unigram_char_prob.items(), key=lambda item: item[1])
+        )
+
+        logging.info(f"Unigram character probabilities")
+        logging.info("char\tprobability")
+        for char, prob in self.unigram_char_prob.items():
+            logging.info(f"{char}\t{prob:.6f}")
+        
+        # Load the char ngram model
+        self.charlm = [kenlm.Model(f'/raid/home/rajivratn/hemant_rajivratn/grpo/ngram/charlm/{i}.arpa') for i in range(2,6)]
         
         # # Load the word ngram model
         # self.wordlm = [kenlm.Model(f'/raid/home/rajivratn/hemant_rajivratn/grpo/ngram/wordlm/{i}.arpa') for i in range(3,5)]
@@ -59,9 +66,7 @@ class Scorer:
         # for param in self.lm.parameters():
         #     param.requires_grad = False
         # self.lm.eval()
-        # self.loss_fct = torch.nn.CrossEntropyLoss(reduction='none')
-
-        
+        # self.loss_fct = torch.nn.CrossEntropyLoss(reduction='none')x
         
     
     def step(self, sentences):
@@ -70,7 +75,7 @@ class Scorer:
                 # Phase 1
                 # character level rewards
                 (1, self.unigram_character_reward),
-                # (0.1, self.charngram),
+                (1, self.charngram),
                 
                 # # Phase 2
                 # # character level rewards

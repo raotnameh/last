@@ -74,8 +74,9 @@ class Tokenizer(nn.Module):
             old_logps = per_token_logps.detach()
             coef = torch.exp(per_token_logps - old_logps)
 
-            per_token_loss = -coef * advantages.unsqueeze(1)  # [self.beam_size, T']
+            per_token_loss = -coef * advantages.unsqueeze(1)  # [self.beam_size, T'] 
             loss = loss + per_token_loss.mean()
+            
         loss = loss / B
         
         if step % self.config['logging']['step']== 0:
@@ -103,7 +104,7 @@ class Tokenizer(nn.Module):
         z_flat = z.contiguous().view(-1, c) # (b * t, c)
         
         log_probs = self.sim(z_flat, e).view(b, t, -1) # (b, t, vocab_size) 
-        if teacher: return log_probs.detach()
+        if teacher: return log_probs
             
         # Reinforce loss
         reinforce_loss, top_ind, top_seq  = self.decode(log_probs, mask.squeeze(-1), step, writer)

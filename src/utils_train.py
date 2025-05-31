@@ -122,7 +122,7 @@ def train(
                     # ===== Downsample =====
                     down_out_teacher = models_teacher['downsample'](enc_out_teacher, mask_teacher) # [B, T, codebook_dim]
                     # ===== Tokenizer =====
-                    ref_per_token_logps = models_teacher['tokenizer'](down_out_teacher, mask_teacher, writer, step, teacher)
+                    ref_per_token_logps = models_teacher['tokenizer'](down_out_teacher, mask_teacher, writer, step, teacher).detach()
 
                 per_token_kl = ( torch.exp(ref_per_token_logps - per_token_logps) - (ref_per_token_logps - per_token_logps) - 1 ) * mask
         
