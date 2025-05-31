@@ -76,9 +76,11 @@ def train(
     step = 1
     while step <= steps:
         models["downsample"].train()
+        if step >= steps: break
     
         for batch in train_speech_loader:
             start = time.time()
+            if step >= steps: break
             # ===== Speech Data =====
             waveforms, padding_masks, dur, paths, txt, spec = batch 
             waveforms = waveforms.to(device) # [B, T]
@@ -96,7 +98,6 @@ def train(
             per_token_logps, z_q, smoothness_loss, commitment_loss, reinforce_loss, top, vocab, e_mean_np = models['tokenizer'](down_out, mask, writer, step)
             
             total_loss = reinforce_loss # Loss
-            
             
             # ===== Decoder =====
             dec_loss = 0.0

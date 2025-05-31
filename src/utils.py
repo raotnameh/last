@@ -32,7 +32,7 @@ class Scorer:
 
         with open("/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train.wrd", "r") as f:
             sentences = f.readlines()
-        sentences = [s for s in sentences if len(s) > 0]
+        sentences = [s.strip() for s in sentences if len(s.strip()) > 0]
             
         
         # unigram character count to compute probabilities
@@ -46,20 +46,20 @@ class Scorer:
 
         logging.info(f"----------Unigram character probabilities: {self.unigram_char_prob}----------")
         
-        # Load the char ngram model
-        self.charlm = [kenlm.Model(f'/raid/home/rajivratn/hemant_rajivratn/grpo/ngram/charlm/{i}.arpa') for i in range(2,6)]
+        # # Load the char ngram model
+        # self.charlm = [kenlm.Model(f'/raid/home/rajivratn/hemant_rajivratn/grpo/ngram/charlm/{i}.arpa') for i in range(2,6)]
         
-        # Load the word ngram model
-        self.wordlm = [kenlm.Model(f'/raid/home/rajivratn/hemant_rajivratn/grpo/ngram/wordlm/{i}.arpa') for i in range(3,5)]
+        # # Load the word ngram model
+        # self.wordlm = [kenlm.Model(f'/raid/home/rajivratn/hemant_rajivratn/grpo/ngram/wordlm/{i}.arpa') for i in range(3,5)]
         
-        # lm fluency llm
-        self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-        self.tokenizer.pad_token = self.tokenizer.eos_token
-        self.lm = GPT2LMHeadModel.from_pretrained("gpt2").cuda()
-        for param in self.lm.parameters():
-            param.requires_grad = False
-        self.lm.eval()
-        self.loss_fct = torch.nn.CrossEntropyLoss(reduction='none')
+        # # lm fluency llm
+        # self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+        # self.tokenizer.pad_token = self.tokenizer.eos_token
+        # self.lm = GPT2LMHeadModel.from_pretrained("gpt2").cuda()
+        # for param in self.lm.parameters():
+        #     param.requires_grad = False
+        # self.lm.eval()
+        # self.loss_fct = torch.nn.CrossEntropyLoss(reduction='none')
 
         
         
@@ -67,21 +67,29 @@ class Scorer:
     def step(self, sentences):
         self.sentences = sentences
         funcs = [
-            
+                # Phase 1
                 # character level rewards
-                self.unigram_character_reward,
-                self.charngram,
-   
-                # word level rewards
-                self.length_reward,
-                # self.wordngram,
-                         
-                # Sentence level rewards
-                # self.lm_fluency_reward,
+                (1, self.unigram_character_reward),
+                # (0.1, self.charngram),
                 
-                ]
+                # # Phase 2
+                # # character level rewards
+                # (1.0, self.unigram_character_reward),
+                # (1.0, self.charngram),
+                # # word level rewards
+                # (1.0, self.wordngram),
+                
+                # # Phase 3
+                # # character level rewards
+                # (0.5, self.unigram_character_reward),
+                # (0.5, self.charngram),
+                # # word level rewards
+                # (0.5, self.length_reward),
+                # # Sentence level rewards
+                # (1.0, self.lm_fluency_reward),
+        ]
         
-        rewards_dict = {func.__name__: func() for func in funcs}
+        rewards_dict = {func.__name__: w * func() for w, func in funcs}
 
         return rewards_dict
     
@@ -144,8 +152,8 @@ class Scorer:
         rewards = []
         for sentence in self.sentences:
             words = sentence.split()
-            penalty = sum(-1 for word in words if len(word) > 8)
-            rewards.append(penalty)
+            penalty = sum(-1 for word in words if len(word) < 2 or len(word) > 8)
+            rewards.append(penalty / len(words))
             
         return self._std_norm(rewards)
     

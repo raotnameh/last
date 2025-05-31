@@ -55,8 +55,8 @@ train:
   dlr: 0.0005
   freeze_epochs: 1
   grad_clip: 1.0
-  groups: 16
-  lr: 1.0e-05
+  groups: 128
+  lr: 5.0e-05
   seed: 42123
   steps: 100000
   teacher: false
