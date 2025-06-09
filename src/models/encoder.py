@@ -65,7 +65,7 @@ class Downsample(torch.nn.Module):
         padding = kernel_size // 2
         self.conv = torch.nn.Conv1d(input_dim, output_dim, kernel_size=kernel_size, stride=stride, padding=padding, groups = groups)
         
-    def forward(self, x, mask): # B x T x C
+    def forward(self, x, mask, stride=1): # B x T x C
         
         x = self.norm(x)
         x = x * mask
@@ -74,10 +74,12 @@ class Downsample(torch.nn.Module):
         x = self.conv(x)
         x = x.transpose(1, 2)
         
+        if stride > 1: mask = mask[:, ::stride, :].contiguous() # downsample the mask
+        
         x = F.normalize(x, dim=-1) # normlaize
         x = x * mask
 
-        return x # B x T x C 
+        return x, mask # B x T x C 
     
 if __name__ == "__main__":
     # Test encoder

@@ -33,7 +33,6 @@ class Scorer:
         with open("/raid/home/rajivratn/hemant_rajivratn/last/data/txt/train.wrd", "r") as f:
             sentences = f.readlines()
         sentences = [s.strip() for s in sentences if len(s.strip()) > 0]
-            
         
         # unigram character count to compute probabilities
         self.char_counter = Counter(
@@ -54,49 +53,61 @@ class Scorer:
             logging.info(f"{char}\t{prob:.6f}")
         
         # Load the char ngram model
-        self.charlm = [kenlm.Model(f'/raid/home/rajivratn/hemant_rajivratn/grpo/ngram/charlm/{i}.arpa') for i in range(2,6)]
+        self.charlm = [kenlm.Model(f'/raid/home/rajivratn/hemant_rajivratn/grpo/ngram/charlm/{i}.arpa') for i in range(5,6)] # 2 to 5 char grams
         
-        # # Load the word ngram model
-        # self.wordlm = [kenlm.Model(f'/raid/home/rajivratn/hemant_rajivratn/grpo/ngram/wordlm/{i}.arpa') for i in range(3,5)]
+        # Load the word ngram model
+        self.wordlm = [kenlm.Model(f'/raid/home/rajivratn/hemant_rajivratn/grpo/ngram/wordlm/{i}.arpa') for i in range(3,4)] # 3 4 grams
         
-        # # lm fluency llm
+        # lm fluency llm
         # self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
         # self.tokenizer.pad_token = self.tokenizer.eos_token
         # self.lm = GPT2LMHeadModel.from_pretrained("gpt2").cuda()
         # for param in self.lm.parameters():
         #     param.requires_grad = False
         # self.lm.eval()
-        # self.loss_fct = torch.nn.CrossEntropyLoss(reduction='none')x
+        # self.loss_fct = torch.nn.CrossEntropyLoss(reduction='none')
         
-    
     def step(self, sentences):
         self.sentences = sentences
         funcs = [
+                # Phase 0
+                (10, self.unigram_character_reward),
+                
                 # Phase 1
-                # character level rewards
-                (1, self.unigram_character_reward),
                 (1, self.charngram),
                 
                 # # Phase 2
-                # # character level rewards
-                # (1.0, self.unigram_character_reward),
-                # (1.0, self.charngram),
-                # # word level rewards
-                # (1.0, self.wordngram),
+                (1, self.wordngram),
                 
                 # # Phase 3
-                # # character level rewards
-                # (0.5, self.unigram_character_reward),
-                # (0.5, self.charngram),
-                # # word level rewards
-                # (0.5, self.length_reward),
-                # # Sentence level rewards
-                # (1.0, self.lm_fluency_reward),
+                # (1, self.lm_fluency_reward),
         ]
         
-        rewards_dict = {func.__name__: w * func() for w, func in funcs}
-
-        return rewards_dict
+        rewards_dict = {}
+        advantages = []
+        m, s = 0, 0 # mean and std of reward over all sentences
+        # for func, reward in rewards_dict.items():
+        for w, func in funcs:
+            reward = func() 
+            reward = torch.tensor(reward, dtype=torch.float32) * w
+            rewards_dict[func.__name__] = reward
+            
+            std = reward.std()        
+            m += reward.mean()
+            s += std
+            if std == 0: advantage = torch.zeros_like(reward)
+            else: advantage = (reward - reward.mean()) / (reward.std() + 1e-8)
+            advantages.append(advantage)
+            
+             
+        m = m / len(rewards_dict)
+        s = s / len(rewards_dict)
+        advantages = torch.stack(advantages, dim=0)  # [num_advantages, sentences]
+        
+        # Sum over all sentences for all advantages
+        advantages = advantages.sum(dim=0) # [sentences,]
+        
+        return rewards_dict, advantages, m, s
     
     def charngram(self,):
         '''
@@ -111,7 +122,7 @@ class Scorer:
             score = [ngram.score(processed, bos=False, eos=False) / len(processed) for ngram in self.charlm]
             rewards.append(sum(score) / len(score))
             
-        return self._std_norm(rewards) 
+        return rewards 
 
     def wordngram(self,):
         '''
@@ -124,7 +135,7 @@ class Scorer:
             score = [ngram.score(sentence, bos=False, eos=False) / len(sentence.split()) for ngram in self.wordlm]
             rewards.append(sum(score) / len(score))
             
-        return self._std_norm(rewards) 
+        return rewards 
     
     def unigram_character_reward(self):
         """
@@ -140,34 +151,17 @@ class Scorer:
             # Q: empirical distribution from sentence
             P_emp = {ch: C[ch] / L for ch in C}
             # P: ground truth unigram distribution
-            kl = 0.0
+            jsd = 0.0
             
             for ch, p in self.unigram_char_prob.items():
                 q = P_emp.get(ch, eps)  # prediction
-                kl += p * math.log((p + eps) / (q + eps))
-
-            rewards.append(-kl)  # higher = better (closer to true unigram)
-
-        return self._std_norm(rewards)
-    
-    def length_reward(self):
-        '''
-        Penalize sentences containing words that are too short (<2 chars) or too long (>8 chars).
-        '''    
-        rewards = []
-        for sentence in self.sentences:
-            words = sentence.split()
-            penalty = sum(-1 for word in words if len(word) < 2 or len(word) > 8)
-            rewards.append(penalty / len(words))
+                m = 0.5 * (p + q)
+                jsd += 0.5 * p * math.log((p + eps) / (m + eps))
+                jsd += 0.5 * q * math.log((q + eps) / (m + eps))
+                
+            rewards.append(-jsd)  # higher = better (closer to true unigram)
             
-        return self._std_norm(rewards)
-    
-    def _std_norm(self, arr):
-        t = torch.tensor(arr, dtype=torch.float32)
-        std = t.std(unbiased=False)
-        if std == 0:
-            return torch.zeros_like(t)
-        return (t - t.mean()) / std
+        return rewards
     
     def lm_fluency_reward(self):
         with torch.no_grad():
@@ -193,7 +187,15 @@ class Scorer:
             # Return negative loss per sentence (reward style)
             return self._std_norm( [-loss for loss in sentence_losses] )
 
-    
+    def _std_norm(self, rewards):
+        """
+        Standard normalization of rewards.
+        """
+        rewards = torch.tensor(rewards, dtype=torch.float32)
+        std = rewards.std()
+        if std == 0:
+            return torch.zeros_like(rewards)
+        return (rewards - rewards.mean()) / std
     
     
     

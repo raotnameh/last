@@ -182,9 +182,9 @@ def configure_training_mode(models, config):
     """Set model training modes and parameter requirements."""
     
     # set encoder layers to train false for config layer number
-    logging.info("Layer freezing for encoder")
-    for name, param in models['encoder'].named_parameters():
-        param.requires_grad = False
+    # logging.info("Layer freezing for encoder")
+    # for name, param in models['encoder'].named_parameters():
+    #     param.requires_grad = False
         
     # Log trainable parameters
     total_params = 0

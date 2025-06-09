@@ -33,6 +33,7 @@ class Tokenizer(nn.Module):
 
         return [ ''.join( self.vocab[ x[i][mask[i]] ] ) for i in range(random_beam_size) ]
         
+        
     def decode(self, log_probs, mask, step, writer):
         """
         Args:
@@ -50,7 +51,7 @@ class Tokenizer(nn.Module):
         loss = 0.0
         top_ind = []
         top_seq = []
-
+        mean, std = [], []
         for b in range(B):
             with torch.no_grad():
                 g_log_prob = g_log_probs[b, :lengths[b], :].unsqueeze(0)  # [1, T', V]      
@@ -61,8 +62,9 @@ class Tokenizer(nn.Module):
                 top_ind.append(sequences[0])
                 top_seq.append(sentences[0])
                 # Compute advantages
-                rewards_dict = self.scorer.step(sentences)  # tensor[sentences,num_rewards]
-                advantages = torch.stack( list(rewards_dict.values()), dim=1 ).sum(dim=1).to(device) # [sentences,] mean over all rewards
+                rewards_dict, advantages, mean, std = self.scorer.step(sentences) # {func:rewards}, [sentences,]
+                advantages = advantages.to(device)  # Move to the same device as log_probs
+                
             
             # Gather per-token log-probs
             per_token_logps = torch.gather(
@@ -80,12 +82,11 @@ class Tokenizer(nn.Module):
         loss = loss / B
         
         if step % self.config['logging']['step']== 0:
-            for k,a in rewards_dict.items(): 
-                writer.add_scalar(f'advantages-min/{k}', a.min().item(), step-1)
-                writer.add_scalar(f'advantages-max/{k}', a.max().item(), step+1)
-
-            writer.add_scalar(f'total-advantage/min', advantages.min().item(), step-1)
-            writer.add_scalar(f'total-advantage/max', advantages.max().item(), step+1)
+            for k,v in rewards_dict.items(): 
+                writer.add_scalar(f'perfunc-reward/mean/{k}', v.mean(), step)
+                writer.add_scalar(f'perfunc-reward/std/{k}', v.std(), step)
+            writer.add_scalar(f'total-reward/mean', mean, step)
+            writer.add_scalar(f'total-reward/std', std, step)
         
         return loss, top_ind, top_seq
     

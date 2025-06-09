@@ -1,0 +1,63 @@
+checkpoint:
+  step: 10000
+codebook:
+  model_name: gpt2
+dataset_speech:
+  batch_size: 8
+  max_duration: 320000
+  min_duration: 32000
+  test_path: /raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/test.tsv
+  train_path: /raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/train.tsv
+  val_path: /raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/val.tsv
+dataset_txt:
+  batch_size: 8
+  path: /raid/home/rajivratn/hemant_rajivratn/last/data/txt/train.wrd
+  skip_non_speech: true
+decoder:
+  max_seq_len: 2048
+  speaker:
+    speaker_emb_dim: 512
+    use_s: false
+  transformer:
+    conv_filter_size: 1024
+    conv_kernel_size:
+    - 9
+    - 1
+    dac_hidden: 80
+    decoder_dropout: 0.2
+    decoder_head: 2
+    decoder_hidden: 256
+    decoder_layer: 4
+device: cuda
+downsample:
+  groups: 32
+  kernel_size: 5
+  stride: 2
+encoder:
+  ckpt_path: /raid/home/rajivratn/hemant_rajivratn/last/weights/hubert_base_ls960.pt
+  encoder_embed_dim: 768
+  frozen_layers:
+  - '11'
+logging:
+  dir: logs
+  step: 10
+lr_scheduler:
+  phase_ratio:
+  - 0.1
+  - 0.0
+  - 0.9
+train:
+  accumulation_steps: 1
+  beta: 0.01
+  checkpoint_path: logs_char/checkpoints/step_100000.pt
+  decoder: true
+  decoder_grad_scale: 0.001
+  dlr: 1.0e-05
+  freeze_epochs: 1
+  grad_clip: 1.0
+  groups: 128
+  lr: 5.0e-06
+  seed: 42123
+  steps: 100000
+  teacher: true
+  temp: 1.0

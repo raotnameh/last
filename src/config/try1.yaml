@@ -24,17 +24,18 @@ dataset_txt:
 train:
   seed: 42123
 
-  decoder_grad_scale: 1.0
-
+  decoder_grad_scale: 0.001
   decoder: True
-  teacher: False
+  dlr: 0.00001
+
+  teacher: True
   beta: 0.01
+  
+  lr: 0.000005
 
   temp: 1.0
-  groups: 512 # this is the beam size.
-
-  dlr: 0.0001
-  lr: 0.00001
+  groups: 128 # this is the beam size.
+  
   grad_clip: 1.0
   
   steps: 100000
@@ -58,9 +59,8 @@ encoder:
 
 downsample:
   kernel_size: 5
-  stride: 1
+  stride: 2
   groups: 32 # do not touch it is downsample
-
 
 decoder:
   speaker:
