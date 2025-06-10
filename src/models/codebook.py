@@ -25,29 +25,23 @@ class Codebook(nn.Module):
         for param in self.model.parameters():
             param.requires_grad = False
         self.tokenizer.pad_token = self.tokenizer.eos_token
-            
-        # Get the vocab_ids from the tokenizer: 
-        vocab_list = list(vocab)
-        vocab_list[0] = f"{self.tokenizer.eos_token}"
-        self.vocab_ids = torch.tensor(
-            [self.tokenizer(v, add_special_tokens=False)["input_ids"][0]
-            for v in vocab_list],
-            dtype=torch.long,
-        )
         
         # Create the embedding matrix
         embed_tokens = self.model.get_input_embeddings()
         embedding = nn.Embedding(len(vocab), embed_tokens.weight.shape[1], padding_idx=0)
         # Initialize the embedding matrix with the pretrained model's embedding matrix with detaching the gradients
         for i, char in enumerate(vocab):
-            tok = self.tokenizer(char, add_special_tokens=False)["input_ids"][0] # returns the list of token ids, 
-            if char != "p": # not padding token 
-                embedding.weight.data[i] = embed_tokens(torch.tensor(tok)).detach().clone()
-            else:
+            if char == "p": # padding token 
                 embedding.weight.data[i] *= 0.0 # padding token embedding is zero
+            elif char == "?": # special token
+                tok = self.tokenizer(self.tokenizer.eos_token, add_special_tokens=False)["input_ids"][0] 
+                embedding.weight.data[i] = embed_tokens(torch.tensor(tok))
+            else: # not padding token or special token
+                tok = self.tokenizer(char, add_special_tokens=False)["input_ids"][0] # returns the list of token ids, 
+                embedding.weight.data[i] = embed_tokens(torch.tensor(tok))
 
         # Normalize the embedding matrix
-        embedding.weight.data = F.normalize(embedding.weight.data, dim=-1)
+        embedding.weight.data = F.normalize(embedding.weight.data.clone(), dim=-1)
         
         self.embedding = embedding
         self.embedding.weight.requires_grad = False # freeze the embedding matrix

@@ -41,10 +41,7 @@ class Decoder(nn.Module): # fastspeech
         self.out_proj = nn.Linear( config["transformer"]["decoder_hidden"], config["transformer"]["dac_hidden"])
 
     
-    def forward(self, x, mask, spec, s=None, stride=1): # b,t,c # mask should be b,t and 1 for masked position and 0 for non-masked position # s is speaker embedding b,t',c
-        if stride > 1: 
-            x = x.repeat_interleave(stride, dim=1)  # Repeat each timestep s times
-        
+    def forward(self, x, mask, spec, s=None): # b,t,c # mask should be b,t and 1 for masked position and 0 for non-masked position # s is speaker embedding b,t',c
         x = x[:,:mask.shape[1]]
         x = self.in_proj(x)
 

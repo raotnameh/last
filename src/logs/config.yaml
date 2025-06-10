@@ -7,7 +7,7 @@ dataset_speech:
   max_duration: 320000
   min_duration: 32000
   test_path: /raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/test.tsv
-  train_path: /raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/train.tsv
+  train_path: /raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/train_1h.tsv
   val_path: /raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/val.tsv
 dataset_txt:
   batch_size: 8
@@ -29,10 +29,6 @@ decoder:
     decoder_hidden: 256
     decoder_layer: 4
 device: cuda
-downsample:
-  groups: 32
-  kernel_size: 5
-  stride: 2
 encoder:
   ckpt_path: /raid/home/rajivratn/hemant_rajivratn/last/weights/hubert_base_ls960.pt
   encoder_embed_dim: 768
@@ -40,7 +36,7 @@ encoder:
   - '11'
 logging:
   dir: logs
-  step: 10
+  step: 100
 lr_scheduler:
   phase_ratio:
   - 0.1
@@ -49,15 +45,15 @@ lr_scheduler:
 train:
   accumulation_steps: 1
   beta: 0.01
-  checkpoint_path: logs_char/checkpoints/step_100000.pt
-  decoder: true
+  checkpoint_path: false
+  ctc: true
+  decoder: false
   decoder_grad_scale: 0.001
-  dlr: 1.0e-05
-  freeze_epochs: 1
-  grad_clip: 1.0
+  dlr: 0.0001
+  grad_clip: 10.0
   groups: 128
-  lr: 5.0e-06
+  lr: 0.0001
   seed: 42123
   steps: 100000
-  teacher: true
+  teacher: false
   temp: 1.0

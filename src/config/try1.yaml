@@ -2,13 +2,13 @@ checkpoint:
   step: 10000
 
 logging: 
-  dir: "/raid/home/rajivratn/hemant_rajivratn/grpo/src/logs"
-  step: 10
+  dir: "/raid/home/rajivratn/hemant_rajivratn/grpo_ctc/src/logs"
+  step: 100
 
 device: "cuda"
 
 dataset_speech:
-  train_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/train.tsv"
+  train_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/train_1h.tsv"
   val_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/val.tsv"
   test_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/test.tsv"
 
@@ -23,23 +23,23 @@ dataset_txt:
 
 train:
   seed: 42123
+  ctc: True
+
+  lr: 0.0001 # encoder learning rate
 
   decoder_grad_scale: 0.001
-  decoder: True
-  dlr: 0.00001
+  decoder: False
+  dlr: 0.0001
 
-  teacher: True
+  teacher: False
   beta: 0.01
   
-  lr: 0.000005
-
   temp: 1.0
   groups: 128 # this is the beam size.
   
-  grad_clip: 1.0
+  grad_clip: 10.0
   
   steps: 100000
-  freeze_epochs: 1
   accumulation_steps: 1
 
   checkpoint_path: False #"/raid/home/rajivratn/hemant_rajivratn/grpo/src/logs_dec/checkpoints/step_052603.pt"
@@ -56,11 +56,6 @@ encoder:
   # ckpt_path: "/raid/home/rajivratn/hemant_rajivratn/last/weights/convert_iter3.pt"
   encoder_embed_dim: 768
   frozen_layers: ["11"]
-
-downsample:
-  kernel_size: 5
-  stride: 2
-  groups: 32 # do not touch it is downsample
 
 decoder:
   speaker:

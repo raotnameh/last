@@ -7,10 +7,10 @@ import warnings
 import sys
 import matplotlib
 from datetime import datetime
+import time
 import yaml
 import random
 from torch.utils.data import Sampler
-
 
 import torch
 import torch.optim as optim
@@ -151,10 +151,7 @@ def setup_models(config, vocab):
     
     models["downsample"] = Downsample(
         input_dim=models['encoder'].cfg['model']['encoder_embed_dim'],
-        output_dim=models['codebook'].embedding.weight.shape[1],
-        kernel_size=config['downsample']['kernel_size'],
-        stride=config['downsample']['stride'],
-        groups=config['downsample']['groups'], 
+        output_dim=models['codebook'].embedding.weight.shape[1], 
         )
     
     models['tokenizer'] = Tokenizer(config, models['codebook'], config["train"]["groups"], config["train"]["temp"])
@@ -182,9 +179,9 @@ def configure_training_mode(models, config):
     """Set model training modes and parameter requirements."""
     
     # set encoder layers to train false for config layer number
-    # logging.info("Layer freezing for encoder")
-    # for name, param in models['encoder'].named_parameters():
-    #     param.requires_grad = False
+    logging.info("Layer freezing for encoder")
+    for name, param in models['encoder'].named_parameters():
+        param.requires_grad = False
         
     # Log trainable parameters
     total_params = 0
@@ -260,7 +257,7 @@ def load_checkpoint(checkpoint_path, models, optimizer, scheduler):
     # Load model states
     for name, model in models.items():
         if name in checkpoint['models']: 
-            model.load_state_dict(checkpoint['models'][name])  # fallback for single GPU or non-wrapped
+            model.load_state_dict(checkpoint['models'][name])  
         else:
             logging.warning(f"No weights found for {name} in checkpoint")
 
@@ -271,7 +268,9 @@ def load_checkpoint(checkpoint_path, models, optimizer, scheduler):
     # Load schedulers
     try: scheduler.load_state_dict(checkpoint['schedulers'][name])
     except: logging.warning(f"No state found for {name} scheduler")
-            
+    
+    # wait for 2 seconds 
+    time.sleep(2)
 
 
 def main():

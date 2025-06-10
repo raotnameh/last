@@ -55,8 +55,8 @@ class Scorer:
         # Load the char ngram model
         self.charlm = [kenlm.Model(f'/raid/home/rajivratn/hemant_rajivratn/grpo/ngram/charlm/{i}.arpa') for i in range(5,6)] # 2 to 5 char grams
         
-        # Load the word ngram model
-        self.wordlm = [kenlm.Model(f'/raid/home/rajivratn/hemant_rajivratn/grpo/ngram/wordlm/{i}.arpa') for i in range(3,4)] # 3 4 grams
+        # # Load the word ngram model
+        self.wordlm = [kenlm.Model(f'/raid/home/rajivratn/hemant_rajivratn/grpo/ngram/wordlm/{i}.arpa') for i in range(4,5)] # 3 to 4 grams
         
         # lm fluency llm
         # self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
@@ -71,12 +71,12 @@ class Scorer:
         self.sentences = sentences
         funcs = [
                 # Phase 0
-                (10, self.unigram_character_reward),
+                # (10, self.unigram_character_reward),
                 
                 # Phase 1
-                (1, self.charngram),
+                # (1, self.charngram),
                 
-                # # Phase 2
+                # # # Phase 2
                 (1, self.wordngram),
                 
                 # # Phase 3

@@ -20,8 +20,11 @@ class Tokenizer(nn.Module):
         
         self.vocab = np.array(codebook.vocab[1:]) # remove the padding token
         self.blank_index = len(self.vocab) - 1
+        self.char_to_idx = {char: idx for idx, char in enumerate(self.vocab)}
+        self.idx_to_char = {idx: char for idx, char in enumerate(self.vocab)}
 
         self.scorer = Scorer()
+        self.ctcloss = nn.CTCLoss(blank=self.blank_index, zero_infinity=False, reduction='mean')
 
     def decode_seq(self, x, random_beam_size):  
         
@@ -90,8 +93,44 @@ class Tokenizer(nn.Module):
         
         return loss, top_ind, top_seq
     
+    def ctc_loss(self, pred_ind, log_probs, target, input_lengths, target_lengths):
+        """
+        Args:
+            log_probs: Tensor of shape [B, T, V] - log probabilities
+            target: Tensor of shape [B, L] - target sequences
+            input_lengths: Tensor of shape [B] - lengths of input sequences
+            target_lengths: Tensor of shape [B] - lengths of target sequences
+        Returns:
+            loss: scalar tensor - CTC loss
+        """
+        
+        # Convert predicted indices to text
+        pred_txts = []
+        for i in range(pred_ind.size(0)):
+            decoded = []
+            prev = -1  # initialize with something not in vocab
+            seq = pred_ind[i][:input_lengths[i]].tolist()  # Get the sequence for the i-th batch item
+            for idx in seq:
+                if idx != prev: decoded.append(idx)
+                prev = idx
+            # Step 2: Remove blanks
+            decoded = [self.idx_to_char[idx] for idx in decoded if idx != self.blank_index]
+
+            pred_txts.append(''.join(decoded))
+        # print(f"Predicted texts: {pred_txts}")
+        
+        loss = self.ctcloss(
+            log_probs, 
+            target, 
+            input_lengths=input_lengths, 
+            target_lengths=target_lengths
+        )
+        
+        # print(f"CTC Loss: log_probs shape: {log_probs.shape}, target shape: {target}, input_lengths shape: {input_lengths}, target_lengths shape: {target_lengths}, loss: {loss.item()}")
     
-    def forward(self, z, mask, writer=None, step=1, teacher=False):
+        return loss, pred_txts
+    
+    def forward(self, z, mask, writer=None, step=1, teacher=False, ctc=False, txts=None, temp=1.0):
         """
         z (torch.Tensor): b,t,c
         codebook (nn.Module): A module with a weight attribute of shape (vocab_size, c).
@@ -104,15 +143,27 @@ class Tokenizer(nn.Module):
         b, t, c = z.shape
         z_flat = z.contiguous().view(-1, c) # (b * t, c)
         
-        log_probs = self.sim(z_flat, e).view(b, t, -1) # (b, t, vocab_size) 
-        if teacher: return log_probs
-            
-        # Reinforce loss
-        reinforce_loss, top_ind, top_seq  = self.decode(log_probs, mask.squeeze(-1), step, writer)
+        # For each time step gets prob corresponding to each codebook token
+        log_probs = self.sim(z_flat, e, temp).view(b, t, -1) # (b, t, vocab_size) 
+        if teacher: 
+            return log_probs
+        
+        if ctc: 
+            top_ind = torch.argmax(log_probs, dim=2) # [B, T]
+            input_lengths = mask.sum(dim=1).long().squeeze() # lengths of input sequences
+            # convert txts to indices 
+            target, target_lengths = [], torch.zeros(len(txts), dtype=torch.long) # lengths of target sequences
+            for ii, txt in enumerate(txts):
+                target_lengths[ii] = len(txt)
+                target.append(torch.tensor([self.char_to_idx[char] for char in txt]))
+            target = pad_sequence(target, batch_first=True, padding_value=self.blank_index)  # [B, L]
+            ctcloss, pred_txts = self.ctc_loss(top_ind, log_probs.permute(1, 0, 2), target, input_lengths, target_lengths)
+        else:
+            # Reinforce loss
+            reinforce_loss, top_ind, top_seq  = self.decode(log_probs, mask.squeeze(-1), step, writer)
         
         # Quantized 
         z_q, one_hot = self.indexing(top_ind, e) 
-        
         # Calculate codebook usage 
         e_mean_np = self.codebook_usage(one_hot, mask.view(-1, 1)) # (V,) probabilities of each codebook token
         # Quantized 
@@ -124,6 +175,11 @@ class Tokenizer(nn.Module):
             writer.add_scalar('tokenizer/theta_std', theta.std().item(), step)
             writer.add_scalar('tokenizer/theta_max', theta.max().item(), step)
             writer.add_scalar('tokenizer/theta_min', theta.min().item(), step)
+            writer.add_scalar('tokenizer/temp', temp.item(), step)
+            
+        
+        if ctc: 
+            return ctcloss, commitment_loss, smoothness_loss, pred_txts, self.vocab, e_mean_np 
         
         z_q = z_flat + (z_q - z_flat).detach() # b*t,c  
         z_q = z_q.contiguous().view(b, t, c) # (batch, time, channels)
@@ -131,11 +187,11 @@ class Tokenizer(nn.Module):
        
         return log_probs, z_q, smoothness_loss, commitment_loss, reinforce_loss, top_seq, self.vocab, e_mean_np 
     
-    def sim(self, z_flat: torch.Tensor, e: torch.Tensor):
+    def sim(self, z_flat, e, temp):
         # cosine similarity between z and codebooks e_j
         cos_sim = torch.matmul(z_flat, e.t()) # (b*t, vocab_size)
         # converting distance to probs
-        logprobs = F.log_softmax(cos_sim, dim=1)  # (b * t, vocab_size)
+        logprobs = F.log_softmax(cos_sim*temp, dim=1)  # (b * t, vocab_size)
         return logprobs
     
     def indexing(self, top_ind, e):

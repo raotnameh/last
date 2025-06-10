@@ -61,25 +61,26 @@ class Downsample(torch.nn.Module):
         super().__init__()
     
         self.norm = torch.nn.LayerNorm(input_dim)
+        # self.lin_q = torch.nn.Linear(input_dim, output_dim)
+        self.lin_q1 = torch.nn.Linear(input_dim, 32)
+        self.relu = torch.nn.ReLU()
+        self.lin_q2 = torch.nn.Linear(32, output_dim)
         
-        padding = kernel_size // 2
-        self.conv = torch.nn.Conv1d(input_dim, output_dim, kernel_size=kernel_size, stride=stride, padding=padding, groups = groups)
+        # scalar temperature for cosine similarity
+        self.temp = torch.nn.Parameter(torch.tensor(10.0), requires_grad=True)
         
-    def forward(self, x, mask, stride=1): # B x T x C
+    def forward(self, x, mask): # B x T x C
         
         x = self.norm(x)
         x = x * mask
-        
-        x = x.transpose(1, 2)
-        x = self.conv(x)
-        x = x.transpose(1, 2)
-        
-        if stride > 1: mask = mask[:, ::stride, :].contiguous() # downsample the mask
+        # x = self.lin_q(x) # B x T x C
+        x = self.lin_q1(x)
+        x = self.relu(x)
+        x = self.lin_q2(x)
         
         x = F.normalize(x, dim=-1) # normlaize
-        x = x * mask
-
-        return x, mask # B x T x C 
+        
+        return x, mask, self.temp # B x T x C 
     
 if __name__ == "__main__":
     # Test encoder
