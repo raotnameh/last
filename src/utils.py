@@ -7,7 +7,8 @@ import logging
 import math
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
 import kenlm
-
+from pyctcdecode import build_ctcdecoder
+import multiprocessing
 
 class Scorer:
 
@@ -56,9 +57,9 @@ class Scorer:
         self.charlm = [kenlm.Model(f'/raid/home/rajivratn/hemant_rajivratn/grpo/ngram/charlm/{i}.arpa') for i in range(5,6)] # 2 to 5 char grams
         
         # # Load the word ngram model
-        self.wordlm = [kenlm.Model(f'/raid/home/rajivratn/hemant_rajivratn/grpo/ngram/wordlm/{i}.arpa') for i in range(4,5)] # 3 to 4 grams
+        # self.wordlm = [kenlm.Model(f'/raid/home/rajivratn/hemant_rajivratn/grpo/ngram/wordlm/{i}.arpa') for i in range(1,2)] # 3 to 4 grams
         
-        # lm fluency llm
+        # # lm fluency llm
         # self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
         # self.tokenizer.pad_token = self.tokenizer.eos_token
         # self.lm = GPT2LMHeadModel.from_pretrained("gpt2").cuda()
@@ -70,14 +71,14 @@ class Scorer:
     def step(self, sentences):
         self.sentences = sentences
         funcs = [
-                # Phase 0
+                # # Phase 0
                 # (10, self.unigram_character_reward),
                 
                 # Phase 1
-                # (1, self.charngram),
+                (1, self.charngram),
                 
                 # # # Phase 2
-                (1, self.wordngram),
+                # (1, self.wordngram),
                 
                 # # Phase 3
                 # (1, self.lm_fluency_reward),
@@ -88,18 +89,20 @@ class Scorer:
         m, s = 0, 0 # mean and std of reward over all sentences
         # for func, reward in rewards_dict.items():
         for w, func in funcs:
-            reward = func() 
-            reward = torch.tensor(reward, dtype=torch.float32) * w
+            reward = func()
+            reward = torch.tensor(reward, dtype=torch.float32)
             rewards_dict[func.__name__] = reward
             
-            std = reward.std()        
+            std = reward.std()
             m += reward.mean()
             s += std
-            if std == 0: advantage = torch.zeros_like(reward)
-            else: advantage = (reward - reward.mean()) / (reward.std() + 1e-8)
-            advantages.append(advantage)
             
-             
+            if std == 0:
+                advantage = torch.zeros_like(reward)
+            else: 
+                advantage = (reward - reward.mean()) / reward.std()
+            advantages.append(advantage * w)
+            
         m = m / len(rewards_dict)
         s = s / len(rewards_dict)
         advantages = torch.stack(advantages, dim=0)  # [num_advantages, sentences]
@@ -109,6 +112,45 @@ class Scorer:
         
         return rewards_dict, advantages, m, s
     
+    def lm_fluency_reward(self):
+        with torch.no_grad():
+            inputs = self.tokenizer(self.sentences, padding=True, truncation=True, return_tensors="pt").to(self.lm.device)
+            input_ids = inputs["input_ids"]
+            attention_mask = inputs["attention_mask"]
+            labels = input_ids.clone()
+
+            outputs = self.lm(input_ids=input_ids, attention_mask=attention_mask)
+            logits = outputs.logits
+
+            # Shift logits and labels to align with next-token prediction
+            shift_logits = logits[:, :-1, :].contiguous()
+            shift_labels = labels[:, 1:].contiguous()
+            shift_mask = attention_mask[:, 1:].contiguous()
+
+            # Flatten the tensors for loss computation
+            loss = self.loss_fct(
+                shift_logits.view(-1, shift_logits.size(-1)), 
+                shift_labels.view(-1)
+            ).view(shift_labels.size())
+
+            # Apply attention mask to ignore padding
+            masked_loss = loss * shift_mask
+
+            # Compute average loss per sentence (i.e., average NLL per token)
+            sent_lengths = shift_mask.sum(dim=1)
+            sent_nll = masked_loss.sum(dim=1) / sent_lengths
+            
+            score = -sent_nll      
+
+            # # print the sorted score and sentences
+            # logging.info("Sentence NLL scores:")
+            # for sentence, nll in sorted(zip(self.sentences, score.cpu().tolist()), key=lambda x: x[1], reverse=True):
+            #     logging.info(f"Sentence: {sentence}, NLL Score: {nll:.4f}")
+                
+            # exit(0)
+                
+            return score.cpu().tolist()
+
     def charngram(self,):
         '''
         For each sentence:
@@ -130,12 +172,21 @@ class Scorer:
         - Compute log10 score.
         '''
         rewards = []
+        d = {}
         for sentence in self.sentences:
             # Get log10 probability score per token from the model
             score = [ngram.score(sentence, bos=False, eos=False) / len(sentence.split()) for ngram in self.wordlm]
             rewards.append(sum(score) / len(score))
-            
+            d[sentence] = rewards[-1]
+        
+        # sort sentences by their scores
+        sorted_sentences = sorted(d.items(), key=lambda item: item[1], reverse=True)
+        print("\nSorted sentences by score:")
+        for sentence, score in sorted_sentences:
+            print(f"Sentence: {sentence}, Score: {score}")
+        exit(0)
         return rewards 
+
     
     def unigram_character_reward(self):
         """
@@ -162,30 +213,6 @@ class Scorer:
             rewards.append(-jsd)  # higher = better (closer to true unigram)
             
         return rewards
-    
-    def lm_fluency_reward(self):
-        with torch.no_grad():
-            inputs = self.tokenizer(self.sentences, padding=True, truncation=True, return_tensors="pt").to(self.lm.device)
-            input_ids = inputs["input_ids"]
-        
-            outputs = self.lm(input_ids=input_ids)
-            logits = outputs.logits
-            # Shift logits and labels for next-token prediction
-            shift_logits = logits[:, :-1, :].contiguous()  # (batch_size, seq_len-1, vocab_size)
-            shift_labels = input_ids[:, 1:].contiguous()   # (batch_size, seq_len-1)
-
-            losses = self.loss_fct(
-                shift_logits.view(-1, shift_logits.size(-1)),
-                shift_labels.view(-1)
-            )  # (batch_size * (seq_len - 1))
-
-            # Reshape to (batch_size, seq_len - 1)
-            losses = losses.view(shift_labels.size())
-            # Average loss per sentence (mean over tokens)
-            sentence_losses = losses.mean(dim=1)
-
-            # Return negative loss per sentence (reward style)
-            return self._std_norm( [-loss for loss in sentence_losses] )
 
     def _std_norm(self, rewards):
         """

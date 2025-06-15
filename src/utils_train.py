@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import time
 import torch.nn.functional as F
 from tqdm import tqdm
+import contextlib
+
 
 class GradScale(torch.autograd.Function):
     @staticmethod
@@ -58,16 +60,18 @@ def train(
     train_speech_loader = speech_loader[0]
     val_speech_loader = speech_loader[1]
     
+    
     accumulation_steps = config['train']['accumulation_steps']  # Get accumulation steps, default to 1 if not provided.
+    freeze_steps = config['train']['freeze_steps'] * accumulation_steps # Total steps to freeze the encoder, multiplied by accumulation steps.
     steps = config['train']["steps"] * accumulation_steps  # Total steps to train, multiplied by accumulation steps.
     config['logging']['step'] *= accumulation_steps  # Adjust logging step to account for accumulation steps.
     config['checkpoint']['step'] *= accumulation_steps  # Adjust checkpoint step to account for accumulation steps
     
     decoder = config['train']['decoder']
     teacher = config['train']['teacher']
+    
     ctc = config['train']['ctc']
     if not teacher: del models_teacher  # If not using teacher model, delete it to save memory.
-    if not decoder: del models['decoder'] # If not using decoder, delete it to save memory.
     
     os.makedirs(f"{save_dir}/plots/", exist_ok=True)
         
@@ -90,12 +94,12 @@ def train(
             spec = spec.to(device)
             
             # ===== Encoder =====
-            with torch.no_grad():
+            with torch.no_grad() if not freeze_steps else contextlib.ExitStack():
                 enc_out, padding_mask  = models['encoder'](waveforms, padding_masks)  # [B, T//320, C], [B, T // 320, C] 
             mask = ~padding_mask # 0 for masked positions.
             mask = mask.float().unsqueeze(-1) # [B, T//320, 1]            
             # ===== Downsample =====
-            down_out, dmask, temp = models['downsample'](enc_out, mask) # [B, T, codebook_dim]
+            down_out, dmask = models['downsample'](enc_out, mask) # [B, T, codebook_dim]
             
             ctc_loss = 0.0
             dec_loss = 0.0
@@ -103,17 +107,18 @@ def train(
             reinforce_loss = 0.0
             commitment_loss = 0.0
             smoothness_loss = 0.0
+            total_loss = 0.0
         
             if ctc: # ===== ctc =====
                 # ===== Tokenizer =====
-                ctc_loss, commitment_loss, smoothness_loss, top, vocab, e_mean_np = models['tokenizer'](down_out, dmask, writer, step, ctc=ctc, txts=txt, temp=temp)                
-                total_loss = ctc_loss # Loss
+                ctc_loss, commitment_loss, smoothness_loss, top, vocab, e_mean_np = models['tokenizer'](down_out, dmask, writer, step, ctc=ctc, txts=txt)
+                total_loss += ctc_loss # Loss
                 
             else: 
                 # ===== Tokenizer =====
-                per_token_logps, z_q, smoothness_loss, commitment_loss, reinforce_loss, top, vocab, e_mean_np = models['tokenizer'](down_out, dmask, writer, step, temp=temp)
+                per_token_logps, z_q, smoothness_loss, commitment_loss, reinforce_loss, top, vocab, e_mean_np = models['tokenizer'](down_out, dmask, writer, step)
                 
-                total_loss = reinforce_loss # Loss
+                total_loss += reinforce_loss # Loss
                 
                 # ===== Decoder =====
                 if decoder:
@@ -123,11 +128,10 @@ def train(
                     dec_loss = F.l1_loss(dec_output, spec, reduction='none') * mask # btc
                     valid_count = mask.sum() * spec.shape[-1] # Total number of valid (non-masked) elements
                     dec_loss = dec_loss.sum() / valid_count 
-                        
-                    total_loss = total_loss + dec_loss # Loss
+                
+                    total_loss += dec_loss # Loss
                 
                 # ===== Teacher =====
-                per_token_kl = 0
                 if teacher: 
                     with torch.no_grad():
                         # ===== Encoder =====
@@ -135,9 +139,9 @@ def train(
                         mask_teacher = ~padding_mask_teacher # 0 for masked positions.
                         mask_teacher = mask_teacher.float().unsqueeze(-1) # [B, T//320, 1]
                         # ===== Downsample =====
-                        down_out_teacher, dmask_teacher, temp = models_teacher['downsample'](enc_out_teacher, mask_teacher) # [B, T, codebook_dim]
+                        down_out_teacher, dmask_teacher = models_teacher['downsample'](enc_out_teacher, mask_teacher) # [B, T, codebook_dim]
                         # ===== Tokenizer =====
-                        ref_per_token_logps = models_teacher['tokenizer'](down_out_teacher,  dmask_teacher, writer, step, teacher, temp=temp).detach()
+                        ref_per_token_logps = models_teacher['tokenizer'](down_out_teacher,  dmask_teacher, writer, step, teacher).detach()
 
                     per_token_kl = ( torch.exp(ref_per_token_logps - per_token_logps) - (ref_per_token_logps - per_token_logps) - 1 ) * dmask_teacher
             
@@ -145,7 +149,7 @@ def train(
                     per_token_kl = per_token_kl.sum() / valid_count
                     per_token_kl *= config['train']['beta']
                     
-                    total_loss = total_loss + per_token_kl # Loss
+                    total_loss += per_token_kl # Loss
             
             # print("Time taken for forward and backward pass: ", time.time() - start)
             # ===== Loss Backward ====
@@ -185,14 +189,14 @@ def train(
                 # loggin norm
                 writer.add_scalar('grad_norm/encoder', get_grad_norm(models['encoder']), step)
                 writer.add_scalar('grad_norm/downsample', get_grad_norm(models['downsample']), step)
-                if decoder: writer.add_scalar('grad_norm/decoder', get_grad_norm(models['decoder']), step)
-                
+                if decoder: writer.add_scalar('grad_norm/decoder', get_grad_norm(models['decoder']), step)  
             
             if (step % accumulation_steps == 0): # Only do the following every accumulation_steps                                
                 # Gradient clipping
                 max_grad_norm = config['train']['grad_clip']
                 torch.nn.utils.clip_grad_norm_(models['encoder'].parameters(), max_grad_norm)
                 torch.nn.utils.clip_grad_norm_(models['downsample'].parameters(), max_grad_norm)
+                torch.nn.utils.clip_grad_norm_(models['decoder'].parameters(), max_grad_norm)
 
                 # Optimizer and Scheduler step
                 optimizer.step()
@@ -223,7 +227,7 @@ def train(
                         mask = ~padding_mask # 0 for masked positions.
                         mask = mask.float().unsqueeze(-1)
                         # ===== Downsample =====
-                        down_out, dmask, temp = models['downsample'](enc_out, mask) # [B, T, codebook_dim]
+                        down_out, dmask = models['downsample'](enc_out, mask) # [B, T, codebook_dim]
                         
                         ctc_loss = 0.0
                         reinforce_loss = 0.0
@@ -232,10 +236,10 @@ def train(
                         
                         if ctc: # ===== ctc =====
                             # ===== Tokenizer =====
-                            ctc_loss, commitment_loss, smoothness_loss, top, vocab, e_mean_np = models['tokenizer'](down_out, dmask, writer, step, ctc=ctc, txts=txt, temp=temp)                
+                            ctc_loss, commitment_loss, smoothness_loss, top, vocab, e_mean_np = models['tokenizer'](down_out, dmask, writer, step, ctc=ctc, txts=txt)                
                         else:
                             # ===== Tokenizer =====
-                            _, z_q, smoothness_loss, commitment_loss, reinforce_loss, top, vocab, e_mean_np = models['tokenizer']( down_out, dmask, writer, step, temp=temp)
+                            _, z_q, smoothness_loss, commitment_loss, reinforce_loss, top, vocab, e_mean_np = models['tokenizer']( down_out, dmask, writer, step)
                     
                         real.extend(txt)
                         pred.extend(top)

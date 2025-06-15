@@ -26,6 +26,7 @@ class Tokenizer(nn.Module):
         self.scorer = Scorer()
         self.ctcloss = nn.CTCLoss(blank=self.blank_index, zero_infinity=False, reduction='mean')
 
+
     def decode_seq(self, x, random_beam_size):  
         
         # Step 1: Create mask to keep first element and non-duplicates
@@ -130,7 +131,7 @@ class Tokenizer(nn.Module):
     
         return loss, pred_txts
     
-    def forward(self, z, mask, writer=None, step=1, teacher=False, ctc=False, txts=None, temp=1.0):
+    def forward(self, z, mask, writer=None, step=1, teacher=False, ctc=False, txts=None):
         """
         z (torch.Tensor): b,t,c
         codebook (nn.Module): A module with a weight attribute of shape (vocab_size, c).
@@ -144,7 +145,7 @@ class Tokenizer(nn.Module):
         z_flat = z.contiguous().view(-1, c) # (b * t, c)
         
         # For each time step gets prob corresponding to each codebook token
-        log_probs = self.sim(z_flat, e, temp).view(b, t, -1) # (b, t, vocab_size) 
+        log_probs = self.sim(z_flat, e).view(b, t, -1) # (b, t, vocab_size) 
         if teacher: 
             return log_probs
         
@@ -175,7 +176,7 @@ class Tokenizer(nn.Module):
             writer.add_scalar('tokenizer/theta_std', theta.std().item(), step)
             writer.add_scalar('tokenizer/theta_max', theta.max().item(), step)
             writer.add_scalar('tokenizer/theta_min', theta.min().item(), step)
-            writer.add_scalar('tokenizer/temp', temp.item(), step)
+            writer.add_scalar('tokenizer/temp', self.temp, step)
             
         
         if ctc: 
@@ -187,11 +188,12 @@ class Tokenizer(nn.Module):
        
         return log_probs, z_q, smoothness_loss, commitment_loss, reinforce_loss, top_seq, self.vocab, e_mean_np 
     
-    def sim(self, z_flat, e, temp):
+    def sim(self, z_flat, e):
         # cosine similarity between z and codebooks e_j
         cos_sim = torch.matmul(z_flat, e.t()) # (b*t, vocab_size)
-        # converting distance to probs
-        logprobs = F.log_softmax(cos_sim*temp, dim=1)  # (b * t, vocab_size)
+        # converting distance to probs    
+        logits = cos_sim*self.temp
+        logprobs = F.log_softmax(logits, dim=1)  # (b * t, vocab_size)
         return logprobs
     
     def indexing(self, top_ind, e):

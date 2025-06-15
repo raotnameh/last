@@ -66,9 +66,7 @@ class Downsample(torch.nn.Module):
         self.relu = torch.nn.ReLU()
         self.lin_q2 = torch.nn.Linear(32, output_dim)
         
-        # scalar temperature for cosine similarity
-        self.temp = torch.nn.Parameter(torch.tensor(10.0), requires_grad=True)
-        
+       
     def forward(self, x, mask): # B x T x C
         
         x = self.norm(x)
@@ -80,7 +78,7 @@ class Downsample(torch.nn.Module):
         
         x = F.normalize(x, dim=-1) # normlaize
         
-        return x, mask, self.temp # B x T x C 
+        return x, mask, # B x T x C 
     
 if __name__ == "__main__":
     # Test encoder

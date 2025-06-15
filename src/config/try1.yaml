@@ -1,5 +1,5 @@
 checkpoint: 
-  step: 10000
+  step: 1000
 
 logging: 
   dir: "/raid/home/rajivratn/hemant_rajivratn/grpo_ctc/src/logs"
@@ -9,6 +9,7 @@ device: "cuda"
 
 dataset_speech:
   train_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/train_1h.tsv"
+  # train_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/train.tsv"
   val_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/val.tsv"
   test_path: "/raid/home/rajivratn/hemant_rajivratn/last/data/librispeech/manifest/test.tsv"
 
@@ -23,27 +24,26 @@ dataset_txt:
 
 train:
   seed: 42123
+  steps: 20000
+  accumulation_steps: 1
+  grad_clip: 1.0
+  checkpoint_path: False #"/raid/home/rajivratn/hemant_rajivratn/grpo/src/logs_dec/checkpoints/step_052603.pt"
+
+  groups: 8 # this is the beam size.
+
   ctc: True
-
+  
+  freeze_steps: 15000
   lr: 0.0001 # encoder learning rate
+  temp: 10.0
 
-  decoder_grad_scale: 0.001
   decoder: False
-  dlr: 0.0001
-
+  decoder_grad_scale: 0.00
+  dlr: 0.0005
+  
   teacher: False
   beta: 0.01
   
-  temp: 1.0
-  groups: 128 # this is the beam size.
-  
-  grad_clip: 10.0
-  
-  steps: 100000
-  accumulation_steps: 1
-
-  checkpoint_path: False #"/raid/home/rajivratn/hemant_rajivratn/grpo/src/logs_dec/checkpoints/step_052603.pt"
-
 lr_scheduler:
   phase_ratio: [0.1, 0.0, 0.9]
 

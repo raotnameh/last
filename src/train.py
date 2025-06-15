@@ -174,25 +174,6 @@ def setup_models(config, vocab):
     
     return models
 
-# step :- Prepare the training mode
-def configure_training_mode(models, config):
-    """Set model training modes and parameter requirements."""
-    
-    # set encoder layers to train false for config layer number
-    logging.info("Layer freezing for encoder")
-    for name, param in models['encoder'].named_parameters():
-        param.requires_grad = False
-        
-    # Log trainable parameters
-    total_params = 0
-    for name, model in models.items():
-        cur_params = sum(p.numel() for p in model.parameters() if p.requires_grad) / 1e6
-        logging.info("%s trainable parameters: %.4fM",
-                    name.capitalize(), 
-                    cur_params)
-        total_params += cur_params
-    logging.info("Total trainable parameters: %.4fM", total_params)  
-
 
 # step :- Prepare the optimizer
 def configure_optimizers(models, config, dataloader):
@@ -254,23 +235,46 @@ def load_checkpoint(checkpoint_path, models, optimizer, scheduler):
     """Load model and optimizer states from checkpoint."""
     checkpoint = torch.load(checkpoint_path, map_location="cpu")
     
-    # Load model states
-    for name, model in models.items():
-        if name in checkpoint['models']: 
-            model.load_state_dict(checkpoint['models'][name])  
-        else:
-            logging.warning(f"No weights found for {name} in checkpoint")
-
-    # Load optimizer states
-    try: optimizer.load_state_dict(checkpoint['optimizers'][name])
-    except: logging.warning(f"No state found for {name} optimizer")
-    
-    # Load schedulers
-    try: scheduler.load_state_dict(checkpoint['schedulers'][name])
-    except: logging.warning(f"No state found for {name} scheduler")
-    
+    try: 
+        models['encoder'].load_state_dict(checkpoint['models']['encoder'])
+    except KeyError: logging.warning("Encoder state not found in checkpoint. Skipping encoder load.")
+    try: 
+        models['downsample'].load_state_dict(checkpoint['models']['downsample'])
+    except KeyError: logging.warning("Downsample state not found in checkpoint. Skipping downsample load.")
+        
     # wait for 2 seconds 
     time.sleep(2)
+
+# step :- Prepare the training mode
+def configure_training_mode(models, config):
+    """Set model training modes and parameter requirements."""
+    
+    # set encoder layers to train false for config layer number
+    logging.info("Layer freezing for encoder")
+    count = 0
+    for name, param in models['encoder'].named_parameters():
+        count += 1
+        if count < 177: # 193,177,161,145,129,113,97,81,65,49,33,17
+            param.requires_grad = False
+        elif 'model.layer_norm' in name:
+            param.requires_grad = False
+        elif 'model.encoder.layer_norm' in name:
+            param.requires_grad = False
+        else:
+            param.requires_grad = True
+        
+        logging.info(f"Trainable parameter: {name} - {param.requires_grad}")
+    
+        
+    # Log trainable parameters
+    total_params = 0
+    for name, model in models.items():
+        cur_params = sum(p.numel() for p in model.parameters() if p.requires_grad) / 1e6
+        logging.info("%s trainable parameters: %.4fM",
+                    name.capitalize(), 
+                    cur_params)
+        total_params += cur_params
+    logging.info("Total trainable parameters: %.4fM", total_params)  
 
 
 def main():

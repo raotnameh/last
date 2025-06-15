@@ -1,5 +1,5 @@
 checkpoint:
-  step: 10000
+  step: 1000
 codebook:
   model_name: gpt2
 dataset_speech:
@@ -48,12 +48,13 @@ train:
   checkpoint_path: false
   ctc: true
   decoder: false
-  decoder_grad_scale: 0.001
-  dlr: 0.0001
-  grad_clip: 10.0
-  groups: 128
+  decoder_grad_scale: 0.0
+  dlr: 0.0005
+  freeze_steps: 15000
+  grad_clip: 1.0
+  groups: 8
   lr: 0.0001
   seed: 42123
-  steps: 100000
+  steps: 20000
   teacher: false
-  temp: 1.0
+  temp: 10.0
