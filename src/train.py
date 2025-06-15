@@ -264,7 +264,6 @@ def configure_training_mode(models, config):
             param.requires_grad = True
         
         logging.info(f"Trainable parameter: {name} - {param.requires_grad}")
-    
         
     # Log trainable parameters
     total_params = 0

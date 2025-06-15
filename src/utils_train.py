@@ -94,7 +94,7 @@ def train(
             spec = spec.to(device)
             
             # ===== Encoder =====
-            with torch.no_grad() if not freeze_steps else contextlib.ExitStack():
+            with torch.no_grad() if step < freeze_steps else contextlib.ExitStack():
                 enc_out, padding_mask  = models['encoder'](waveforms, padding_masks)  # [B, T//320, C], [B, T // 320, C] 
             mask = ~padding_mask # 0 for masked positions.
             mask = mask.float().unsqueeze(-1) # [B, T//320, 1]            
@@ -190,7 +190,7 @@ def train(
                 writer.add_scalar('grad_norm/encoder', get_grad_norm(models['encoder']), step)
                 writer.add_scalar('grad_norm/downsample', get_grad_norm(models['downsample']), step)
                 if decoder: writer.add_scalar('grad_norm/decoder', get_grad_norm(models['decoder']), step)  
-            
+                
             if (step % accumulation_steps == 0): # Only do the following every accumulation_steps                                
                 # Gradient clipping
                 max_grad_norm = config['train']['grad_clip']
